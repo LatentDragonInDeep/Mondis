@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6"/>
+	<Project>
+		<Option title="Mondis"/>
+		<Option makefile_is_custom="1"/>
+		<Option compiler="gcc"/>
+		<Option virtualFolders="CMake Files\;"/>
+		<Build>
+			<Target title="all">
+				<Option working_dir="C:/Users/caesarschen/CLionProjects/Mondis/cmake-build-debug"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="D:/mingw-w64/x86_64-4.9.2-posix-seh-rt_v3-rev1/mingw64/bin/mingw32-make.exe -f &quot;C:/Users/caesarschen/CLionProjects/Mondis/cmake-build-debug/Makefile&quot;  VERBOSE=1 all"/>
+					<CompileFile command="D:/mingw-w64/x86_64-4.9.2-posix-seh-rt_v3-rev1/mingw64/bin/mingw32-make.exe -f &quot;C:/Users/caesarschen/CLionProjects/Mondis/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="D:/mingw-w64/x86_64-4.9.2-posix-seh-rt_v3-rev1/mingw64/bin/mingw32-make.exe -f &quot;C:/Users/caesarschen/CLionProjects/Mondis/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="D:/mingw-w64/x86_64-4.9.2-posix-seh-rt_v3-rev1/mingw64/bin/mingw32-make.exe -f &quot;C:/Users/caesarschen/CLionProjects/Mondis/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="Mondis">
+				<Option output="C:/Users/caesarschen/CLionProjects/Mondis/cmake-build-debug/Mondis.exe" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="C:/Users/caesarschen/CLionProjects/Mondis/cmake-build-debug"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add directory="D:/mingw-w64/x86_64-4.9.2-posix-seh-rt_v3-rev1/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/4.9.2/include"/>
+					<Add directory="D:/mingw-w64/x86_64-4.9.2-posix-seh-rt_v3-rev1/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/4.9.2/include-fixed"/>
+					<Add directory="D:/mingw-w64/x86_64-4.9.2-posix-seh-rt_v3-rev1/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/4.9.2/../../../../x86_64-w64-mingw32/include"/>
+					<Add directory="D:/mingw-w64/x86_64-4.9.2-posix-seh-rt_v3-rev1/mingw64/lib/gcc/../../x86_64-w64-mingw32/include/c++"/>
+					<Add directory="D:/mingw-w64/x86_64-4.9.2-posix-seh-rt_v3-rev1/mingw64/lib/gcc/../../x86_64-w64-mingw32/include/c++/x86_64-w64-mingw32"/>
+					<Add directory="D:/mingw-w64/x86_64-4.9.2-posix-seh-rt_v3-rev1/mingw64/lib/gcc/../../x86_64-w64-mingw32/include/c++/backward"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="D:/mingw-w64/x86_64-4.9.2-posix-seh-rt_v3-rev1/mingw64/bin/mingw32-make.exe -f &quot;C:/Users/caesarschen/CLionProjects/Mondis/cmake-build-debug/Makefile&quot;  VERBOSE=1 Mondis"/>
+					<CompileFile command="D:/mingw-w64/x86_64-4.9.2-posix-seh-rt_v3-rev1/mingw64/bin/mingw32-make.exe -f &quot;C:/Users/caesarschen/CLionProjects/Mondis/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="D:/mingw-w64/x86_64-4.9.2-posix-seh-rt_v3-rev1/mingw64/bin/mingw32-make.exe -f &quot;C:/Users/caesarschen/CLionProjects/Mondis/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="D:/mingw-w64/x86_64-4.9.2-posix-seh-rt_v3-rev1/mingw64/bin/mingw32-make.exe -f &quot;C:/Users/caesarschen/CLionProjects/Mondis/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="Mondis/fast">
+				<Option output="C:/Users/caesarschen/CLionProjects/Mondis/cmake-build-debug/Mondis.exe" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="C:/Users/caesarschen/CLionProjects/Mondis/cmake-build-debug"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add directory="D:/mingw-w64/x86_64-4.9.2-posix-seh-rt_v3-rev1/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/4.9.2/include"/>
+					<Add directory="D:/mingw-w64/x86_64-4.9.2-posix-seh-rt_v3-rev1/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/4.9.2/include-fixed"/>
+					<Add directory="D:/mingw-w64/x86_64-4.9.2-posix-seh-rt_v3-rev1/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/4.9.2/../../../../x86_64-w64-mingw32/include"/>
+					<Add directory="D:/mingw-w64/x86_64-4.9.2-posix-seh-rt_v3-rev1/mingw64/lib/gcc/../../x86_64-w64-mingw32/include/c++"/>
+					<Add directory="D:/mingw-w64/x86_64-4.9.2-posix-seh-rt_v3-rev1/mingw64/lib/gcc/../../x86_64-w64-mingw32/include/c++/x86_64-w64-mingw32"/>
+					<Add directory="D:/mingw-w64/x86_64-4.9.2-posix-seh-rt_v3-rev1/mingw64/lib/gcc/../../x86_64-w64-mingw32/include/c++/backward"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="D:/mingw-w64/x86_64-4.9.2-posix-seh-rt_v3-rev1/mingw64/bin/mingw32-make.exe -f &quot;C:/Users/caesarschen/CLionProjects/Mondis/cmake-build-debug/Makefile&quot;  VERBOSE=1 Mondis/fast"/>
+					<CompileFile command="D:/mingw-w64/x86_64-4.9.2-posix-seh-rt_v3-rev1/mingw64/bin/mingw32-make.exe -f &quot;C:/Users/caesarschen/CLionProjects/Mondis/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="D:/mingw-w64/x86_64-4.9.2-posix-seh-rt_v3-rev1/mingw64/bin/mingw32-make.exe -f &quot;C:/Users/caesarschen/CLionProjects/Mondis/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="D:/mingw-w64/x86_64-4.9.2-posix-seh-rt_v3-rev1/mingw64/bin/mingw32-make.exe -f &quot;C:/Users/caesarschen/CLionProjects/Mondis/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="edit_cache">
+				<Option working_dir="C:/Users/caesarschen/CLionProjects/Mondis/cmake-build-debug"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="D:/mingw-w64/x86_64-4.9.2-posix-seh-rt_v3-rev1/mingw64/bin/mingw32-make.exe -f &quot;C:/Users/caesarschen/CLionProjects/Mondis/cmake-build-debug/Makefile&quot;  VERBOSE=1 edit_cache"/>
+					<CompileFile command="D:/mingw-w64/x86_64-4.9.2-posix-seh-rt_v3-rev1/mingw64/bin/mingw32-make.exe -f &quot;C:/Users/caesarschen/CLionProjects/Mondis/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="D:/mingw-w64/x86_64-4.9.2-posix-seh-rt_v3-rev1/mingw64/bin/mingw32-make.exe -f &quot;C:/Users/caesarschen/CLionProjects/Mondis/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="D:/mingw-w64/x86_64-4.9.2-posix-seh-rt_v3-rev1/mingw64/bin/mingw32-make.exe -f &quot;C:/Users/caesarschen/CLionProjects/Mondis/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="rebuild_cache">
+				<Option working_dir="C:/Users/caesarschen/CLionProjects/Mondis/cmake-build-debug"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="D:/mingw-w64/x86_64-4.9.2-posix-seh-rt_v3-rev1/mingw64/bin/mingw32-make.exe -f &quot;C:/Users/caesarschen/CLionProjects/Mondis/cmake-build-debug/Makefile&quot;  VERBOSE=1 rebuild_cache"/>
+					<CompileFile command="D:/mingw-w64/x86_64-4.9.2-posix-seh-rt_v3-rev1/mingw64/bin/mingw32-make.exe -f &quot;C:/Users/caesarschen/CLionProjects/Mondis/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="D:/mingw-w64/x86_64-4.9.2-posix-seh-rt_v3-rev1/mingw64/bin/mingw32-make.exe -f &quot;C:/Users/caesarschen/CLionProjects/Mondis/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="D:/mingw-w64/x86_64-4.9.2-posix-seh-rt_v3-rev1/mingw64/bin/mingw32-make.exe -f &quot;C:/Users/caesarschen/CLionProjects/Mondis/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+		</Build>
+		<Unit filename="C:/Users/caesarschen/CLionProjects/Mondis/src/MondisList.cpp">
+			<Option target="Mondis"/>
+		</Unit>
+		<Unit filename="C:/Users/caesarschen/CLionProjects/Mondis/src/MondisList.h">
+			<Option target="Mondis"/>
+		</Unit>
+		<Unit filename="C:/Users/caesarschen/CLionProjects/Mondis/src/MondisObject.cpp">
+			<Option target="Mondis"/>
+		</Unit>
+		<Unit filename="C:/Users/caesarschen/CLionProjects/Mondis/src/MondisObject.h">
+			<Option target="Mondis"/>
+		</Unit>
+		<Unit filename="C:/Users/caesarschen/CLionProjects/Mondis/CMakeLists.txt">
+			<Option virtualFolder="CMake Files\"/>
+		</Unit>
+	</Project>
+</CodeBlocks_project_file>

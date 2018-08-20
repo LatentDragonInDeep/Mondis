@@ -1,0 +1,3 @@
+C:/Users/caesarschen/CLionProjects/Mondis/cmake-build-debug/CMakeFiles/Mondis.dir
+C:/Users/caesarschen/CLionProjects/Mondis/cmake-build-debug/CMakeFiles/edit_cache.dir
+C:/Users/caesarschen/CLionProjects/Mondis/cmake-build-debug/CMakeFiles/rebuild_cache.dir

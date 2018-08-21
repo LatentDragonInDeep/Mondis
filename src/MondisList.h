@@ -39,24 +39,24 @@ public:
 
     MondisList();
     virtual ~MondisList();
-    int PushBack(MondisObject* object);
-    MondisObject* PopBack();
-    int PushFront(MondisObject* object);
-    MondisObject* PopFront();
+    int pushBack (MondisObject *object);
+    MondisObject* popBack ();
+    int pushFront (MondisObject *object);
+    MondisObject* popFront ();
 
-    int GetRange(int from, int to,vector<MondisObject*>* res);
+    int getRange (int from, int to, vector<MondisObject *> *res);
 
-    MondisObject* Get(int index);
+    MondisObject* get (int index);
 
     int count();
 
-    int Set(int index,MondisObject* object);
+    int set (int index, MondisObject *object);
 
-    int Add(vector<MondisObject*>* data);
+    int add (vector<MondisObject *> *data);
 
 private:
-    void Trim();
-    MondisListNode* Locate(int index);
+    void trim ();
+    MondisListNode* locate (int index);
 
 };
 

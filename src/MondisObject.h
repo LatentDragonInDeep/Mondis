@@ -6,6 +6,7 @@
 #define MONDIS_MONDISOBJECT_H
 
 #include <string>
+#include <stdint-gcc.h>
 
 #include "MondisList.h"
 

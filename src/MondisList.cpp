@@ -11,7 +11,7 @@ MondisList::MondisList ()
     tail->pre = mid;
 }
 
-int MondisList::PushBack (MondisObject *object)
+int MondisList::pushBack (MondisObject *object)
 {
     MondisListNode * newNode = new MondisListNode;
     newNode->data = object;
@@ -25,10 +25,10 @@ int MondisList::PushBack (MondisObject *object)
     indexToNode[nextSize+headModifyNum] = newNode;
 }
 
-MondisObject *MondisList::PopBack ()
+MondisObject *MondisList::popBack ()
 {
     if(nextSize == 0) {
-        Trim();
+        trim();
     }
     if(nextSize == 0) {
         return MondisObject::getNullObject();
@@ -44,7 +44,7 @@ MondisObject *MondisList::PopBack ()
     return obj;
 }
 
-void MondisList::Trim ()
+void MondisList::trim ()
 {
     MondisListNode* last = mid->pre;
     last->next = tail;
@@ -66,7 +66,7 @@ void MondisList::Trim ()
     nextSize = index--;
 }
 
-int MondisList::PushFront (MondisObject *object)
+int MondisList::pushFront (MondisObject *object)
 {
     MondisListNode * newNode = new MondisListNode;
     newNode->data = object;
@@ -93,7 +93,7 @@ int MondisList::PushFront (MondisObject *object)
 
 }
 
-MondisObject *MondisList::PopFront ()
+MondisObject *MondisList::popFront ()
 {
     if(preSize>0) {
         preSize--;
@@ -118,15 +118,15 @@ MondisObject *MondisList::PopFront ()
     }
 }
 
-MondisObject *MondisList::Get (int index)
+MondisObject *MondisList::get (int index)
 {
-    return Locate(index)->data;
+    return locate(index)->data;
 }
 
-int MondisList::GetRange (int from, int to, vector<MondisObject*> *res)
+int MondisList::getRange (int from, int to, vector<MondisObject *> *res)
 {
-    MondisListNode* start = Locate(from);
-    MondisListNode* end = Locate(to);
+    MondisListNode* start = locate(from);
+    MondisListNode* end = locate(to);
     for (MondisListNode* cur = start;cur!=end;cur = cur->next)
     {
         if(cur!=mid) {
@@ -135,7 +135,7 @@ int MondisList::GetRange (int from, int to, vector<MondisObject*> *res)
     }
 }
 
-MondisListNode *MondisList::Locate (int index)
+MondisListNode *MondisList::locate (int index)
 {
     if(index<preSize) {
         return indexToNode[-preSize+index-1];
@@ -148,15 +148,15 @@ int MondisList::count ()
     return preSize+nextSize;
 }
 
-int MondisList::Set (int index, MondisObject *object)
+int MondisList::set (int index, MondisObject *object)
 {
-    Locate(index)->data = object;
+    locate(index)->data = object;
 }
 
-int MondisList::Add (vector<MondisObject*> *data)
+int MondisList::add (vector<MondisObject *> *data)
 {
     for(MondisObject* pObj:*data) {
-        PushBack(pObj);
+        pushBack(pObj);
     }
 }
 

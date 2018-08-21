@@ -12,7 +12,7 @@ capacity(getCapacity(capacity)),loadFactor(loadFactor)
     arrayFrom = new Content[capacity];
 }
 
-bool HashMap::put(HashKey &key, MondisObject *value)
+bool HashMap::put(Key &key, MondisObject *value)
 {
     int index = getIndex(key.hashCode());
     Content content= arrayFrom[index];
@@ -47,7 +47,7 @@ bool HashMap::put(HashKey &key, MondisObject *value)
     }
 }
 
-MondisObject *HashMap::get (HashKey &key)
+MondisObject *HashMap::get (Key &key)
 {
     int index = getIndex(key.hashCode());
     Content content= arrayFrom[index];
@@ -65,7 +65,7 @@ MondisObject *HashMap::get (HashKey &key)
     return content.tree->search(key)->object;
 }
 
-bool HashMap::containsKey (HashKey &key)
+bool HashMap::containsKey (Key &key)
 {
     return get(key) == nullptr;
 }
@@ -85,7 +85,7 @@ int HashMap::getCapacity (int capa)
     return init;
 }
 
-bool HashMap::remove (HashKey &key)
+bool HashMap::remove (Key &key)
 {
     if(! containsKey(key)) {
         return false;

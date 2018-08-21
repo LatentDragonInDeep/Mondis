@@ -46,7 +46,7 @@ AVLTreeNode *AVLTree::realInsert (Entry &entry, AVLTreeNode *root)
     return root;
 }
 
-bool AVLTree::remove (HashKey &key)
+bool AVLTree::remove (Key &key)
 {
     Entry* temp = new Entry;
     temp->key = &key;
@@ -55,7 +55,7 @@ bool AVLTree::remove (HashKey &key)
     return res;
 }
 
-Entry *AVLTree::search (HashKey &key)
+Entry *AVLTree::search (Key &key)
 {
     return nullptr;
 }

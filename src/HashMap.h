@@ -12,21 +12,21 @@
 using namespace std;
 
 
-class HashKey {
+class Key {
 public:
     union {
         string* str;
         int intValue;
     } key;
     bool flag;
-    bool compare(HashKey& other) {
+    bool compare(Key& other) {
         if(flag) {
             return key.str->compare(*other.key.str);
         }
         return key.intValue>other.key.intValue;
     }
 
-    bool equals(HashKey& other) {
+    bool equals(Key& other) {
         if(flag) {
             return *key.str == *other.key.str;
         }
@@ -103,7 +103,7 @@ private:
 
 class Entry{
 public:
-    HashKey* key;
+    Key* key;
     MondisObject* object;
     Entry* pre;
     Entry* next;
@@ -167,8 +167,8 @@ public:
     };
 public:
     bool insert(Entry& entry);
-    bool remove(HashKey& key);
-    Entry* search(HashKey& key);
+    bool remove(Key& key);
+    Entry* search(Key& key);
     AVLIterator iterator();
 private:
     AVLTreeNode* realInsert(Entry& entry,AVLTreeNode* root);
@@ -201,10 +201,10 @@ public:
     HashMap();
     HashMap(unsigned int capacity, float loadFactor);
     ~HashMap();
-    bool put (HashKey &key, MondisObject *value);
-    MondisObject* get (HashKey &key);
-    bool containsKey (HashKey &key);
-    bool remove (HashKey &key);
+    bool put (Key &key, MondisObject *value);
+    MondisObject* get (Key &key);
+    bool containsKey (Key &key);
+    bool remove (Key &key);
 
 private:
     void rehash();

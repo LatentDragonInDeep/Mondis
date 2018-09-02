@@ -1,6 +1,9 @@
 file(REMOVE_RECURSE
+  "CMakeFiles/Mondis.dir/src/AVLTree.cpp.obj"
+  "CMakeFiles/Mondis.dir/src/HashMap.cpp.obj"
+  "CMakeFiles/Mondis.dir/src/MondisBinary.cpp.obj"
   "CMakeFiles/Mondis.dir/src/MondisList.cpp.obj"
-  "CMakeFiles/Mondis.dir/src/MondisObject.cpp.obj"
+  "CMakeFiles/Mondis.dir/src/SkipList.cpp.obj"
   "Mondis.pdb"
   "Mondis.exe"
   "Mondis.exe.manifest"

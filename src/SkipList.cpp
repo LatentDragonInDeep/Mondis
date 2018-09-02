@@ -27,12 +27,12 @@ SkipListNode *SkipList::insert (Key &key, MondisObject *obj)
     for (int i = level; i>=0; --i)
     {
         while (true) {
-            if(key.equals(*cur->forwards[i]->key)) {
-                cur->forwards[i]->data = obj;
+            if(key.equals(*cur->forwards[i].next->key)) {
+                cur->forwards[i].next->data = obj;
                 return cur;
             }
-            else if(key.compare(*cur->forwards[i]->key)) {
-                cur = cur->forwards[i];
+            else if(key.compare(*cur->forwards[i].next->key)) {
+                cur = cur->forwards[i].next;
             }
             else{
                 break;
@@ -51,7 +51,7 @@ SkipListNode *SkipList::insert (Key &key, MondisObject *obj)
     for (int j = 0; j <level; ++j)
     {
         newNode->forwards[j] = last[j]->forwards[j];
-        last[j]->forwards[j] = newNode;
+        last[j]->forwards[j].next = newNode;
     }
 
 }

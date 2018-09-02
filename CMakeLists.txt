@@ -5,4 +5,4 @@ set(CMAKE_CXX_STANDARD 17)
 
 AUX_SOURCE_DIRECTORY(src/ SRC_DIR)
 
-add_executable(Mondis ${SRC_DIR} src/SkipList.cpp src/SkipList.h)
+add_executable(Mondis ${SRC_DIR} src/SkipList.cpp src/SkipList.h src/MondisBinary.cpp src/MondisBinary.h)

@@ -12,14 +12,17 @@
 
 class SkipListNode {
 public:
-    static const MAX_LEVEL = 32;
+    static const int MAX_LEVEL = 32;
     MondisObject* data = nullptr;
     Key* key = nullptr;
     SkipListNode* backward = nullptr;
-    SkipListNode** forwards = nullptr;
+    struct SkipListLevel {
+        SkipListNode * next = nullptr;
+        int span = 0;//跨度
+    } *forwards;
 
     SkipListNode(int levelNum) {
-        forwards = new SkipListNode*[levelNum];
+        forwards = new SkipListLevel[levelNum];
     }
 
     static SkipListNode* getDummyNode() {
@@ -36,7 +39,7 @@ private:
     int level = 1;
     static uniform_int_distribution<int> distribution;
     static default_random_engine engine;
-    static const float SKIP_LIST_P = 0.25f;
+    static const float constexpr SKIP_LIST_P = 0.25f;
     static const int SKIP_LIST_RANDOM_UPPER_BOUND = 65535;
 public:
     SkipList();

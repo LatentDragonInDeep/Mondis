@@ -168,3 +168,14 @@ AVLTreeNode *AVLTree::getSuccessor (AVLTreeNode *root)
     return cur;
 }
 
+void AVLTree::toJson() {
+    AVLIterator iterator = this->iterator();
+    *json+="{\n";
+    while (iterator.next()) {
+        *json+=iterator->data->getJson();
+        *json+=",";
+        *json+="\n";
+    }
+    *json+="}\n";
+}
+

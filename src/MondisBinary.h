@@ -11,7 +11,9 @@
 #include <stdexcept>
 #include <string>
 
-class MondisBinary {
+#include "MondisData.h"
+
+class MondisBinary: public MondisData{
 private:
     char* heapBuffer;
     const unsigned offset;//offset以前无法读
@@ -62,6 +64,8 @@ public:
 
     void persist(std::string& filePath,int start,int end);
     void persist(std::string& filePath);
+
+    void toJson();
 };
 
 

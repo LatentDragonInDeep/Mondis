@@ -9,6 +9,9 @@
 #include <stdint-gcc.h>
 
 #include "MondisList.h"
+#include "HashMap.h"
+#include "MondisBinary.h"
+#include "SkipList.h"
 
 using namespace std;
 enum MondisObjectType {
@@ -27,15 +30,38 @@ class MondisObject
 {
 public:
     MondisObjectType type = MondisObjectType::EMPTY;
-    void* objectData;
+    void * objectData;
 private:
     MondisObject * mp_nullObj = new MondisObject;
+    bool hasSerialized = false;
+    string& json;
 public:
     static MondisObject* getNullObject() {
         return mp_nullObj;
     }
+    string& getJson() {
+        if(hasSerialized) {
+            return json;
+        }
+        switch (type){
+            case MondisObjectType ::RAW_STRING:
+                json="\""+(*(string*)objectData)+"\"";
+                break;
+            case MondisObjectType ::RAW_INT:
+                json="\""+std::to_string(*((int*)objectData))+"\"";
+                break
+            case RAW_BIN:
+            case LIST:
+            case SET:
+            case ZSET:
+            case HASH:
+                MondisData* data = static_cast<MondisData*>(objectData);
+                json = data->getJson();
+        }
 
-
+        hasSerialized = true;
+        return json;
+    }
 };
 
 

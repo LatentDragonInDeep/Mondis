@@ -95,6 +95,9 @@
 		<Unit filename="C:/Users/11956/ClionProjects/Mondis/src/MondisBinary.h">
 			<Option target="Mondis"/>
 		</Unit>
+		<Unit filename="C:/Users/11956/ClionProjects/Mondis/src/MondisData.h">
+			<Option target="Mondis"/>
+		</Unit>
 		<Unit filename="C:/Users/11956/ClionProjects/Mondis/src/MondisList.cpp">
 			<Option target="Mondis"/>
 		</Unit>

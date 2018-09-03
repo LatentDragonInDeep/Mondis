@@ -170,6 +170,16 @@ MondisList::~MondisList ()
     }
 }
 
+void MondisList::toJson() {
+    *json+="[\n";
+    ListIterator iterator = this->iterator();
+    while (iterator.next()) {
+        *json+=iterator->data->getJson();
+        *json+="\n";
+    }
+    *json+="]\n";
+}
+
 
 
 

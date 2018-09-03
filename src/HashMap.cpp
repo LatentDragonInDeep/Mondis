@@ -192,3 +192,7 @@ void HashMap::add (int index, Entry &entry)
     }
 }
 
+void HashMap::toJson() {
+
+}
+

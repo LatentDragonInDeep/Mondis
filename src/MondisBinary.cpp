@@ -110,3 +110,7 @@ void MondisBinary::persist(std::string &filePath, int start, int end) {
     out.write(heapBuffer+start,end-start);
     out.flush();
 }
+
+void MondisBinary::toJson() {
+    json = new std::string(heapBuffer,capacity);
+}

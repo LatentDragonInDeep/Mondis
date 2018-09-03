@@ -8,11 +8,12 @@
 #include <stack>
 
 #include "MondisObject.h"
+#include "MondisData.h"
 
 using namespace std;
 
 
-class Key {
+class Key :public MondisData{
 public:
     union {
         string* str;
@@ -99,14 +100,27 @@ private:
 
         return (unsigned int)h;
     }
+
+    void toJson() {
+        if(flag) {
+            *json+="\"";
+            *json+=*key.str;
+            *json+="\"";
+        } else{
+            *json+="\"";
+            *json+=to_string(key.intValue);
+            *json+="\"";
+        }
+    }
 };
 
-class Entry{
+class Entry:public MondisData{
 public:
     Key* key;
     MondisObject* object;
-    Entry* pre;
-    Entry* next;
+    Entry* pre = nullptr;
+    Entry* next = nullptr;
+    bool isValueNull = false;
     bool compare(Entry& other) {
         return key->compare(*other.key);
     }
@@ -117,6 +131,14 @@ public:
     ~Entry (){
         delete key;
         delete object;
+    }
+
+    void toJson() {
+        *json+=key->getJson();
+        if(!isValueNull) {
+            *json += " : ";
+            *json += object->getJson();
+        }
     }
 };
 
@@ -129,7 +151,7 @@ public:
     int height = 1;
 };
 
-class AVLTree
+class AVLTree:public MondisData
 {
 private:
     AVLTreeNode* root;
@@ -179,15 +201,18 @@ private:
     AVLTreeNode* leftRightRotate(AVLTreeNode* root);
     AVLTreeNode* rightLeftRotate(AVLTreeNode* root);
     int getHeight(AVLTreeNode* root);
+
+    void toJson();
 };
 
-class HashMap
+class HashMap:public MondisData
 {
 private:
     float loadFactor = 0.75f;
     unsigned int capacity = 16;
     unsigned int size = 0;
     const int treeThreshold = 8;
+    bool isValueNull = false;
     typedef struct {
         Entry * first;
         AVLTree* tree;
@@ -197,6 +222,15 @@ private:
     } Content;
     Content * arrayFrom;
     Content * arrayTo;
+    class MapIterator{
+        Entry* cur;
+        bool next() {
+            //TODO
+        }
+        Entry*operator->() {
+            return cur;
+        }
+    };
 public:
     HashMap();
     HashMap(unsigned int capacity, float loadFactor);
@@ -213,6 +247,9 @@ private:
     void add(int index,Entry& entry);
 
     int getCapacity (int capa);
+    void toJson();
+    //TODO
+    HashMap::MapIterator iterator();
 };
 
 

@@ -9,19 +9,18 @@
 #include <vector>
 
 #include "MondisObject.h"
+#include "MondisData.h"
 
 using namespace std;
 
 class MondisListNode {
 public:
-    MondisListNode * pre;
-    MondisListNode* next;
-    MondisObject* data;
-
-    MondisListNode():pre(nullptr),next(nullptr),data(nullptr) {}
+    MondisListNode * pre = nullptr;
+    MondisListNode* next = nullptr;
+    MondisObject* data = nullptr;
 };
 
-class MondisList
+class MondisList:public MondisData
 {
 private:
     unordered_map<int,MondisListNode*> indexToNode;
@@ -34,6 +33,19 @@ private:
     int headModifyNum = 0;
     int preSize = 0;
     int nextSize = 0;
+public:
+    class ListIterator {
+    private:
+        MondisListNode* cur;
+    public:
+        bool next() {
+
+        };
+
+        MondisListNode* operator->() {
+            return cur;
+        }
+    };
 
 public:
 
@@ -53,6 +65,10 @@ public:
     int set (int index, MondisObject *object);
 
     int add (vector<MondisObject *> *data);
+
+    ListIterator iterator();
+
+    void toJson() override;
 
 private:
     void trim ();

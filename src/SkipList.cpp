@@ -4,10 +4,7 @@
 
 #include "SkipList.h"
 
-SkipList::SkipList ():head(SkipListNode::getDummyNode())
-{
-
-}
+SkipList::SkipList ():head(SkipListNode::getDummyNode()) {}
 
 int SkipList::getRandomLevel ()
 {
@@ -54,6 +51,30 @@ SkipListNode *SkipList::insert (Key &key, MondisObject *obj)
         last[j]->forwards[j].next = newNode;
     }
 
+}
+
+void SkipList::toJson() {
+    if(isKeyInteger) {
+        SkipIterator iterator = this->iterator();
+        *json += "[";
+        *json += "\n";
+        while (iterator.next()) {
+            *json += iterator->data->getJson();
+            *json += "\n";
+        }
+        *json += "]\n";
+    } else{
+        SkipIterator iterator = this->iterator();
+        *json += "{";
+        *json += "\n";
+        while (iterator.next()) {
+            *json+=iterator->key->getJson();
+            *json+=" : ";
+            *json += iterator->data->getJson();
+            *json += ",\n";
+        }
+        *json += "}\n";
+    }
 }
 
 

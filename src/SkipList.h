@@ -9,6 +9,7 @@
 
 #include "MondisObject.h"
 #include "HashMap.h"
+#include "MondisData.h"
 
 class SkipListNode {
 public:
@@ -30,7 +31,7 @@ public:
     }
 };
 
-class SkipList
+class SkipList:public MondisData
 {
 private:
     SkipListNode* head;
@@ -41,22 +42,30 @@ private:
     static default_random_engine engine;
     static const float constexpr SKIP_LIST_P = 0.25f;
     static const int SKIP_LIST_RANDOM_UPPER_BOUND = 65535;
+    bool isKeyInteger = true;
 public:
+    class SkipIterator {
+    private:
+        SkipListNode* cur;
+    public:
+        bool next() {
+
+        }
+
+        SkipListNode*operator->() {
+            return cur;
+        }
+    };
     SkipList();
     ~SkipList ();
     SkipListNode *insert(Key& key, MondisObject* obj);
+    //TODO
     int remove(Key& key);
     void getRange(Key& from, Key& to,vector<MondisObject*>* res);
-
+    void toJson();
+    SkipIterator iterator();
 private:
     int getRandomLevel();
-
-};
-
-class ZSet{
-private:
-    HashMap* dict;
-    SkipList* list;
 };
 
 

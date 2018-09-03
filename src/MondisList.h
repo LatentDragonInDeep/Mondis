@@ -38,8 +38,15 @@ public:
     private:
         MondisListNode* cur;
     public:
+        ListIterator(MondisList* list) {
+            cur = list->head;
+        }
         bool next() {
-
+            if(cur->next!= nullptr) {
+                cur = cur->next;
+                return true;
+            }
+            return false;
         };
 
         MondisListNode* operator->() {
@@ -50,7 +57,7 @@ public:
 public:
 
     MondisList();
-    virtual ~MondisList();
+    ~MondisList();
     int pushBack (MondisObject *object);
     MondisObject* popBack ();
     int pushFront (MondisObject *object);

@@ -67,6 +67,7 @@ void SkipList::toJson() {
         SkipIterator iterator = this->iterator();
         *json += "{";
         *json += "\n";
+        *json+="\"InMemoryType\":\"ZSET\"";
         while (iterator.next()) {
             *json+=iterator->key->getJson();
             *json+=" : ";
@@ -75,6 +76,10 @@ void SkipList::toJson() {
         }
         *json += "}\n";
     }
+}
+
+SkipList::SkipIterator SkipList::iterator() {
+    return SkipList::SkipIterator(this);
 }
 
 

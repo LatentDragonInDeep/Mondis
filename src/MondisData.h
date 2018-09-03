@@ -13,13 +13,13 @@ protected:
     bool hasSerialized = false;
     virtual void toJson() = 0;
 public:
-     std::string& getJson() {
+     std::string* getJson() {
         if(hasSerialized) {
-            return *json;
+            return json;
         }
         toJson();
         hasSerialized  = true;
-        return *json;
+        return json;
     }
     virtual ~MondisData() {
          delete json;

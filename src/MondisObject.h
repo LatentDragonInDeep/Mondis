@@ -31,24 +31,47 @@ class MondisObject
 public:
     MondisObjectType type = MondisObjectType::EMPTY;
     void * objectData;
+    long lastAccessTime;//上次修改时间
+    long ttl;//单位秒
+
+    ~MondisObject(){
+        switch (type){
+            case MondisObjectType ::RAW_STRING:
+                delete reinterpret_cast<string*>(objectData);
+                break;
+            case MondisObjectType ::RAW_INT:
+                delete reinterpret_cast<int*>(objectData);
+                break
+            case RAW_BIN:
+            case LIST:
+            case SET:
+            case ZSET:
+            case HASH:
+                MondisData* data = dynamic_cast<MondisData*>(objectData);
+                delete data;
+                break;
+        }
+        delete json;
+        delete nullObj;
+    }
 private:
-    MondisObject * mp_nullObj = new MondisObject;
+    MondisObject * nullObj = new MondisObject;
     bool hasSerialized = false;
-    string& json;
+    string* json = new string("");
 public:
     static MondisObject* getNullObject() {
-        return mp_nullObj;
+        return nullObj;
     }
-    string& getJson() {
+    string* getJson() {
         if(hasSerialized) {
             return json;
         }
         switch (type){
             case MondisObjectType ::RAW_STRING:
-                json="\""+(*(string*)objectData)+"\"";
+                *json+=("\""+(*(string*)objectData)+"\"");
                 break;
             case MondisObjectType ::RAW_INT:
-                json="\""+std::to_string(*((int*)objectData))+"\"";
+                *json=("\""+std::to_string(*((int*)objectData))+"\"");
                 break
             case RAW_BIN:
             case LIST:
@@ -56,7 +79,7 @@ public:
             case ZSET:
             case HASH:
                 MondisData* data = static_cast<MondisData*>(objectData);
-                json = data->getJson();
+                *json = data->getJson();
         }
 
         hasSerialized = true;

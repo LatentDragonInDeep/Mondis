@@ -180,6 +180,10 @@ void MondisList::toJson() {
     *json+="]\n";
 }
 
+MondisList::ListIterator MondisList::iterator() {
+    return MondisList::ListIterator(this);
+}
+
 
 
 

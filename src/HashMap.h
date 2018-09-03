@@ -149,6 +149,11 @@ public:
     AVLTreeNode* parent = nullptr;
     Entry* data = nullptr;
     int height = 1;
+    ~AVLTreeNode() {
+        delete left;
+        delete right;
+        delete data;
+    }
 };
 
 class AVLTree:public MondisData
@@ -192,6 +197,7 @@ public:
     bool remove(Key& key);
     Entry* search(Key& key);
     AVLIterator iterator();
+    ~AVLTree();
 private:
     AVLTreeNode* realInsert(Entry& entry,AVLTreeNode* root);
     AVLTreeNode* realRemove(Entry& entry,AVLTreeNode* root);
@@ -223,11 +229,56 @@ private:
     Content * arrayFrom;
     Content * arrayTo;
     class MapIterator{
-        Entry* cur;
-        bool next() {
-            //TODO
+    private:
+        Entry* cur = nullptr;
+        Content * array;
+        unsigned slotIndex = 0;
+        AVLTree::AVLIterator avlIterator;
+        bool isTree = false;
+
+        bool lookForNext() {
+            while (true) {
+                if(slotIndex>capacity) {
+                    return false;
+                }
+                Content current = array[slotIndex];
+                if(current.isList) {
+                    if(current.first == nullptr) {
+                        slotIndex++;
+                        continue;
+                    }
+                    cur = current.first;
+                    isTree = false;
+                    break;
+                }
+                avlIterator = current.tree->iterator();
+                cur = avlIterator.next();
+                isTree = true;
+                break;
+            }
+            return true;
+
         }
-        Entry*operator->() {
+    public:
+        MapIterator(HashMap* map)array(map->arrayFrom) {
+            lookForNext();
+        }
+        bool next() {
+            if(isTree) {
+                if(!avlIterator.next()) {
+                    return lookForNext();
+                }
+            }
+            else if(cur->next == nullptr) {
+                return lookForNext();
+            }
+            cur = cur->next;
+            return true;
+        }
+        Entry* operator->() {
+            if(isTree) {
+                return avlIterator->();
+            }
             return cur;
         }
     };
@@ -248,7 +299,6 @@ private:
 
     int getCapacity (int capa);
     void toJson();
-    //TODO
     HashMap::MapIterator iterator();
 };
 

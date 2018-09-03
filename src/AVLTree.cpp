@@ -171,11 +171,16 @@ AVLTreeNode *AVLTree::getSuccessor (AVLTreeNode *root)
 void AVLTree::toJson() {
     AVLIterator iterator = this->iterator();
     *json+="{\n";
+    *json+="\"InMemoryType\":\"HASH\"";
     while (iterator.next()) {
         *json+=iterator->data->getJson();
         *json+=",";
         *json+="\n";
     }
     *json+="}\n";
+}
+
+AVLTree::~AVLTree() {
+    delete root;
 }
 

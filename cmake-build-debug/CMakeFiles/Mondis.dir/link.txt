@@ -1,3 +1,0 @@
-"C:\Program Files\JetBrains\CLion 2018.2.1\bin\cmake\win\bin\cmake.exe" -E remove -f CMakeFiles\Mondis.dir/objects.a
-D:\mingw64\bin\ar.exe cr CMakeFiles\Mondis.dir/objects.a @CMakeFiles\Mondis.dir\objects1.rsp
-D:\mingw64\bin\g++.exe -g   -Wl,--whole-archive CMakeFiles\Mondis.dir/objects.a -Wl,--no-whole-archive  -o Mondis.exe -Wl,--out-implib,libMondis.dll.a -Wl,--major-image-version,0,--minor-image-version,0 @CMakeFiles\Mondis.dir\linklibs.rsp

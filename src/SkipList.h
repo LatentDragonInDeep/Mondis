@@ -34,8 +34,8 @@ public:
 class SkipList:public MondisData
 {
 private:
-    SkipListNode* head;
-    SkipListNode* tail = nullptr;
+    SkipListNode* head = new SkipListNode;
+    SkipListNode* tail = new SkipListNode;
     unsigned long length = 0;
     int level = 1;
     static uniform_int_distribution<int> distribution;
@@ -48,8 +48,15 @@ public:
     private:
         SkipListNode* cur;
     public:
+        SkipIterator(SkipList* list) {
+            cur = list->head;
+        }
         bool next() {
-
+            if(cur->forwards[0].next!= nullptr) {
+                cur = cur->forwards[0].next;
+                return true;
+            }
+            return false;
         }
 
         SkipListNode*operator->() {
@@ -65,7 +72,7 @@ public:
     void toJson();
     SkipIterator iterator();
 private:
-    int getRandomLevel();
+    static int getRandomLevel();
 };
 
 

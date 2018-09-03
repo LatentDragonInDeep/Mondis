@@ -1,3 +1,0 @@
-C:/Users/11956/ClionProjects/Mondis/cmake-build-debug/CMakeFiles/Mondis.dir
-C:/Users/11956/ClionProjects/Mondis/cmake-build-debug/CMakeFiles/edit_cache.dir
-C:/Users/11956/ClionProjects/Mondis/cmake-build-debug/CMakeFiles/rebuild_cache.dir

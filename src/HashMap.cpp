@@ -196,3 +196,7 @@ void HashMap::toJson() {
 
 }
 
+HashMap::MapIterator HashMap::iterator() {
+    return HashMap::MapIterator(this);
+}
+

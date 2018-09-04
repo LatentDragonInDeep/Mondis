@@ -7,6 +7,7 @@
 
 #include <string>
 #include <stdint-gcc.h>
+#include <unordered_set>
 
 #include "MondisList.h"
 #include "HashMap.h"
@@ -25,6 +26,16 @@ enum MondisObjectType {
     EMPTY,
 };
 
+void handleEscapeChar(string& raw) {
+    int modCount = 0;
+    for (int i = 0;i<raw.size()+modCount; ++i) {
+        if(raw[i]=='"') {
+            raw.insert(i,'\\');
+            ++i;
+            modCount++;
+        }
+    }
+}
 
 class MondisObject
 {
@@ -68,10 +79,13 @@ public:
         }
         switch (type){
             case MondisObjectType ::RAW_STRING:
-                *json+=("\""+(*(string*)objectData)+"\"");
+                reinterpret_cast<string*>(objectData);
+                handleEscapeChar(*objectData);
+                *json+=("\""+*objectData+"\"");
                 break;
             case MondisObjectType ::RAW_INT:
-                *json=("\""+std::to_string(*((int*)objectData))+"\"");
+                reinterpret_cast<int*>(objectData);
+                *json+=("\""+std::to_string(*((int*)objectData))+"\"");
                 break
             case RAW_BIN:
             case LIST:

@@ -37,9 +37,9 @@ public:
 
     void put(unsigned i, char data);
 
-    unsigned read(unsigned length, char buffer[]);
+    unsigned read(unsigned length, char *buffer);
 
-    unsigned write(unsigned length,char buffer[]);
+    unsigned write(unsigned length,char *buffer);
 
     bool setPosition(unsigned pos);
 

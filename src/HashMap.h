@@ -116,8 +116,8 @@ private:
 
 class Entry:public MondisData{
 public:
-    Key* key;
-    MondisObject* object;
+    Key* key = nullptr;
+    MondisObject* object = nullptr;
     Entry* pre = nullptr;
     Entry* next = nullptr;
     bool isValueNull = false;
@@ -127,6 +127,9 @@ public:
 
     bool equals(Entry& other) {
         return key->equals(*other.key);
+    }
+    Entry(Key* key,MondisObject* data):key(key),object(data) {
+
     }
     ~Entry (){
         delete key;

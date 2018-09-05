@@ -65,7 +65,7 @@ MondisObject *JSONParser::parseObject(string &content) {
 MondisObject *JSONParser::parseObject(JSONParser::LexicalParser *lp) {
     Token next = lp->nextToken();
     if(next.type == LEFT_ANGLE_BRACKET) {
-        return parseJSONObject(lp, false);
+        return parseJSONObject(lp, false, false);
     } else if(next.type == LEFT_SQAURE_BRACKET) {
         return parseJSONArray(lp, false);
     }
@@ -97,12 +97,34 @@ MondisObject *JSONParser::parseObject(JSONParser::LexicalParser *lp) {
     return nullptr;
 }
 
-MondisObject *JSONParser::parseJSONObject(JSONParser::LexicalParser *lp, bool isNeedNext) {
+MondisObject *JSONParser::parseJSONObject(JSONParser::LexicalParser *lp, bool isNeedNext, bool isInteger) {
     if(isNeedNext) {
         matchToken(lp,LEFT_ANGLE_BRACKET);
     }
-    auto first = parseEntry(lp);
     MondisObject* res = new MondisObject;
+    Token next = lp->nextToken();
+    if(next.type = STRING) {
+        if(isInteger) {
+            res->type = RAW_INT;
+            int * data = new int;
+            ss<<*next.content;
+            ss>>*data;
+            if(ss.fail()) {
+                delete data;
+                ss.clear();
+                throw std::invalid_argument("parse json:transform string to integer error");
+            }
+            ss.clear();
+            res->objectData = data;
+        } else {
+            res->type = RAW_STRING;
+            res->objectData = next.content;
+        }
+        res->objectData = next.content;
+        next.content = nullptr;
+        return res;
+    }
+    auto first = parseEntry(lp);
     if(first.key = nullptr) {
         res->type = HASH;
         res->objectData = (void*)new AVLTree;
@@ -148,7 +170,7 @@ MondisObject *JSONParser::parseJSONObject(JSONParser::LexicalParser *lp, bool is
 void JSONParser::matchToken(JSONParser::LexicalParser *lp, TokenType type) {
     current = lp->nextToken();
     if(current.type != type) {
-        throw new invalid_argument("unexpected token!");
+        throw invalid_argument("unexpected token!");
     };
 }
 
@@ -163,15 +185,22 @@ MondisObject *JSONParser::parseJSONArray(JSONParser::LexicalParser *lp, bool isN
         res->objectData = new MondisList;
         return res;
     }
-    MondisObject* first = parseJSONObject(lp, false);
+    MondisObject* first = parseJSONObject(lp, false, false);
     if(first->type !=RAW_STRING||first->type !=RAW_INT||
-    (first->type == RAW_STRING&&((*((string*)first->objectData)))!="SET")) {
+    (first->type == RAW_STRING&&*first->getJson()!="SET")) {
+        delete first;
+        MondisObject* second = parseJSONObject(lp, true, false);
+        bool isInteger = false;
+        if(*second->getJson() == "INT") {
+            isInteger = true;
+            delete second;
+        }
         res->type = LIST;
         MondisList* data = new MondisList;
         data->pushBack(first);
         MondisObject* cur;
         while (true) {
-            cur = parseJSONObject(lp, true);
+            cur = parseJSONObject(lp, true, isInteger);
             if(cur->type!=EMPTY) {
                 data->pushBack(cur);
             } else{
@@ -181,12 +210,19 @@ MondisObject *JSONParser::parseJSONArray(JSONParser::LexicalParser *lp, bool isN
         res->objectData = data;
         return res;
     }
+    delete first;
+    MondisObject* second = parseJSONObject(lp, true, false);
+    bool isInteger = false;
+    if(*second->getJson() == "INT") {
+        isInteger = true;
+        delete second;
+    }
     res->type = SET;
-    HashMap* data = new HashMap(true, false);
+    HashMap* data = new HashMap(true, isInteger);
     data->put();
     MondisObject* cur;
     while (true) {
-        cur = parseJSONObject(lp, true);
+        cur = parseJSONObject(lp, true, isInteger);
         if(cur->type!=EMPTY) {
             data->put(cur,nullptr);
         } else{

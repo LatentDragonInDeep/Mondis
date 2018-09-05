@@ -47,7 +47,7 @@ public:
         other.content = nullptr;
 
         return *this;
-    }
+    };
     Token():Token(TERMINATOR){};
     static Token* leftSquareBracket;
     static Token* rightSquareBracket;
@@ -182,7 +182,7 @@ public:
 private:
     LexicalParser* lexicalParser;
     MondisObject* parseObject(LexicalParser* lp);
-    MondisObject* parseJSONObject(LexicalParser* lp,bool isNeedNext);
+    MondisObject *parseJSONObject(JSONParser::LexicalParser *lp, bool isNeedNext, bool isInteger);
     MondisObject* parseJSONArray(LexicalParser* lp, bool isNeedNext);
 
     KeyValue parseEntry(LexicalParser* lp);

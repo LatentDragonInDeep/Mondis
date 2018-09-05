@@ -9,20 +9,19 @@
 using namespace std;
 bool AVLTree::insert (Entry &entry)
 {
-    realInsert(entry,root);
-    return true;
+    return realInsert(*entry.toKeyValue(),root) == nullptr;
 }
 
-AVLTreeNode *AVLTree::realInsert (Entry &entry, AVLTreeNode *root)
+AVLTreeNode *AVLTree::realInsert (KeyValue &kv, AVLTreeNode *root)
 {
     if(root == nullptr) {
         root = new AVLTreeNode;
-        root->data = &entry;
+        root->data = &kv;
     }
-    else if(entry.compare(*root->data)) {
-        root->right = realInsert(entry,root->right);
+    else if(kv.compare(*root->data)) {
+        root->right = realInsert(kv,root->right);
         if(getHeight(root->right)-getHeight(root->left) == 2) {
-            if(entry.compare(*root->right->data)) {
+            if(kv.compare(*root->right->data)) {
                 root=leftRotate(root);
             }
             else{
@@ -31,9 +30,9 @@ AVLTreeNode *AVLTree::realInsert (Entry &entry, AVLTreeNode *root)
         }
     }
     else{
-        root->left = realInsert(entry,root->left);
+        root->left = realInsert(kv,root->left);
         if(getHeight(root->left)-getHeight(root->right) == 2) {
-            if(entry.compare(*root->left->data)) {
+            if(kv.compare(*root->left->data)) {
                 root=leftRightRotate(root)
             }
             else{
@@ -48,16 +47,11 @@ AVLTreeNode *AVLTree::realInsert (Entry &entry, AVLTreeNode *root)
 
 bool AVLTree::remove (Key &key)
 {
-    Entry* temp = new Entry;
+    KeyValue* temp = new KeyValue;
     temp->key = &key;
     bool res = realRemove(*temp,root)==nullptr;
     delete temp;
     return res;
-}
-
-Entry *AVLTree::search (Key &key)
-{
-    return nullptr;
 }
 
 AVLTree::AVLIterator AVLTree::iterator ()
@@ -106,12 +100,12 @@ int AVLTree::getHeight (AVLTreeNode *root)
     return root->height;
 }
 
-AVLTreeNode *AVLTree::realRemove (Entry &entry, AVLTreeNode *root)
+AVLTreeNode *AVLTree::realRemove (KeyValue &kv, AVLTreeNode *root)
 {
     if(root == nullptr) {
         return nullptr;
     }
-    if(entry.equals(*root->data)) {
+    if(kv.equals(*root->data)) {
         if(root->left == nullptr&&root->right == nullptr) {
             delete root;
             return nullptr;
@@ -129,8 +123,8 @@ AVLTreeNode *AVLTree::realRemove (Entry &entry, AVLTreeNode *root)
         else{
             AVLTreeNode* successor = getSuccessor(root);
             root->data = successor->data;
-            entry.key = successor->data->key;
-            root->right = realRemove(entry,root->right);
+            kv.key = successor->data->key;
+            root->right = realRemove(kv,root->right);
             if(getHeight(root->left)-getHeight(root->right) == 2) {
                 root = rightRotate(root);
             }
@@ -138,8 +132,8 @@ AVLTreeNode *AVLTree::realRemove (Entry &entry, AVLTreeNode *root)
             return root;
         }
     }
-    else if(entry.compare(*root->data)){
-        root->right = realRemove(entry,root->right);
+    else if(kv.compare(*root->data)){
+        root->right = realRemove(kv,root->right);
         if(getHeight(root->left)-getHeight(root->right) == 2) {
             root = rightRotate(root);
         }
@@ -148,7 +142,7 @@ AVLTreeNode *AVLTree::realRemove (Entry &entry, AVLTreeNode *root)
         return root;
     }
     else{
-        root->right = realRemove(entry,root->right);
+        root->right = realRemove(kv,root->right);
         if(getHeight(root->left)-getHeight(root->right) == 2) {
             root = rightRotate(root);
         }
@@ -173,7 +167,7 @@ void AVLTree::toJson() {
     *json+="{\n";
     *json+="\"InMemoryType\":\"HASH\"";
     while (iterator.next()) {
-        *json+=iterator->data->getJson();
+        *json+=*iterator->data->getJson();
         *json+=",";
         *json+="\n";
     }
@@ -182,5 +176,39 @@ void AVLTree::toJson() {
 
 AVLTree::~AVLTree() {
     delete root;
+}
+
+bool AVLTree::insert(KeyValue &kv) {
+    return realInsert(kv,root) == nullptr;
+}
+
+KeyValue *AVLTree::get(Key &key) {
+    AVLTreeNode* cur = root;
+    while (true) {
+        if(cur == nullptr) {
+            return nullptr;
+        }
+        if(key.equals(*cur->data->key)) {
+            return cur->data;
+        } else if(key.compare(*cur->data->key)) {
+            cur = cur->right;
+            continue;
+        } else{
+            cur = cur->left;
+            continue;
+        }
+    }
+}
+
+MondisObject *AVLTree::getValue(Key &key) {
+    KeyValue* kv = get(key);
+    if(kv == nullptr) {
+        return nullptr;
+    }
+    return kv->value;
+}
+
+bool AVLTree::containsKey(Key &key) {
+    return get(key) == nullptr;
 }
 

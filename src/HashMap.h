@@ -21,6 +21,9 @@ public:
     } key;
     bool flag;
     bool compare(Key& other) {
+        if(flag!=other.flag) {
+            return false;
+        }
         if(flag) {
             return key.str->compare(*other.key.str);
         }
@@ -28,6 +31,9 @@ public:
     }
 
     bool equals(Key& other) {
+        if(flag!=other.flag) {
+            return false;
+        }
         if(flag) {
             return *key.str == *other.key.str;
         }
@@ -114,13 +120,45 @@ private:
     }
 };
 
+class KeyValue :public MondisData{
+public:
+    Key* key = nullptr;
+    MondisObject* value = nullptr;
+    KeyValue(Key* k,MondisObject* v):key(k),value(v) {
+
+    }
+    KeyValue(){};
+    KeyValue(KeyValue&& other) = default;
+    KeyValue(KeyValue& other):key(other.key),value(other.value) {
+        other.key = nullptr;
+        other.value = nullptr;
+    }
+    bool compare(KeyValue& other) {
+        return key->compare(*other.key);
+    }
+
+    bool equals(KeyValue& other) {
+        return key->equals(*other.key);
+    }
+    ~KeyValue() {
+        delete key;
+        delete value;
+    }
+
+    void toJson() {
+        *json+=*key->getJson();
+        *json+=",";
+        *json+=*value->getJson();
+        *json+="\n";
+    }
+};
+
 class Entry:public MondisData{
 public:
     Key* key = nullptr;
     MondisObject* object = nullptr;
     Entry* pre = nullptr;
     Entry* next = nullptr;
-    bool isValueNull = false;
     bool compare(Entry& other) {
         return key->compare(*other.key);
     }
@@ -130,7 +168,12 @@ public:
     }
     Entry(Key* key,MondisObject* data):key(key),object(data) {
 
-    }
+    };
+    Entry(KeyValue* kv):key(kv->key),object(kv->value){
+        kv->key= nullptr;
+        kv->value = nullptr;
+    };
+    Entry(){};
     ~Entry (){
         delete key;
         delete object;
@@ -143,6 +186,12 @@ public:
             *json += object->getJson();
         }
     }
+    KeyValue* toKeyValue() {
+        KeyValue* res = new KeyValue(key,object);
+        key = nullptr;
+        object = nullptr;
+        return res;
+    }
 };
 
 class AVLTreeNode {
@@ -150,7 +199,7 @@ public:
     AVLTreeNode* left = nullptr;
     AVLTreeNode* right = nullptr;
     AVLTreeNode* parent = nullptr;
-    Entry* data = nullptr;
+    KeyValue* data = nullptr;
     int height = 1;
     ~AVLTreeNode() {
         delete left;
@@ -197,13 +246,16 @@ public:
     };
 public:
     bool insert(Entry& entry);
+    bool insert(KeyValue& kv);
     bool remove(Key& key);
-    Entry* search(Key& key);
+    KeyValue* get(Key& key);
+    MondisObject* getValue(Key& key);
+    bool containsKey(Key& key);
     AVLIterator iterator();
     ~AVLTree();
 private:
-    AVLTreeNode* realInsert(Entry& entry,AVLTreeNode* root);
-    AVLTreeNode* realRemove(Entry& entry,AVLTreeNode* root);
+    AVLTreeNode* realInsert(KeyValue& kv,AVLTreeNode* root);
+    AVLTreeNode* realRemove(KeyValue& kv,AVLTreeNode* root);
     AVLTreeNode* getSuccessor(AVLTreeNode* root);
     AVLTreeNode* leftRotate(AVLTreeNode* root);
     AVLTreeNode* rightRotate(AVLTreeNode* root);
@@ -221,7 +273,8 @@ private:
     unsigned int capacity = 16;
     unsigned int size = 0;
     const int treeThreshold = 8;
-    bool isValueNull = false;
+    const bool isValueNull = false;
+    const bool isIntset = false;
     typedef struct {
         Entry * first;
         AVLTree* tree;
@@ -265,7 +318,7 @@ private:
     public:
         MapIterator(HashMap* map)array(map->arrayFrom) {
             lookForNext();
-        }
+        };
         bool next() {
             if(isTree) {
                 if(!avlIterator.next()) {
@@ -277,17 +330,22 @@ private:
             }
             cur = cur->next;
             return true;
-        }
+        };
         Entry* operator->() {
             if(isTree) {
                 return avlIterator->();
             }
             return cur;
-        }
+        };
     };
 public:
     HashMap();
     HashMap(unsigned int capacity, float loadFactor);
+
+    HashMap(float loadFactor, unsigned int capacity, const bool isValueNull, const bool isIntset);
+
+    HashMap(const bool isValueNull, const bool isIntset);
+
     ~HashMap();
     bool put (Key &key, MondisObject *value);
     MondisObject* get (Key &key);
@@ -298,7 +356,7 @@ private:
     void rehash();
     void toTree (int index);
     int getIndex (int hash);
-    void add(int index,Entry& entry);
+    void add(int index,Entry* entry);
 
     int getCapacity (int capa);
     void toJson();

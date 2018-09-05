@@ -34,10 +34,21 @@ public:
     Token(TokenType type):type(type) {
 
     }
-
+    Token(Token&& other) = default;
+    Token(Token& other):content(other.content),type(other.type) {
+        other.content = nullptr;
+    }
     Token(std::string& data):type(STRING),content(&data){
 
     }
+    Token& operator=(Token& other) {
+        type = other.type;
+        content = other.content;
+        other.content = nullptr;
+
+        return *this;
+    }
+    Token():Token(TERMINATOR){};
     static Token* leftSquareBracket;
     static Token* rightSquareBracket;
     static Token* leftAngleBracket;
@@ -83,7 +94,6 @@ public:
     class LexicalParser{
     private:
         string * source;
-        Token* current = Token::getToken(TERMINATOR);
         unsigned curIndex = 0;
         bool isEnd = false;
         static bool hasInit;
@@ -115,7 +125,7 @@ public:
         }
         LexicalParser(const char* filePath){
             struct stat info;
-            int fd = open(filePath.c_str(), O_RDONLY);
+            int fd = open(filePath, O_RDONLY);
             fstat(fd, &info);
 
             source = new string("");
@@ -134,20 +144,17 @@ public:
         ~LexicalParser(){
             delete source;
         }
-        Token* nextToken() {
-            if(current->type == STRING) {
-                delete current;
-            }
-            current = Token::getToken(TERMINATOR);
+        Token nextToken() {
+            Token res;
             if(isEnd) {
-                return current;
+                return res;
             }
             int start;
             int end;
             if(directRecognize[src[curIndex]] != nullptr) {
-                current = directRecognize[src[curIndex]];
+                res = *directRecognize[src[curIndex]];
                 curIndex++;
-                return current;
+                return res;
             }
             if(src[curIndex] == '"') {
                 start = curIndex;
@@ -156,9 +163,9 @@ public:
                     if(src[curIndex] == '"') {
                         if(src[curIndex-1]!='\\') {
                             end = curIndex;
-                            current->type = STRING;
-                            current->content = new string(src,start,end-start);
-                            return current;
+                            res.type = STRING;
+                            res.content = new string(src,start,end-start);
+                            return res;
                         }
                     }
                 }
@@ -166,19 +173,19 @@ public:
 
         }
     };
-    Token* current;
+    Token current;
     stringstream ss;
     JSONParser(std::string& filePath);
     void parse(HashMap* keySpace);
     MondisObject* parseObject(string& content);
-    pair<Key*,MondisObject*> parseEntry(string& content);
+    KeyValue parseEntry(string& content);
 private:
     LexicalParser* lexicalParser;
     MondisObject* parseObject(LexicalParser* lp);
     MondisObject* parseJSONObject(LexicalParser* lp,bool isNeedNext);
     MondisObject* parseJSONArray(LexicalParser* lp, bool isNeedNext);
 
-    pair<Key*,MondisObject*> parseEntry(LexicalParser* lp);
+    KeyValue parseEntry(LexicalParser* lp);
     void matchToken(LexicalParser* lp,TokenType type);
     void matchToken(TokenType type);
 };

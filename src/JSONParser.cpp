@@ -20,13 +20,13 @@ JSONParser::JSONParser(std::string &filePath) {
 
 void JSONParser::parse(HashMap *keySpace) {
     matchToken(LEFT_ANGLE_BRACKET);
-    pair<Key*,MondisObject*> cur;
+    KeyValue cur;
     while(true) {
         cur = parseEntry(lexicalParser);
-        if(cur.first == nullptr) {
+        if(cur.key == nullptr) {
             return;
         }
-        keySpace->put(cur.first,cur.second);
+        keySpace->put(cur.key,cur.value);
     }
 }
 
@@ -34,27 +34,25 @@ void JSONParser::matchToken(TokenType type) {
     matchToken(lexicalParser,type);
 }
 
-pair<Key*, MondisObject*> JSONParser::parseEntry(LexicalParser* lp) {
-    lexicalParser = lp;
-    pair<Key*,MondisObject*> res;
-    res.first = nullptr;
-    Token * next = lp->nextToken();
-    if(next->type == COMMA) {
-        delete next;
+KeyValue JSONParser::parseEntry(LexicalParser* lp) {
+    KeyValue res;
+    res.key = nullptr;
+    Token  next = lp->nextToken();
+    if(next.type == COMMA) {
         return res;
     }
-    matchToken(STRING);
+    matchToken(lp,STRING);
     Key* key = new Key;
     key->flag = true;
     key->key.str = new string(*current->content);
-    res.first = key;
-    matchToken(COLON);
-    res.second = parseObject(lp);
+    res.key = key;
+    matchToken(lp,COLON);
+    res.value = parseObject(lp);
 
     return res;
 }
 
-pair<Key *, MondisObject *> JSONParser::parseEntry(string &content) {
+KeyValue JSONParser::parseEntry(string &content) {
     LexicalParser parser(content);
     return parseEntry(&parser);
 }
@@ -65,30 +63,30 @@ MondisObject *JSONParser::parseObject(string &content) {
 }
 
 MondisObject *JSONParser::parseObject(JSONParser::LexicalParser *lp) {
-    Token* next = lp->nextToken();
-    if(next->type == LEFT_ANGLE_BRACKET) {
+    Token next = lp->nextToken();
+    if(next.type == LEFT_ANGLE_BRACKET) {
         return parseJSONObject(lp, false);
-    } else if(next->type == LEFT_SQAURE_BRACKET) {
+    } else if(next.type == LEFT_SQAURE_BRACKET) {
         return parseJSONArray(lp, false);
     }
-    else if(next->type == STRING) {
+    else if(next.type == STRING) {
         MondisObject *res = new MondisObject;
-        if (next->content->size() > 11) {
-            if (next->content->substr(0, 11) == "LatentDragon") {
+        if (next.content->size() > 11) {
+            if (next.content->substr(0, 11) == "LatentDragon") {
                 res->type = RAW_BIN;
-                MondisBinary *binary = MondisBinary::allocate(next->content->size()-11);
-                binary->write(next->content->size()-11,next->content->data());
+                MondisBinary *binary = MondisBinary::allocate(next.content->size()-11);
+                binary->write(next.content->size()-11,next.content->data());
                 res->objectData = (void*)binary;
                 return res;
             }
         }
 
         int *data = new int;
-        ss << *next->content;
+        ss << *next.content;
         ss >> *data;
         if (ss.fail()) {
             res->type = RAW_STRING;
-            res->objectData = (void*)new string(*next->content);
+            res->objectData = (void*)new string(*next.content);
             return res;
         }
         res->type = RAW_INT;
@@ -105,38 +103,38 @@ MondisObject *JSONParser::parseJSONObject(JSONParser::LexicalParser *lp, bool is
     }
     auto first = parseEntry(lp);
     MondisObject* res = new MondisObject;
-    if(first.first = nullptr) {
+    if(first.key = nullptr) {
         res->type = HASH;
         res->objectData = (void*)new AVLTree;
         return res;
     }
-    if(*first.first->key.str == "InMemoryType") {
-        if(*first.first->key.str == "HASH") {
+    if(*first.key->key.str == "InMemoryType") {
+        if(*first.key->key.str == "HASH") {
             res->type = HASH;
             AVLTree* tree = new AVLTree;
             matchToken(lp,COMMA);
-            pair<Key*,MondisObject*> cur;
+            KeyValue cur;
             while (true) {
                 cur = parseEntry(lp);
-                if(cur.first = nullptr) {
+                if(cur.key = nullptr) {
                     break;
                 }
-                tree->insert(*new Entry(cur.first,cur.second));
+                tree->insert(*new KeyValue(cur.key,cur.value));
                 cur = parseEntry(lp);
                 matchToken(lp,COMMA);
             }
             res->objectData = (void*)tree;
-        } else if(*first.first->key.str == "ZSET") {
+        } else if(*first.key->key.str == "ZSET") {
             res->type = ZSET;
             SkipList* skipList = new SkipList;
             matchToken(lp,COMMA);
-            pair<Key*,MondisObject*> cur;
+            KeyValue cur;
             while (true) {
                 cur = parseEntry(lp);
-                if(cur.first = nullptr) {
+                if(cur.key = nullptr) {
                     break;
                 }
-                skipList->insert(cur.first,cur.second);
+                skipList->insert(cur.key,cur.value);
                 cur = parseEntry(lp);
                 matchToken(lp,COMMA);
             }
@@ -148,11 +146,8 @@ MondisObject *JSONParser::parseJSONObject(JSONParser::LexicalParser *lp, bool is
 }
 
 void JSONParser::matchToken(JSONParser::LexicalParser *lp, TokenType type) {
-    if(current->type == STRING) {
-        delete current;
-    }
     current = lp->nextToken();
-    if(current->type != type) {
+    if(current.type != type) {
         throw new invalid_argument("unexpected token!");
     };
 }
@@ -161,5 +156,43 @@ MondisObject *JSONParser::parseJSONArray(JSONParser::LexicalParser *lp, bool isN
     if(isNeedNext) {
         matchToken(lp,LEFT_SQAURE_BRACKET);
     }
-
+    MondisObject* res = new MondisObject;
+    Token next = lp->nextToken();
+    if(next.type == RIGHT_SQUARE_BRACKET) {
+        res->type = LIST;
+        res->objectData = new MondisList;
+        return res;
+    }
+    MondisObject* first = parseJSONObject(lp, false);
+    if(first->type !=RAW_STRING||first->type !=RAW_INT||
+    (first->type == RAW_STRING&&((*((string*)first->objectData)))!="SET")) {
+        res->type = LIST;
+        MondisList* data = new MondisList;
+        data->pushBack(first);
+        MondisObject* cur;
+        while (true) {
+            cur = parseJSONObject(lp, true);
+            if(cur->type!=EMPTY) {
+                data->pushBack(cur);
+            } else{
+                break;
+            }
+        }
+        res->objectData = data;
+        return res;
+    }
+    res->type = SET;
+    HashMap* data = new HashMap(true, false);
+    data->put();
+    MondisObject* cur;
+    while (true) {
+        cur = parseJSONObject(lp, true);
+        if(cur->type!=EMPTY) {
+            data->put(cur,nullptr);
+        } else{
+            break;
+        }
+    }
+    res->objectData = data;
+    return res;
 }

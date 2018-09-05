@@ -4,13 +4,9 @@
 
 #include "HashMap.h"
 
-HashMap::HashMap () {}
+HashMap::HashMap ():HashMap(16,0.75f) {}
 
-HashMap::HashMap (unsigned int capacity, float loadFactor):
-capacity(getCapacity(capacity)),loadFactor(loadFactor)
-{
-    arrayFrom = new Content[capacity];
-}
+HashMap::HashMap (unsigned int capacity, float loadFactor): HashMap(capacity,loadFactor, false, false) {}
 
 bool HashMap::put(Key &key, MondisObject *value)
 {
@@ -62,7 +58,7 @@ MondisObject *HashMap::get (Key &key)
         return nullptr;
     }
 
-    return content.tree->search(key)->object;
+    return content.tree->get(key)->value;
 }
 
 bool HashMap::containsKey (Key &key)
@@ -105,7 +101,7 @@ bool HashMap::remove (Key &key)
             }
         }
     }
-    if(content.tree->search(key)) {
+    if(content.tree->get(key)) {
         size--;
         content.tree->remove(key);
         return true;
@@ -140,14 +136,14 @@ void HashMap::rehash ()
             {
                 Entry* next = cur->next;
                 int index = cur->key->hashCode()&(capacity-1);
-                add(index,*cur);
+                add(index,cur);
             }
         }
         else{
             auto treeIterator = arrayFrom[i].tree->iterator();
             while (treeIterator.next()) {
                 int index = treeIterator->data->key->hashCode()&(capacity-1);
-                add(index,*treeIterator->data);
+                add(index,new Entry(treeIterator->data));
                 delete arrayFrom[i].tree;
             }
         }
@@ -176,9 +172,9 @@ HashMap::~HashMap ()
     delete[] arrayFrom;
 }
 
-void HashMap::add (int index, Entry &entry)
+void HashMap::add (int index, Entry *entry)
 {
-    Entry* cur = &entry;
+    Entry* cur = entry;
     if(arrayTo[index].first == nullptr) {
         arrayTo[index].first = cur;
         arrayTo[index].end = cur;
@@ -193,10 +189,23 @@ void HashMap::add (int index, Entry &entry)
 }
 
 void HashMap::toJson() {
-
+    *json+="{\n";
+    auto iter = iterator();
+    while (iter.next()) {
+        *json+=*iter->getJson();
+        *json+=",\n";
+    }
+    *json+='}';
 }
 
 HashMap::MapIterator HashMap::iterator() {
     return HashMap::MapIterator(this);
 }
+
+HashMap::HashMap(float loadFactor, unsigned int capacity, const bool isValueNull, const bool isIntset) : loadFactor(
+        loadFactor), capacity(getCapacity(capacity)), isValueNull(isValueNull), isIntset(isIntset) {
+    arrayFrom = new Content[capacity];
+}
+
+HashMap::HashMap(const bool isValueNull, const bool isIntset) : HashMap(16,0.75f,isValueNull,isIntset) {}
 

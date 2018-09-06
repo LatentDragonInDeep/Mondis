@@ -13,6 +13,8 @@
 #include <sstream>
 
 #include "MondisObject.h"
+#include "Command.h"
+
 #define src (*source)
 
 
@@ -93,7 +95,7 @@ class JSONParser {
 public:
     class LexicalParser{
     private:
-        string * source;
+        string* source;
         unsigned curIndex = 0;
         bool isEnd = false;
         static bool hasInit;
@@ -149,6 +151,7 @@ public:
             if(isEnd) {
                 return res;
             }
+            skip();
             int start;
             int end;
             if(directRecognize[src[curIndex]] != nullptr) {
@@ -172,9 +175,19 @@ public:
             }
 
         }
+
+        void reset() {
+            source = nullptr;
+            curIndex = 0;
+            isEnd = false;
+        }
+
+        void setSource(string* newSrc) {
+            source = newSrc;
+        }
     };
     Token current;
-    stringstream ss;
+    JSONParser();
     JSONParser(std::string& filePath);
     void parse(HashMap* keySpace);
     MondisObject* parseObject(string& content);

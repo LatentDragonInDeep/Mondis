@@ -58,8 +58,13 @@ KeyValue JSONParser::parseEntry(string &content) {
 }
 
 MondisObject *JSONParser::parseObject(string &content) {
-    LexicalParser parser(content);
-    return parseObject(&parser);
+    if(lexicalParser == nullptr) {
+        lexicalParser = new LexicalParser(content);
+        return parseObject(lexicalParser);
+    }
+    lexicalParser->reset();
+    lexicalParser->setSource(&content);
+    return parseObject(lexicalParser);
 }
 
 MondisObject *JSONParser::parseObject(JSONParser::LexicalParser *lp) {
@@ -82,16 +87,14 @@ MondisObject *JSONParser::parseObject(JSONParser::LexicalParser *lp) {
         }
 
         int *data = new int;
-        ss << *next.content;
-        ss >> *data;
-        if (ss.fail()) {
+        bool to = toInteger(*next.content,data);
+        if (!to) {
             res->type = RAW_STRING;
             res->objectData = (void*)new string(*next.content);
             return res;
         }
         res->type = RAW_INT;
         res->objectData = (void*)data;
-        ss.clear();
         return res;
     }
     return nullptr;
@@ -107,14 +110,11 @@ MondisObject *JSONParser::parseJSONObject(JSONParser::LexicalParser *lp, bool is
         if(isInteger) {
             res->type = RAW_INT;
             int * data = new int;
-            ss<<*next.content;
-            ss>>*data;
-            if(ss.fail()) {
+            bool to = toInteger(*next.content,data);
+            if (!to) {
                 delete data;
-                ss.clear();
                 throw std::invalid_argument("parse json:transform string to integer error");
             }
-            ss.clear();
             res->objectData = data;
         } else {
             res->type = RAW_STRING;
@@ -231,4 +231,8 @@ MondisObject *JSONParser::parseJSONArray(JSONParser::LexicalParser *lp, bool isN
     }
     res->objectData = data;
     return res;
+}
+
+JSONParser::JSONParser() {
+
 }

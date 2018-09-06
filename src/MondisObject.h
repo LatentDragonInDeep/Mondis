@@ -8,11 +8,13 @@
 #include <string>
 #include <stdint-gcc.h>
 #include <unordered_set>
+#include <sstream>
 
 #include "MondisList.h"
 #include "HashMap.h"
 #include "MondisBinary.h"
 #include "SkipList.h"
+#include "Command.h"
 
 using namespace std;
 enum MondisObjectType {
@@ -63,7 +65,6 @@ public:
                 break;
         }
         delete json;
-        delete nullObj;
     }
 private:
     MondisObject * nullObj = new MondisObject;
@@ -72,7 +73,7 @@ private:
 public:
     static MondisObject* getNullObject() {
         return nullObj;
-    }
+    };
     string* getJson() {
         if(hasSerialized) {
             return json;
@@ -93,12 +94,103 @@ public:
             case ZSET:
             case HASH:
                 MondisData* data = static_cast<MondisData*>(objectData);
-                *json = data->getJson();
+                json = data->getJson();
         }
 
         hasSerialized = true;
         return json;
+    };
+
+    ExecutionResult execute(Command& command) {
+        if(type = RAW_STRING) {
+            return executeString();
+        } else if(type = RAW_INT) {
+            return executeInteger(command);
+        } else  {
+            MondisData* data = (MondisData*)objectData;
+            return data->execute(command);
+        }
     }
+
+private:
+    ExecutionResult executeInteger(Command& command) {
+        int * data = (int*)objectData;
+        ExecutionResult res;
+        switch (command.type) {
+            case INCR:
+                CHECK_PARAM_NUM(0)
+                (*data)++;
+                OK_AND_RETURN
+            case DECR:
+                CHECK_PARAM_NUM(0)
+                (*data)--;
+                OK_AND_RETURN
+            case INCR_BY:
+                CHECK_PARAM_NUM(1)
+                CHECK_AND_DEFINE_INT_LEGAL(0,delta)
+                (*data)+=delta;
+                OK_AND_RETURN
+            case DECR_BY:
+                CHECK_PARAM_NUM(1)
+                CHECK_AND_DEFINE_INT_LEGAL(0,delta)
+                (*data)-=delta;
+                OK_AND_RETURN
+        }
+        INVALID_AND_RETURN
+    };
+
+    ExecutionResult executeString(Command& command) {
+        string* data = (string*)objectData;
+        ExecutionResult res;
+        switch (type) {
+            case SET:
+            case GET:
+                CHECK_PARAM_NUM(2)
+                CHECK_AND_DEFINE_INT_LEGAL(0,index)
+                if(command.second.size()!=1) {
+                    res.res = "error data";
+                }
+                if(command.type = SET) {
+                    (*data)[index] = command[1].content[0];
+                } else{
+                    res.res = data->substr(index,1);
+                }
+                OK_AND_RETURN
+            case SET_RANGE:
+                CHECK_PARAM_NUM(3)
+                CHECK_START(0)
+                CHECK_END(1,data->size())
+                if(command.third.size()!=end-start) {
+                    res.res = "data length error!";
+                    return res;
+                }
+                for (int i = start; i < end; ++i) {
+                    (*data)[i] = command.third[i-start];
+                }
+                OK_AND_RETURN
+            case GET_RANGE:
+                CHECK_PARAM_NUM(2)
+                CHECK_START(0)
+                CHECK_END(1,data->size())
+
+                res.res = data->substr(start,end-start);
+
+                OK_AND_RETURN
+            case STRLEN:
+                CHECK_PARAM_NUM(0)
+                res.res = std::to_string(data->size());
+
+                OK_AND_RETURN
+            case APPEND:
+                CHECK_PARAM_NUM(1)
+                (*data)+=command.first;
+
+                OK_AND_RETURN
+        }
+        res.res = "Invalid command";
+
+        return res
+    };
 };
 
 

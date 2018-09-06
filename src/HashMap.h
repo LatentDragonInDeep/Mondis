@@ -16,33 +16,36 @@ using namespace std;
 class Key :public MondisData{
 public:
     union {
-        string* str;
+        string str;
         int intValue;
     } key;
-    bool flag;
+    bool flag = true;
     bool compare(Key& other) {
         if(flag!=other.flag) {
             return false;
         }
         if(flag) {
-            return key.str->compare(*other.key.str);
+            return key.str.compare(other.key.str);
         }
         return key.intValue>other.key.intValue;
     }
+    Key(string& k):key.str(k) {}
+
+    Key(int k):key.intValue(k){};
 
     bool equals(Key& other) {
         if(flag!=other.flag) {
             return false;
         }
         if(flag) {
-            return *key.str == *other.key.str;
+            return key.str == other.key.str;
         }
         return key.intValue == other.key.intValue;
     }
 
     unsigned int hashCode() {
         if(flag) {
-            return strHash(*key.str);
+            return strHash(key.str);
         }
         else  {
             return intHash(key.intValue);
@@ -110,7 +113,7 @@ private:
     void toJson() {
         if(flag) {
             *json+="\"";
-            *json+=*key.str;
+            *json+=key.str;
             *json+="\"";
         } else{
             *json+="\"";
@@ -134,11 +137,11 @@ public:
         other.value = nullptr;
     }
     bool compare(KeyValue& other) {
-        return key->compare(*other.key);
+        return key->compare(other.key);
     }
 
     bool equals(KeyValue& other) {
-        return key->equals(*other.key);
+        return key->equals(other.key);
     }
     ~KeyValue() {
         delete key;

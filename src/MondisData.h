@@ -7,6 +7,8 @@
 
 #include <string>
 
+#include "Command.h"
+
 class MondisData {
 protected:
     std::string *json=new std::string("");
@@ -20,10 +22,13 @@ public:
         toJson();
         hasSerialized  = true;
         return json;
-    }
-    virtual ~MondisData() {
+     }
+     virtual ~MondisData() {
          delete json;
      };
+
+     virtual ExecutionResult execute(Command* command) = 0;
+     virtual MondisData* locate(Command* command) = 0;
 
 };
 

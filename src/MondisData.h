@@ -8,6 +8,7 @@
 #include <string>
 
 #include "Command.h"
+#include "MondisObject.h"
 
 class MondisData {
 protected:
@@ -27,8 +28,8 @@ public:
          delete json;
      };
 
-     virtual ExecutionResult execute(Command* command) = 0;
-     virtual MondisData* locate(Command* command) = 0;
+     virtual ExecutionResult execute(Command& command);
+     virtual MondisObject* locate(Command& command);
 
 };
 

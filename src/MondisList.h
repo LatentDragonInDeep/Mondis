@@ -67,7 +67,7 @@ public:
 
     MondisObject* get (int index);
 
-    int count();
+    int size();
 
     int set (int index, MondisObject *object);
 
@@ -76,6 +76,8 @@ public:
     ListIterator iterator();
 
     void toJson() override;
+    ExecutionResult execute(Command& command);
+    MondisObject* locate(Command& command) override;
 
 private:
     void trim ();

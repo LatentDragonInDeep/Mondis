@@ -65,7 +65,7 @@ private:
 
     int daemonize;                  /* True if running as a daemon */
 
-    JSONParser parser;
+    static JSONParser parser;
 
 public:
     int start(string& confFile);
@@ -75,6 +75,7 @@ public:
     int appendLog();
     ExecutionResult execute(Command& command);
     ExecutionResult locateExecute(Command& command);
+    static JSONParser* getJSONParser();
 };
 
 

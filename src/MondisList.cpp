@@ -13,7 +13,7 @@ MondisList::MondisList ()
 
 int MondisList::pushBack (MondisObject *object)
 {
-    MondisListNode * newNode = new MondisListNode;
+    auto * newNode = new MondisListNode;
     newNode->data = object;
     MondisListNode * pre = tail->pre;
     pre->next = newNode;
@@ -143,7 +143,7 @@ MondisListNode *MondisList::locate (int index)
     return indexToNode[index-preSize+headModifyNum];
 }
 
-int MondisList::count ()
+int MondisList::size()
 {
     return preSize+nextSize;
 }
@@ -174,7 +174,7 @@ void MondisList::toJson() {
     *json+="[\n";
     ListIterator iterator = this->iterator();
     while (iterator.next()) {
-        *json+=iterator->data->getJson();
+        *json+=*iterator->data->getJson();
         *json+="\n";
     }
     *json+="]\n";
@@ -182,6 +182,25 @@ void MondisList::toJson() {
 
 MondisList::ListIterator MondisList::iterator() {
     return MondisList::ListIterator(this);
+}
+
+MondisObject *MondisList::locate(Command &command) {
+    if(command.params.size()!=1) {
+        return nullptr;
+    }
+    if(command[0].type!=Command::ParamType::PLAIN) {
+        return nullptr;
+    }
+    int index;
+    if(!toInteger(command[0].content,&index)) {
+        return nullptr;
+    }
+
+    return locate(index)->data;
+}
+
+ExecutionResult MondisList::execute(Command &command) {
+    return MondisData::execute(command);
 }
 
 

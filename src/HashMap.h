@@ -9,6 +9,7 @@
 
 #include "MondisObject.h"
 #include "MondisData.h"
+#include "Command.h"
 
 using namespace std;
 
@@ -29,10 +30,34 @@ public:
         }
         return key.intValue>other.key.intValue;
     }
-    Key(string& k):key.str(k) {}
+    Key(string& k) {
+        if(toInteger(k,key.intValue)) {
+            flag = false;
+        } else{
+            key.str = k;
+        }
+    }
+    Key(int k):key.intValue(k),flag(false){};
 
-    Key(int k):key.intValue(k){};
+    bool isInteger() {
+        return !flag;
+    }
+    void toString() {
+        if(flag) {
+            return;
+        }
+        key.str = to_string(key.intValue);
+        flag = true;
+    }
 
+    bool toInteger() {
+        bool res = toInteger(key.str,key.intValue);
+        if(res) {
+            flag = false;
+            return true;
+        }
+        return false;
+    }
     bool equals(Key& other) {
         if(flag!=other.flag) {
             return false;
@@ -64,22 +89,16 @@ private:
     }
 
     unsigned int strHash(string& str) {
-        /* 'm' and 'r' are mixing constants generated offline.
-     They're not really 'magic', they just happen to work well.  */
-        //m和r这两个值用于计算哈希值，只是因为效果好。
         int len = str.size();
         const char * key = str.c_str();
         uint32_t seed = 2017;
         const uint32_t m = 0x5bd1e995;
         const int r = 24;
 
-        /* Initialize the hash to a 'random' value */
         uint32_t h = seed ^ len;    //初始化
 
-        /* Mix 4 bytes at a time into the hash */
         const unsigned char *data = (const unsigned char *)key;
 
-        //将字符串key每四个一组看成uint32_t类型，进行运算的到h
         while(len >= 4) {
             uint32_t k = *(uint32_t*)data;
 
@@ -94,15 +113,13 @@ private:
             len -= 4;
         }
 
-        /* Handle the last few bytes of the input array  */
         switch(len) {
             case 3: h ^= data[2] << 16;
             case 2: h ^= data[1] << 8;
             case 1: h ^= data[0]; h *= m;
         };
 
-        /* Do a few final mixes of the hash to ensure the last few
-         * bytes are well-incorporated. */
+
         h ^= h >> 13;
         h *= m;
         h ^= h >> 15;
@@ -215,6 +232,7 @@ class AVLTree:public MondisData
 {
 private:
     AVLTreeNode* root;
+    unsigned _size;
 public:
     class AVLIterator {
     private:
@@ -250,12 +268,16 @@ public:
 public:
     bool insert(Entry& entry);
     bool insert(KeyValue& kv);
+    bool insert(Key& key,MondisObject* value);
     bool remove(Key& key);
     KeyValue* get(Key& key);
     MondisObject* getValue(Key& key);
     bool containsKey(Key& key);
     AVLIterator iterator();
     ~AVLTree();
+    ExecutionResult execute(Command& command);
+    MondisObject* locate(Command& command);
+    unsigned size();
 private:
     AVLTreeNode* realInsert(KeyValue& kv,AVLTreeNode* root);
     AVLTreeNode* realRemove(KeyValue& kv,AVLTreeNode* root);
@@ -274,10 +296,10 @@ class HashMap:public MondisData
 private:
     float loadFactor = 0.75f;
     unsigned int capacity = 16;
-    unsigned int size = 0;
+    unsigned int _size = 0;
     const int treeThreshold = 8;
     const bool isValueNull = false;
-    const bool isIntset = false;
+    bool isIntset = true;
     typedef struct {
         Entry * first;
         AVLTree* tree;
@@ -345,18 +367,19 @@ public:
     HashMap();
     HashMap(unsigned int capacity, float loadFactor);
 
-    HashMap(float loadFactor, unsigned int capacity, const bool isValueNull, const bool isIntset);
+    HashMap(float loadFactor, unsigned int capacity, const bool isIntset);
 
-    HashMap(const bool isValueNull, const bool isIntset);
+    HashMap(const bool isIntset);
 
     ~HashMap();
     bool put (Key &key, MondisObject *value);
     MondisObject* get (Key &key);
     bool containsKey (Key &key);
     bool remove (Key &key);
-
+    unsigned size();
 private:
     void rehash();
+    void toStringSet();
     void toTree (int index);
     int getIndex (int hash);
     void add(int index,Entry* entry);
@@ -364,6 +387,10 @@ private:
     int getCapacity (int capa);
     void toJson();
     HashMap::MapIterator iterator();
+    void checkType(Key& key);
+
+    virtual ExecutionResult execute(Command& command);
+    virtual MondisObject* locate(Command& command);
 };
 
 

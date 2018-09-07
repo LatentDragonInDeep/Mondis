@@ -10,8 +10,11 @@
 #include <exception>
 #include <stdexcept>
 #include <string>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include "MondisData.h"
+#include "Command.h"
 
 class MondisBinary: public MondisData{
 private:
@@ -66,6 +69,9 @@ public:
     void persist(std::string& filePath);
 
     void toJson();
+
+    ExecutionResult execute(Command& command);
+    MondisObject* locate(Command* command);
 };
 
 

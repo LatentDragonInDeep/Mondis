@@ -7,15 +7,21 @@
 ExecutionResult Executor::execute(Command *command) {
     if(serverCommand.find(command->type)!=serverCommand.end()) {
         if(command->next == nullptr) {
-            return server->execute(command);
+            ExecutionResult res = server->execute(command);
+            destroyCommand(command);
+            return res;
         }
+        destroyCommand(command);
         ExecutionResult res;
         res.type = LOGIC_ERROR;
         res.res = "invalid pipeline command";
         return res;
     } else if(command->type = LOCATE) {
-        return server->locateExecute(command);
+        ExecutionResult res = server->locateExecute(command);
+        destroyCommand(command);
+        return res;
     }
+    destroyCommand(command);
     ExecutionResult res;
     res.type = LOGIC_ERROR;
     res.res = "unsuitable command";
@@ -25,11 +31,9 @@ ExecutionResult Executor::execute(Command *command) {
 void CommandInterpreter::init() {
     PUT(SET)
     PUT(GET)
-    PUT(DUMP)
     PUT(EXISTS)
     PUT(RENAME)
     PUT(TYPE)
-    PUT(MOVE)
     PUT(GET)
     PUT(GET_RANGE)
     PUT(SET_RANGE)
@@ -60,6 +64,15 @@ void CommandInterpreter::init() {
     PUT(EXIT)
     PUT(SAVE)
     PUT(BGSAVE)
+    PUT(PERSIST)
+    PUT(READ_FROM)
+    PUT(READ_CHAR)
+    PUT(READ_SHORT)
+    PUT(READ_INT)
+    PUT(READ_LONG)
+    PUT(READ_LONG_LONG)
+    PUT(BACK)
+    PUT(FORWARD)
 }
 
 CommandInterpreter::CommandInterpreter() {
@@ -173,17 +186,33 @@ Executor::Executor() {
     }
 }
 
+Executor *Executor::getExecutor() {
+    return executor;
+}
+
 void Executor::init() {
     INSERT(SET)
     INSERT(GET)
-    INSERT(DUMP)
+
     INSERT(EXISTS)
     INSERT(RENAME)
     INSERT(TYPE)
-    INSERT(MOVE)
 
     INSERT(SAVE)
     INSERT(BGSAVE)
     INSERT(EXIT)
     INSERT(LOGIN)
+}
+
+void Executor::destroyCommand(Command *command) {
+    if(command == nullptr) {
+        return;
+    }
+    Command* cur = command;
+    while (cur!= nullptr) {
+        Command* temp = cur;
+        cur = cur->next;
+        delete temp;
+    }
+
 }

@@ -3,6 +3,7 @@
 //
 
 #include "HashMap.h"
+#include "Command.h"
 
 HashMap::HashMap ():HashMap(16,0.75f) {}
 
@@ -10,12 +11,14 @@ HashMap::HashMap (unsigned int capacity, float loadFactor): HashMap(capacity,loa
 
 bool HashMap::put(Key &key, MondisObject *value)
 {
+    checkType(key);
     int index = getIndex(key.hashCode());
     Content content= arrayFrom[index];
     if(content.isList) {
         Entry* cur = content.first;
         for (;cur!=nullptr;cur = cur->next) {
             if(key.equals(*cur->key)) {
+                delete cur->object;
                 cur->object = value;
                 return true;
             }
@@ -36,8 +39,8 @@ bool HashMap::put(Key &key, MondisObject *value)
     newEntry->object = value;
     newEntry->key = &key;
     content.tree->insert(*newEntry);
-    size++;
-    if(size/capacity>loadFactor) {
+    _size++;
+    if(_size/capacity>loadFactor) {
         rehash();
         return true;
     }
@@ -45,6 +48,12 @@ bool HashMap::put(Key &key, MondisObject *value)
 
 MondisObject *HashMap::get (Key &key)
 {
+    if(isIntset&&!key.isInteger()) {
+        return nullptr;
+    }
+    if(!isIntset) {
+        key.toString();
+    }
     int index = getIndex(key.hashCode());
     Content content= arrayFrom[index];
     if(content.isList) {
@@ -83,8 +92,11 @@ int HashMap::getCapacity (int capa)
 
 bool HashMap::remove (Key &key)
 {
-    if(! containsKey(key)) {
+    if(isIntset&&!key.isInteger()) {
         return false;
+    }
+    if(!isIntset) {
+        key.toString();
     }
     int index = getIndex(key.hashCode());
     Content content= arrayFrom[index];
@@ -96,20 +108,17 @@ bool HashMap::remove (Key &key)
                 pre->next = cur->next;
                 cur->next->pre = pre;
                 delete cur;
-                size--;
+                _size--;
                 return true;
             }
         }
     }
     if(content.tree->get(key)) {
-        size--;
+        _size--;
         content.tree->remove(key);
         return true;
     }
-    else{
-        return false;
-    }
-
+    return false;
 }
 
 void HashMap::toTree (int index)
@@ -202,10 +211,90 @@ HashMap::MapIterator HashMap::iterator() {
     return HashMap::MapIterator(this);
 }
 
-HashMap::HashMap(float loadFactor, unsigned int capacity, const bool isValueNull, const bool isIntset) : loadFactor(
-        loadFactor), capacity(getCapacity(capacity)), isValueNull(isValueNull), isIntset(isIntset) {
+HashMap::HashMap(float loadFactor, unsigned int capacity, const bool isIntset) : loadFactor(
+        loadFactor), capacity(getCapacity(capacity)), isIntset(isIntset) {
     arrayFrom = new Content[capacity];
 }
 
-HashMap::HashMap(const bool isValueNull, const bool isIntset) : HashMap(16,0.75f,isValueNull,isIntset) {}
+HashMap::HashMap(const bool isValueNull, const bool isIntset) : HashMap(1024,0.75f,isValueNull,isIntset) {}
+
+MondisObject *HashMap::locate(Command& command) {
+    if(command.params.size()!=1) {
+        return nullptr;
+    }
+    if(command[0].type!=Command::ParamType::PLAIN) {
+        return nullptr;
+    }
+    return get(Key(command[0].content));
+
+}
+
+ExecutionResult HashMap::execute(Command& command) {
+    ExecutionResult res;
+    switch (command.type) {
+        case ADD:
+            CHECK_PARAM_NUM(1)
+            put(KEY(0), nullptr);
+            OK_AND_RETURN
+        case REMOVE:
+            CHECK_PARAM_NUM(1)
+            remove(KEY(0))
+            OK_AND_RETURN
+        case EXISTS:
+            CHECK_PARAM_NUM(1)
+            res.res = to_string(containsKey(KEY(0)));
+            OK_AND_RETURN
+        case SIZE:
+            CHECK_PARAM_NUM(0)
+            res.res = to_string(size());
+            OK_AND_RETURN
+    }
+    INVALID_AND_RETURN
+}
+
+void HashMap::toStringSet() {
+    if(!isIntset) {
+        return;
+    }
+    arrayTo = new Content[capacity];
+    for (int i = 0; i < capacity;++i)
+    {
+        if(arrayFrom[i].isList) {
+            for (Entry* cur = arrayFrom[i].first;cur!= nullptr;)
+            {
+                Entry* next = cur->next;
+                Key* k = cur->key;
+                k->toString();
+                int index = k->hashCode()&(capacity-1);
+                add(index,cur);
+            }
+        }
+        else{
+            auto treeIterator = arrayFrom[i].tree->iterator();
+            while (treeIterator.next()) {
+                Key* k = treeIterator->data->key;
+                k->toString();
+                int index = k->hashCode()&(capacity-1);
+                add(index,new Entry(treeIterator->data));
+                delete arrayFrom[i].tree;
+            }
+        }
+    }
+    delete[] arrayFrom;
+    arrayFrom = arrayTo;
+    isIntset = false;
+}
+
+void HashMap::checkType(Key &key) {
+    if(isIntset) {
+        if(!key.isInteger()) {
+            toStringSet();
+        }
+
+    }
+}
+
+unsigned HashMap::size() {
+    return _size;
+}
 

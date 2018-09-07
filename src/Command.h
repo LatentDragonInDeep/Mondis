@@ -25,7 +25,7 @@
 #define INVALID_AND_RETURN res.res = "Invalid command";\
                              return res;
 
-#define CHECK_INT_LEGAL(DATA,RES) if(!toInteger(DATA,RES)) {\
+#define CHECK_INT_LEGAL(DATA,NAME) if(!toInteger(DATA,NAME)) {\
                                     res.res = "argument can not be transformed to int";\
                                     return res;\
                                     }
@@ -36,8 +36,8 @@
 #define CHECK_INT_END_LEGAL(INDEX) int end;\
                                       CHECK_INT_LEGAL(command[INDEX].content,&end)
 
-#define CHECK_AND_DEFINE_INT_LEGAL(INDEX,RES) int RES;\
-                                      CHECK_INT_LEGAL(command[INDEX].content,&##RES)
+#define CHECK_AND_DEFINE_INT_LEGAL(INDEX,NAME) int NAME;\
+                                      CHECK_INT_LEGAL(command[INDEX].content,&##NAME)
 
 #define CHECK_START if(start<0) {\
                      res.res = "start under zero!";\
@@ -60,6 +60,13 @@
                                         return res;\
                                         }
 
+#define KEY(INDEX) Key(command[INDEX].content)
+
+#define CHECK_PARAM_LENGTH(INDEX,LENGTH) if(command[INDEX].content.size()!=LENGTH) { \
+                                            res.res = "argument length error";\
+                                            return res;\
+                                            }
+
 bool toInteger(string& data,int* res) {
     static stringstream ss;
     ss<<data;
@@ -72,14 +79,19 @@ bool toInteger(string& data,int* res) {
     return false;
 };
 
+string to_string(bool data) {
+    if(data) {
+        return "true";
+    }
+    return "false";
+}
+
 enum CommandType {
     SET,
     DEL,
-    DUMP,
     EXISTS,
     RENAME,
     TYPE,
-    MOVE,
     GET,
     GET_RANGE,
     SET_RANGE,
@@ -106,6 +118,18 @@ enum CommandType {
     GET_BY_SCORE,
     GET_RANGE_BY_RANK,
     GET_RANGE_BY_SCORE,
+    PERSIST,
+    READ_FROM,
+    READ_CHAR,
+    READ_SHORT,
+    READ_INT,
+    READ_LONG,
+    READ_LONG_LONG,
+    BACK,
+    FORWARD,
+    SET_POSITION,
+    READ,
+    WRITE,
 
     //key space command
 //    KEYSPACE_SET,//set
@@ -250,7 +274,7 @@ public:
 
     ExecutionResult execute(Command* command);
     static Executor* getExecutor();
-
+    static void destroyCommand(Command* command);
 private:
     Executor();
     Executor(Executor&) = default;

@@ -117,3 +117,132 @@ void MondisBinary::toJson() {
     *json+= *new std::string(heapBuffer,capacity);
     *json+="\"";
 }
+
+ExecutionResult MondisBinary::execute(Command &command) {
+    ExecutionResult res;
+    switch (command.type) {
+        case SET: {
+            CHECK_PARAM_NUM(2)
+            CHECK_PARAM_TYPE(0, PLAIN);
+            CHECK_AND_DEFINE_INT_LEGAL(0, pos)
+            CHECK_PARAM_TYPE(1, STRING)
+            CHECK_PARAM_LENGTH(1, 1)
+            if (pos < offset || pos > limit) {
+                res.res = "read or write out of range";
+                return res;
+            }
+            heapBuffer[pos] = command[1][0];
+            OK_AND_RETURN
+        }
+        case GET: {
+            CHECK_PARAM_NUM(1)
+            CHECK_PARAM_TYPE(0, PLAIN);
+            CHECK_AND_DEFINE_INT_LEGAL(0, pos)
+            if (pos < offset || pos > limit) {
+                res.res = "read or write out of range";
+                return res;
+            }
+            res.res = std::to_string(heapBuffer[pos]);
+            OK_AND_RETURN
+        }
+        case SET_RANGE: {
+            CHECK_PARAM_NUM(3)
+            CHECK_PARAM_TYPE(0, PLAIN);
+            CHECK_PARAM_TYPE(1, PLAIN);
+            CHECK_PARAM_TYPE(2, STRING);
+            CHECK_AND_DEFINE_INT_LEGAL(0, start)
+            CHECK_AND_DEFINE_INT_LEGAL(1, end)
+            CHECK_PARAM_LENGTH(2, end - start);
+            if (start < offset || end > limit || start > end) {
+                res.res = "read or write out of range";
+                return res;
+            }
+            memcpy(heapBuffer + start, command[0].content.data(), end - start);
+            OK_AND_RETURN
+        }
+        case GET_RANGE: {
+            CHECK_PARAM_NUM(3)
+            CHECK_PARAM_TYPE(0, PLAIN);
+            CHECK_PARAM_TYPE(1, PLAIN);
+            CHECK_PARAM_TYPE(2, STRING);
+            CHECK_AND_DEFINE_INT_LEGAL(0, start)
+            CHECK_AND_DEFINE_INT_LEGAL(1, end)
+            CHECK_PARAM_LENGTH(2, end - start);
+            if (start < offset || end > limit || start > end) {
+                res.res = "read or write out of range";
+                return res;
+            }
+            res.res = string(heapBuffer + start, end - start);
+            OK_AND_RETURN
+        }
+        case READ_CHAR: {
+            CHECK_PARAM_NUM(0)
+            res.res = std::to_string(readType<char>());
+            OK_AND_RETURN
+        }
+        case READ_SHORT: {
+            CHECK_PARAM_NUM(0)
+            res.res = std::to_string(readType<short>());
+            OK_AND_RETURN
+        }
+        case READ_INT: {
+            CHECK_PARAM_NUM(0)
+            res.res = std::to_string(readType<int>());
+            OK_AND_RETURN
+        }
+        case READ_LONG: {
+            CHECK_PARAM_NUM(0)
+            res.res = std::to_string(readType<long>());
+            OK_AND_RETURN
+        }
+        case READ_LONG_LONG: {
+            CHECK_PARAM_NUM(0)
+            res.res = std::to_string(readType<long long>());
+            OK_AND_RETURN
+        }
+        case BACK: {
+            CHECK_PARAM_NUM(1)
+            CHECK_PARAM_TYPE(0, PLAIN)
+            CHECK_AND_DEFINE_INT_LEGAL(0, off)
+            back(off);
+            OK_AND_RETURN
+        }
+        case FORWARD: {
+            CHECK_PARAM_NUM(1)
+            CHECK_PARAM_TYPE(0, PLAIN)
+            CHECK_AND_DEFINE_INT_LEGAL(0, off)
+            forward(off);
+            OK_AND_RETURN
+        }
+        case READ: {
+            CHECK_PARAM_NUM(1)
+            CHECK_PARAM_TYPE(0, PLAIN)
+            CHECK_AND_DEFINE_INT_LEGAL(0, readable)
+            char *buffer = new char[readable];
+            read(readable, buffer);
+            res.res = string(buffer, readable);
+            delete[] buffer;
+            OK_AND_RETURN
+        }
+        case WRITE: {
+            CHECK_PARAM_NUM(1)
+            CHECK_PARAM_TYPE(0, STRING)
+            write(command[0].content.size(), command[0].content.data());
+            OK_AND_RETURN
+        }
+        case SET_POSITION: {
+            CHECK_PARAM_NUM(1)
+            CHECK_PARAM_TYPE(0, PLAIN);
+            CHECK_AND_DEFINE_INT_LEGAL(0, pos)
+            setPosition(pos);
+            OK_AND_RETURN
+        }
+
+    }
+    INVALID_AND_RETURN
+}
+
+MondisObject *MondisBinary::locate(Command &command) {
+    return nullptr;
+}
+

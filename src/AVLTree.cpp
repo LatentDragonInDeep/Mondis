@@ -3,6 +3,8 @@
 //
 
 #include "HashMap.h"
+#include "MondisServer.h"
+#include "Command.h"
 
 #include <algorithm>
 
@@ -17,6 +19,7 @@ AVLTreeNode *AVLTree::realInsert (KeyValue &kv, AVLTreeNode *root)
     if(root == nullptr) {
         root = new AVLTreeNode;
         root->data = &kv;
+        _size++;
     }
     else if(kv.compare(*root->data)) {
         root->right = realInsert(kv,root->right);
@@ -28,6 +31,9 @@ AVLTreeNode *AVLTree::realInsert (KeyValue &kv, AVLTreeNode *root)
                 root = rightLeftRotate(root);
             }
         }
+    } else if(kv.equals(*root->data)) {
+        delete root->data;
+        root->data = &kv;
     }
     else{
         root->left = realInsert(kv,root->left);
@@ -108,16 +114,19 @@ AVLTreeNode *AVLTree::realRemove (KeyValue &kv, AVLTreeNode *root)
     if(kv.equals(*root->data)) {
         if(root->left == nullptr&&root->right == nullptr) {
             delete root;
+            _size--;
             return nullptr;
         }
         else if(root->left!= nullptr&&root->right== nullptr) {
             AVLTreeNode* res = root->left;
             delete root;
+            _size--;
             return res;
         }
         else if(root->left== nullptr&&root->right!= nullptr) {
             AVLTreeNode* res = root->right;
             delete root;
+            _size--;
             return res;
         }
         else{
@@ -128,7 +137,7 @@ AVLTreeNode *AVLTree::realRemove (KeyValue &kv, AVLTreeNode *root)
             if(getHeight(root->left)-getHeight(root->right) == 2) {
                 root = rightRotate(root);
             }
-
+            _size--;
             return root;
         }
     }
@@ -183,6 +192,9 @@ bool AVLTree::insert(KeyValue &kv) {
 }
 
 KeyValue *AVLTree::get(Key &key) {
+    if(key.isInteger()) {
+        key.toString();
+    }
     AVLTreeNode* cur = root;
     while (true) {
         if(cur == nullptr) {
@@ -210,5 +222,52 @@ MondisObject *AVLTree::getValue(Key &key) {
 
 bool AVLTree::containsKey(Key &key) {
     return get(key) == nullptr;
+}
+
+MondisObject *AVLTree::locate(Command &command) {
+    return getValue(KEY(0));
+}
+
+ExecutionResult AVLTree::execute(Command &command) {
+    ExecutionResult res;
+    switch (command.type) {
+        case SET:
+            CHECK_PARAM_NUM(2);
+            CHECK_PARAM_TYPE(0,PLAIN)
+            CHECK_PARAM_TYPE(1,STRING)
+            insert(*new KEY(0),MondisServer::getJSONParser()->parseObject(command[1].content));
+            OK_AND_RETURN;
+        case GET:
+            CHECK_PARAM_NUM(1);
+            CHECK_PARAM_TYPE(0,PLAIN)
+            auto * obj = getValue(KEY(0));
+            if(obj!= nullptr) {
+                res.res = *obj->getJson();
+            }
+            OK_AND_RETURN;
+        case DEL:
+            CHECK_PARAM_NUM(1)
+            CHECK_PARAM_TYPE(0,PLAIN)
+            remove(KEY(0));
+            OK_AND_RETURN
+        case EXISTS:
+            CHECK_PARAM_NUM(1)
+            CHECK_PARAM_TYPE(0,PLAIN)
+            res.res = to_string(containsKey(KEY(0)));
+            OK_AND_RETURN
+        case SIZE:
+            CHECK_PARAM_NUM(0)
+            res.res = to_string(size());
+            OK_AND_RETURN
+    }
+    INVALID_AND_RETURN
+}
+
+bool AVLTree::insert(Key &key, MondisObject *value) {
+    return insert(*new KeyValue(&key,value));
+}
+
+unsigned AVLTree::size() {
+    return _size;
 }
 

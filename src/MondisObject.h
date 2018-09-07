@@ -18,7 +18,7 @@
 
 using namespace std;
 enum MondisObjectType {
-    RAW_STRING,
+    RAW_STRING = 0,
     RAW_INT,
     RAW_BIN,
     LIST,
@@ -71,6 +71,10 @@ private:
     bool hasSerialized = false;
     string* json = new string("");
 public:
+    static string typeStrs[];
+    string getTypeStr() {
+        return typeStrs[type];
+    }
     static MondisObject* getNullObject() {
         return nullObj;
     };
@@ -191,7 +195,15 @@ private:
 
         return res
     };
+public:
+    MondisObject* locate(Command* command) {
+        if(type == RAW_INT||type == RAW_STRING||type == RAW_BIN) {
+            return nullptr;
+        }
+        MondisData* data = (MondisData*)objectData;
+        return data->locate(command);
+    }
 };
 
-
+string MondisObject::typeStrs[] = {"RAW_STRING", "RAW_INT", "RAW_BIN", "LIST", "SET", "ZSET", "HASH", "EMPTY"};
 #endif //MONDIS_MONDISOBJECT_H

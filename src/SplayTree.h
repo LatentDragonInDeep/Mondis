@@ -11,44 +11,26 @@
 #include "HashMap.h"
 #include "MondisData.h"
 
-class SkipListNode {
+class SplayTreeNode {
 public:
-    static const int MAX_LEVEL = 32;
+    int score;
     MondisObject* data = nullptr;
-    Key* key = nullptr;
-    SkipListNode* backward = nullptr;
-    struct SkipListLevel {
-        SkipListNode * next = nullptr;
-        int span = 0;//跨度
-    } *forwards;
-
-    SkipListNode(int levelNum) {
-        forwards = new SkipListLevel[levelNum];
-    }
-
-    static SkipListNode* getDummyNode() {
-        return new SkipListNode(MAX_LEVEL);
-    }
+    SplayTreeNode* left = nullptr;
+    SplayTreeNode* right = nullptr;
+    unsigned height = 0;
+    unsigned treeSize = 0;
 };
 
-class SkipList:public MondisData
+class SplayTree:public MondisData
 {
 private:
-    SkipListNode* head = new SkipListNode;
-    SkipListNode* tail = new SkipListNode;
-    unsigned long length = 0;
-    int level = 1;
-    static uniform_int_distribution<int> distribution;
-    static default_random_engine engine;
-    static const float constexpr SKIP_LIST_P = 0.25f;
-    static const int SKIP_LIST_RANDOM_UPPER_BOUND = 65535;
-    bool isKeyInteger = true;
+    SplayTreeNode* root;
 public:
-    class SkipIterator {
+    class SplayIterator {
     private:
-        SkipListNode* cur;
+        SplayTreeNode* cur;
     public:
-        SkipIterator(SkipList* list) {
+        SkipIterator(SplayTree* list) {
             cur = list->head;
         }
         bool next() {
@@ -59,19 +41,19 @@ public:
             return false;
         }
 
-        SkipListNode*operator->() {
+        SplayTreeNode*operator->() {
             return cur;
         }
     };
-    SkipList();
-    ~SkipList();
-    SkipListNode *insert(int score, MondisObject* obj);
+    SplayTree();
+    ~SplayTree();
+    bool insert(int score, MondisObject* obj);
     //TODO
     bool removeByScore(int score);
     bool removeByRank(int rank)
     MondisObject* getByScore(int score);
     MondisObject* getByRank(int rank);
-    bool containsKey(int score);
+    bool contains(int score);
     unsigned count(int startScore,int endScore);
     void removeRangeByRank(int start,int end);
     void removeRangeByScore(int startScore,int endScore);
@@ -79,7 +61,7 @@ public:
     void getRangeByScore(int startScore, int endScore,vector<MondisObject*>* res);
     unsigned size();
     void toJson();
-    SkipIterator iterator();
+    SplayIterator iterator();
     ExecutionResult execute(Command& command);
     MondisObject* locate(Command& command);
 private:

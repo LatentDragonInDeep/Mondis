@@ -13,7 +13,7 @@
 #include "MondisList.h"
 #include "HashMap.h"
 #include "MondisBinary.h"
-#include "SkipList.h"
+#include "SplayTree.h"
 #include "Command.h"
 
 using namespace std;

@@ -130,39 +130,20 @@ MondisObject *JSONParser::parseJSONObject(JSONParser::LexicalParser *lp, bool is
         res->objectData = (void*)new AVLTree;
         return res;
     }
-    if(*first.key->key.str == "InMemoryType") {
-        if(*first.key->key.str == "HASH") {
-            res->type = HASH;
-            AVLTree* tree = new AVLTree;
-            matchToken(lp,COMMA);
-            KeyValue cur;
-            while (true) {
-                cur = parseEntry(lp);
-                if(cur.key = nullptr) {
-                    break;
-                }
-                tree->insert(*new KeyValue(cur.key,cur.value));
-                cur = parseEntry(lp);
-                matchToken(lp,COMMA);
-            }
-            res->objectData = (void*)tree;
-        } else if(*first.key->key.str == "ZSET") {
-            res->type = ZSET;
-            SkipList* skipList = new SkipList;
-            matchToken(lp,COMMA);
-            KeyValue cur;
-            while (true) {
-                cur = parseEntry(lp);
-                if(cur.key = nullptr) {
-                    break;
-                }
-                skipList->insert(cur.key,cur.value);
-                cur = parseEntry(lp);
-                matchToken(lp,COMMA);
-            }
-            res->objectData = (void*)skipList;
+    res->type = HASH;
+    AVLTree* tree = new AVLTree;
+    matchToken(lp,COMMA);
+    KeyValue cur;
+    while (true) {
+        cur = parseEntry(lp);
+        if(cur.key = nullptr) {
+            break;
         }
+        tree->insert(*new KeyValue(cur.key,cur.value));
+        cur = parseEntry(lp);
+        matchToken(lp,COMMA);
     }
+    res->objectData = (void*)tree;
 
     return res;
 }

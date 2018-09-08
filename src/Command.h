@@ -71,7 +71,7 @@ bool toInteger(string& data,int* res) {
     static stringstream ss;
     ss<<data;
     int res;
-    ss>>res;
+    ss>>*res;
     if(!ss.fail()) {
         ss.clear();
         return true;
@@ -156,14 +156,13 @@ enum CommandType {
 //    SET_SIZE,
 
     //ZSET
-//    ZSET_ADD,
+//    ZSET_INSERT,
 //    ZSET_REMOVE_BY_RANK,
 //    ZSET_REMOVE_BY_SCORE,
 //    ZSET_REMOVE_RANGE_BY_RANK,
 //    ZSET_REMOVE_RANGE_BY_SCORE,
 //    ZSET_EXISTS,
 //    ZSET_SIZE,
-//    ZSET_COUNT_RANGE_BY_RANK,
 //    ZSET_COUNT_RANGE_BY_SCORE,
 //    ZSET_GET_BY_RANK,
 //    ZSET_GET_BY_SCORE,

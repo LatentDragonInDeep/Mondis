@@ -142,43 +142,41 @@ void CommandInterpreter::LexicalParser::skip() {
 
 CommandInterpreter::Token CommandInterpreter::LexicalParser::nextToken() {
     Token res;
-    if(curIndex>=raw.size()) {
+    if (curIndex >= raw.size()) {
         return res;
     }
     skip();
-    if(isEnd) {
+    if (isEnd) {
         return res;
     }
     int start;
-    if(raw[curIndex] == '"') {
-        start = curIndex;
-        curIndex++;
-        while (true) {
-            if(raw[curIndex]=='"'&&raw[curIndex-1]!='\\') {
-                res.type = STRING_PARAM;
-                res.content = raw.substr(start+1,curIndex);
-                curIndex++;
-                return res;
-            }
-            curIndex++;
+    if (raw[curIndex] == '"') {
+        if (*raw.end() == '"') {
+            start = curIndex;
+            curIndex = raw.size();
+            res.type = STRING_PARAM;
+            res.content = raw.substr(start);
+            return res;
         }
-    } else if(raw[curIndex] == '|') {
+        res.type = END;
+        return res;
+    } else if (raw[curIndex] == '|') {
         res.type = VERTICAL;
         curIndex++;
         return res;
     }
     start = curIndex;
     while (true) {
-        if(raw[curIndex]==' ') {
+        if (raw[curIndex] == ' ') {
             res.type = PLAIN_PARAM;
-            res.content = raw.substr(start,curIndex);
+            res.content = raw.substr(start, curIndex);
             curIndex++;
             return res;
         }
         curIndex++;
     }
-
 }
+
 
 Executor::Executor() {
     if(!hasInit) {

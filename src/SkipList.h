@@ -64,13 +64,24 @@ public:
         }
     };
     SkipList();
-    ~SkipList ();
-    SkipListNode *insert(Key& key, MondisObject* obj);
+    ~SkipList();
+    SkipListNode *insert(int score, MondisObject* obj);
     //TODO
-    int remove(Key& key);
-    void getRange(Key& from, Key& to,vector<MondisObject*>* res);
+    bool removeByScore(int score);
+    bool removeByRank(int rank)
+    MondisObject* getByScore(int score);
+    MondisObject* getByRank(int rank);
+    bool containsKey(int score);
+    unsigned count(int startScore,int endScore);
+    void removeRangeByRank(int start,int end);
+    void removeRangeByScore(int startScore,int endScore);
+    void getRangeByRank(int start,int end,vector<MondisObject*>* res);
+    void getRangeByScore(int startScore, int endScore,vector<MondisObject*>* res);
+    unsigned size();
     void toJson();
     SkipIterator iterator();
+    ExecutionResult execute(Command& command);
+    MondisObject* locate(Command& command);
 private:
     static int getRandomLevel();
 };

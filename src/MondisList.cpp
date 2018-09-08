@@ -1,7 +1,10 @@
 //
 // Created by caesarschen on 2018/8/20.
 //
+#include <vector>
+
 #include "MondisList.h"
+#include "Command.h"
 
 MondisList::MondisList ()
 {
@@ -200,7 +203,67 @@ MondisObject *MondisList::locate(Command &command) {
 }
 
 ExecutionResult MondisList::execute(Command &command) {
-    return MondisData::execute(command);
+    ExecutionResult res;
+    switch (command.type) {
+        case SET:
+            CHECK_PARAM_NUM(2)
+            CHECK_PARAM_TYPE(0,PLAIN)
+            CHECK_AND_DEFINE_INT_LEGAL(0,index)
+            CHECK_PARAM_TYPE(1,STRING)
+            if(index<0||index>size()) {
+                res.res = "index out of range";
+                return res;
+            }
+            set(index,MondisServer::getJSONParser()->parseObject(command[1].content));
+            OK_AND_RETURN
+        case GET:
+            CHECK_PARAM_NUM(1)
+            CHECK_PARAM_TYPE(0,PLAIN)
+            CHECK_AND_DEFINE_INT_LEGAL(0,index)
+            if(index<0||index>size()) {
+                res.res = "index out of range";
+                return res;
+            }
+            res.res = *get(index)->getJson();
+            OK_AND_RETURN
+        case PUSH_FRONT:
+            CHECK_PARAM_NUM(1)
+            CHECK_PARAM_TYPE(0,STRING)
+            pushFront(MondisServer::getJSONParser()->parseObject(command[0].content));
+            OK_AND_RETURN
+        case PUSH_BACK:
+            CHECK_PARAM_NUM(1)
+            CHECK_PARAM_TYPE(0,STRING)
+            pushBack(MondisServer::getJSONParser()->parseObject(command[0].content));
+            OK_AND_RETURN
+        case POP_FRONT:
+            CHECK_PARAM_NUM(0)
+            CHECK_PARAM_TYPE(0,STRING)
+            res.res = *popFront()->getJson();
+            OK_AND_RETURN
+        case POP_BACK:
+            CHECK_PARAM_NUM(0)
+            CHECK_PARAM_TYPE(0,STRING)
+            res.res = *popBack()->getJson();
+            OK_AND_RETURN
+        case GET_RANGE:
+            CHECK_PARAM_NUM(2)
+            CHECK_PARAM_TYPE(0,PLAIN)
+            CHECK_PARAM_TYPE(1,PLAIN)
+            CHECK_INT_START_LEGAL(0)
+            CHECK_START
+            CHECK_INT_END_LEGAL(1)
+            CHECK_END(size())
+            std::vector<MondisObject*> data;
+            getRange(start,end,data);
+            res.res+="{\n";
+            for (auto obj:data) {
+                res.res+=*obj->getJson();
+            }
+            res.res+="}\n";
+            OK_AND_RETURN
+    }
+    INVALID_AND_RETURN
 }
 
 

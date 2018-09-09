@@ -1,8 +1,8 @@
 # Mondis
-Mondis is a key-value database powered by redis and add some new feature。
-#什么是Mondis
-Mondis是一个key-value数据库，它很像redis，但是支持许多redis不支持的新特性。实际上，它的名字mondis就是取自mongodb与redis。后面将会说明这样做的原因。
-#mondis的数据结构
+Mondis is a key-value database powered by redis and add some new feature。</br>
+#什么是Mondis</br>
+Mondis是一个key-value数据库，它很像redis，但是支持许多redis不支持的新特性。实际上，它的名字mondis就是取自mongodb与redis。后面将会说明这样做的原因。</br>
+#mondis的数据结构</br>
 mondis支持redis所支持的全部数据结构，除此之外，mondis还支持二进制数据。
 #mondis二进制数据操作
 mondis的二进制数据类似于java里面的bytebuffer，一个高效的内存缓冲区。它支持bytebuffer支持的几乎所有操作，但是不支持offset,limit有关操作。

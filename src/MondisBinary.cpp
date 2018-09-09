@@ -5,85 +5,75 @@
 #include "MondisBinary.h"
 #include <fstream>
 
-MondisBinary::MondisBinary(int mark, int pos, int lim, int cap, char *hb, int offset,bool isWrapped) :
-        m_mark(mark),position(pos),limit(lim),capacity(cap),heapBuffer(hb),offset(offset),isWrapped(isWrapped){}
+MondisBinary::MondisBinary(int mark, int pos, int cap, char *hb) :
+        m_mark(mark),position(pos),capacity(cap),heapBuffer(hb){}
 
-MondisBinary::MondisBinary(int mark, int pos, int lim, int cap) :MondisBinary(mark,pos,lim,cap,new char[capacity],0,false){}
+MondisBinary::MondisBinary(int mark,int pos,int cap) :MondisBinary(mark,pos,cap,new char[capacity]){}
 
 MondisBinary *MondisBinary::allocate(int cap) {
-    return new MondisBinary(0,0,cap,cap);
-}
-
-MondisBinary *MondisBinary::wrap(char *hb, int cap, int offset, int length) {
-    return new MondisBinary(0,offset,offset+length,cap,hb,offset, true);
+    return new MondisBinary(0,cap,cap);
 }
 
 char MondisBinary::get(unsigned i) {
-    if(i<offset||i>limit) {
-        throw std::invalid_argument("read out of range");
-    }
     return heapBuffer[i];
 }
 
 void MondisBinary::put(unsigned i, char data) {
-    if(i<offset||i>limit) {
-        throw std::invalid_argument("write out of range");
-    }
     heapBuffer[i] = data;
 }
 
 unsigned MondisBinary::read(unsigned length, char *buffer) {
-    if(position>=limit) {
+    if(position>=capacity) {
         return 0;
     }
-    else if(position+length<=limit) {
+    else if(position+length<=capacity) {
         memcpy(buffer,heapBuffer+position,length);
         position+=length;
         return length;
     }
-    int readable = limit-position;
+    int readable = capacity-position;
     memcpy(buffer,heapBuffer+position,readable);
-    position = limit;
+    position = capacity;
 
     return readable;
 }
 
 unsigned MondisBinary::write(unsigned length, char *buffer) {
-    if(position>=limit) {
+    if(position>=capacity) {
         return 0;
     }
-    else if(position+length<=limit) {
+    else if(position+length<=capacity) {
         memcpy(heapBuffer+position,buffer,length);
         position+=length;
         return length;
     }
-    int writable = limit-position;
+    int writable = capacity-position;
     memcpy(heapBuffer+position,buffer,writable);
-    position = limit;
+    position = capacity;
 
     return writable;
 }
 
 bool MondisBinary::setPosition(unsigned pos) {
-    if(pos<offset||pos>limit) {
+    if(pos>=capacity) {
         throw std::invalid_argument("position out of range");
     }
     position = pos;
 }
 
 bool MondisBinary::back(unsigned off) {
-    if(position-off<offset) {
+    if(position-off<0) {
         return false;
     }
-    position-=offset;
+    position-=off;
     return true;
 }
 
 bool MondisBinary::forward(unsigned off) {
-    if(position+off>limit) {
+    if(position+off>+capacity) {
         return false;
     }
-    position+=offset;
+    position+=off;
     return true;
 }
 
@@ -96,9 +86,7 @@ void MondisBinary::reset() {
 }
 
 MondisBinary::~MondisBinary() {
-    if(!isWrapped) {
-        delete[] heapBuffer;
-    }
+    delete[] heapBuffer;
 }
 
 void MondisBinary::persist(std::string &filePath) {
@@ -127,7 +115,7 @@ ExecutionResult MondisBinary::execute(Command &command) {
             CHECK_AND_DEFINE_INT_LEGAL(0, pos)
             CHECK_PARAM_TYPE(1, STRING)
             CHECK_PARAM_LENGTH(1, 1)
-            if (pos < offset || pos > limit) {
+            if (pos < 0 || pos >=capacity) {
                 res.res = "read or write out of range";
                 return res;
             }
@@ -138,7 +126,7 @@ ExecutionResult MondisBinary::execute(Command &command) {
             CHECK_PARAM_NUM(1)
             CHECK_PARAM_TYPE(0, PLAIN);
             CHECK_AND_DEFINE_INT_LEGAL(0, pos)
-            if (pos < offset || pos > limit) {
+            if (pos < 0 || pos >=capacity) {
                 res.res = "read or write out of range";
                 return res;
             }
@@ -153,7 +141,7 @@ ExecutionResult MondisBinary::execute(Command &command) {
             CHECK_AND_DEFINE_INT_LEGAL(0, start)
             CHECK_AND_DEFINE_INT_LEGAL(1, end)
             CHECK_PARAM_LENGTH(2, end - start);
-            if (start < offset || end > limit || start > end) {
+            if (start < 0 || end > capacity || start > end) {
                 res.res = "read or write out of range";
                 return res;
             }
@@ -168,7 +156,7 @@ ExecutionResult MondisBinary::execute(Command &command) {
             CHECK_AND_DEFINE_INT_LEGAL(0, start)
             CHECK_AND_DEFINE_INT_LEGAL(1, end)
             CHECK_PARAM_LENGTH(2, end - start);
-            if (start < offset || end > limit || start > end) {
+            if (start < 0 || end > capacity || start > end) {
                 res.res = "read or write out of range";
                 return res;
             }

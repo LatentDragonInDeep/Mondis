@@ -184,7 +184,7 @@ void AVLTree::toJson() {
 }
 
 AVLTree::~AVLTree() {
-    delete root;
+    deleteTree(root);
 }
 
 bool AVLTree::insert(KeyValue &kv) {
@@ -269,5 +269,16 @@ bool AVLTree::insert(Key &key, MondisObject *value) {
 
 unsigned AVLTree::size() {
     return _size;
+}
+
+void AVLTree::deleteTree(AVLTreeNode *root) {
+    if(root == nullptr) {
+        return;
+    }
+    AVLTreeNode* left = root->left;
+    AVLTreeNode* right = root->right;
+    delete root;
+    deleteTree(left);
+    deleteTree(right);
 }
 

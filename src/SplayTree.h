@@ -5,54 +5,77 @@
 #ifndef MONDIS_SKIPLIST_H
 #define MONDIS_SKIPLIST_H
 
-#include <random>
-
 #include "MondisObject.h"
 #include "HashMap.h"
 #include "MondisData.h"
 
 class SplayTreeNode {
 public:
-    int score;
+    const int score;
     MondisObject* data = nullptr;
     SplayTreeNode* left = nullptr;
     SplayTreeNode* right = nullptr;
-    unsigned height = 0;
+    SplayTreeNode* parent = nullptr;
     unsigned treeSize = 0;
+    SplayTreeNode(){};
+    SplayTreeNode(int sc,MondisObject* d):score(sc):data(d){};
+    ~SplayTreeNode() {
+        delete data;
+    }
 };
 
 class SplayTree:public MondisData
 {
 private:
     SplayTreeNode* root;
+    SplayTreeNode* head = new SplayTreeNode(numeric_limits<int>::min(), nullptr);
+    SplayTreeNode* tail = new SplayTreeNode(numeric_limits<int>::max(), nullptr);
 public:
     class SplayIterator {
     private:
+        SplayTree* tree;
         SplayTreeNode* cur;
-    public:
-        SkipIterator(SplayTree* list) {
-            cur = list->head;
-        }
-        bool next() {
-            if(cur->forwards[0].next!= nullptr) {
-                cur = cur->forwards[0].next;
-                return true;
+        stack<SplayTreeNode*> s;
+        void dfs(SplayTreeNode* cur) {
+            while (cur!= nullptr) {
+                s.push(cur);
+                cur=cur->left;
             }
-            return false;
         }
-
-        SplayTreeNode*operator->() {
+    public:
+        SplayIterator(SplayTree* avlTree):tree(avlTree),cur(avlTree->root)
+        {
+            dfs(cur);
+        }
+        SplayTreeNode* operator->() {
             return cur;
+        };
+
+        bool next() {
+            if(s.empty())
+            {
+                return false;
+            }
+            cur = s.top();
+            s.pop();
+            dfs(cur->right);
+            return true;
         }
     };
     SplayTree();
     ~SplayTree();
     bool insert(int score, MondisObject* obj);
-    //TODO
     bool removeByScore(int score);
-    bool removeByRank(int rank)
+    bool removeByRank(int rank);
     MondisObject* getByScore(int score);
     MondisObject* getByRank(int rank);
+
+private:
+    MondisObject* getByRank(SplayTreeNode* root,int rank);
+    SplayTreeNode* getNodeByRank(SplayTreeNode* root,int rank);
+    SplayTreeNode* getNodeByScore(int score);
+    bool remove(SplayTreeNode* target);
+public:
     bool contains(int score);
     unsigned count(int startScore,int endScore);
     void removeRangeByRank(int start,int end);
@@ -65,7 +88,19 @@ public:
     ExecutionResult execute(Command& command);
     MondisObject* locate(Command& command);
 private:
-    static int getRandomLevel();
+    void splay(SplayTreeNode* cur);
+    void sizeUpdate(SplayTreeNode* cur, int delta);
+    unsigned getSize(SplayTreeNode* root);
+    void leftRotate(SplayTreeNode* cur);
+    void rightRotate(SplayTreeNode* cur);
+    void leftRightRotate(SplayTreeNode* cur);
+    void rightLeftRotate(SplayTreeNode* cur);
+    void deleteTree(SplayTreeNode* root);
+    SplayTreeNode* getSuccessor(SplayTreeNode* root);
+    SplayTreeNode* getPredecessor(SplayTreeNode* root);
+    void inOrderTraversal(SplayTreeNode* root,vector<MondisObject*>* res);
+    SplayTreeNode *getLowerBound(int score);
+    SplayTreeNode *getUpperBound(int score);
 };
 
 

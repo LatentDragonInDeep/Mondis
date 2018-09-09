@@ -19,22 +19,19 @@
 class MondisBinary: public MondisData{
 private:
     char* heapBuffer;
-    const unsigned offset;//offset以前无法读
     const unsigned capacity;//char数组的容量
-    const unsigned limit;//limit以后无法读
     unsigned position;//下一次读的起始位置
     unsigned m_mark;//标记
-    const bool isWrapped;
 public:
-    MondisBinary(int mark, int pos, int lim, int cap,
-                 char hb[], int offset, bool isWrapped);
-    MondisBinary(int mark, int pos, int lim, int cap);
+    MondisBinary(int mark, int pos, int cap,
+                 char hb[]);
+    MondisBinary(int mark,int pos,int cap);
 
     ~MondisBinary();
 
     static MondisBinary* allocate(int cap);
 
-    static MondisBinary* wrap(char hb[],int cap,int offset,int length);
+    static MondisBinary* wrap(char hb[],int cap,int length);
 
     char get(unsigned i);
 

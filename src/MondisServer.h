@@ -14,6 +14,12 @@
 #include "Command.h"
 #include "JSONParser.h"
 
+class Log{
+    string currentTime;
+    Command command;
+    ExecutionResult res;
+};
+
 class MondisServer {
 private:
     /* General */
@@ -69,10 +75,10 @@ private:
 
 public:
     int start(string& confFile);
-    int runAsDeamon();
+    int runAsDaemon();
     int save();
     int startEventLoop();
-    int appendLog();
+    int appendLog(Log& log);
     ExecutionResult execute(Command& command);
     ExecutionResult locateExecute(Command& command);
     static JSONParser* getJSONParser();

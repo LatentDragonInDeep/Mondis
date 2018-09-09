@@ -222,8 +222,6 @@ public:
     KeyValue* data = nullptr;
     int height = 1;
     ~AVLTreeNode() {
-        delete left;
-        delete right;
         delete data;
     }
 };
@@ -287,6 +285,7 @@ private:
     AVLTreeNode* leftRightRotate(AVLTreeNode* root);
     AVLTreeNode* rightLeftRotate(AVLTreeNode* root);
     int getHeight(AVLTreeNode* root);
+    void deleteTree(AVLTreeNode* root);
 
     void toJson();
 };

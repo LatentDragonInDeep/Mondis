@@ -3,42 +3,37 @@
 //
 
 #include "HashMap.h"
-#include "MondisServer.h"
-#include "Command.h"
-
-#include <algorithm>
 
 using namespace std;
-bool AVLTree::insert (Entry &entry)
-{
-    return realInsert(*entry.toKeyValue(),root) == nullptr;
+
+bool AVLTree::insert(Entry *entry) {
+    return realInsert(entry->toKeyValue(), root) == nullptr;
 }
 
-AVLTreeNode *AVLTree::realInsert (KeyValue &kv, AVLTreeNode *root)
+AVLTreeNode *AVLTree::realInsert(KeyValue *kv, AVLTreeNode *root)
 {
     if(root == nullptr) {
         root = new AVLTreeNode;
-        root->data = &kv;
+        root->data = kv;
         _size++;
-    }
-    else if(kv.compare(*root->data)) {
+    } else if (kv->compare(*root->data)) {
         root->right = realInsert(kv,root->right);
         if(getHeight(root->right)-getHeight(root->left) == 2) {
-            if(kv.compare(*root->right->data)) {
+            if (kv->compare(*root->right->data)) {
                 root=leftRotate(root);
             }
             else{
                 root = rightLeftRotate(root);
             }
         }
-    } else if(kv.equals(*root->data)) {
+    } else if (kv->equals(*root->data)) {
         delete root->data;
-        root->data = &kv;
+        root->data = kv;
     }
     else{
         root->left = realInsert(kv,root->left);
         if(getHeight(root->left)-getHeight(root->right) == 2) {
-            if(kv.compare(*root->left->data)) {
+            if (kv->compare(*root->left->data)) {
                 root=leftRightRotate(root);
             }
             else{
@@ -173,20 +168,20 @@ AVLTreeNode *AVLTree::getSuccessor (AVLTreeNode *root)
 
 void AVLTree::toJson() {
     AVLIterator iterator = this->iterator();
-    *json+="{\n";
+    json += "{\n";
     while (iterator.next()) {
-        *json+=*iterator->data->getJson();
-        *json+=",";
-        *json+="\n";
+        json += iterator->data->getJson();
+        json += ",";
+        json += "\n";
     }
-    *json+="}\n";
+    json += "}\n";
 }
 
 AVLTree::~AVLTree() {
     deleteTree(root);
 }
 
-bool AVLTree::insert(KeyValue &kv) {
+bool AVLTree::insert(KeyValue *kv) {
     return realInsert(kv,root) == nullptr;
 }
 
@@ -223,47 +218,57 @@ bool AVLTree::containsKey(Key &key) {
     return get(key) == nullptr;
 }
 
-MondisObject *AVLTree::locate(Command &command) {
-    return getValue(KEY(0));
+MondisObject *AVLTree::locate(Command *command) {
+    KEY(0)
+    return getValue(key);
 }
 
-ExecutionResult AVLTree::execute(Command &command) {
+ExecutionResult AVLTree::execute(Command *command) {
     ExecutionResult res;
-    switch (command.type) {
-        case SET:
+    switch (command->type) {
+        case SET: {
             CHECK_PARAM_NUM(2);
-            CHECK_PARAM_TYPE(0,PLAIN)
-            CHECK_PARAM_TYPE(1,STRING)
-            insert(*new KEY(0),MondisServer::getJSONParser()->parseObject(command[1].content));
+            CHECK_PARAM_TYPE(0, PLAIN)
+            CHECK_PARAM_TYPE(1, STRING)
+            Key *key = new Key((*command)[0].content);
+            insert(key, MondisServer::getJSONParser()->parseObject((*command)[1].content));
             OK_AND_RETURN;
-        case GET:
+        }
+        case GET: {
             CHECK_PARAM_NUM(1);
-            CHECK_PARAM_TYPE(0,PLAIN)
-            auto * obj = getValue(KEY(0));
-            if(obj!= nullptr) {
-                res.res = *obj->getJson();
+            CHECK_PARAM_TYPE(0, PLAIN)
+            KEY(0)
+            auto *obj = getValue(key);
+            if (obj != nullptr) {
+                res.res = obj->getJson();
             }
             OK_AND_RETURN;
-        case DEL:
+        }
+        case DEL: {
             CHECK_PARAM_NUM(1)
-            CHECK_PARAM_TYPE(0,PLAIN)
-            remove(KEY(0));
+            CHECK_PARAM_TYPE(0, PLAIN)
+            KEY(0)
+            remove(key);
             OK_AND_RETURN
-        case EXISTS:
+        }
+        case EXISTS: {
             CHECK_PARAM_NUM(1)
-            CHECK_PARAM_TYPE(0,PLAIN)
-            res.res = to_string(containsKey(KEY(0)));
+            CHECK_PARAM_TYPE(0, PLAIN)
+            KEY(0)
+            res.res = to_string(containsKey(key));
             OK_AND_RETURN
-        case SIZE:
+        }
+        case SIZE: {
             CHECK_PARAM_NUM(0)
             res.res = to_string(size());
             OK_AND_RETURN
+        }
     }
     INVALID_AND_RETURN
 }
 
-bool AVLTree::insert(Key &key, MondisObject *value) {
-    return insert(*new KeyValue(&key,value));
+bool AVLTree::insert(Key *key, MondisObject *value) {
+    return insert(new KeyValue(key, value));
 }
 
 unsigned AVLTree::size() {

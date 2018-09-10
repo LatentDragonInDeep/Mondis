@@ -9,7 +9,6 @@
 #include <vector>
 
 #include "MondisObject.h"
-#include "MondisData.h"
 #include "Command.h"
 
 using namespace std;
@@ -60,9 +59,11 @@ public:
     MondisList();
     ~MondisList();
     int pushBack (MondisObject *object);
-    MondisObject* popBack ();
+
+    MondisObject *popBack();
     int pushFront (MondisObject *object);
-    MondisObject* popFront ();
+
+    MondisObject *popFront();
 
     int getRange (int from, int to, vector<MondisObject *> *res);
 
@@ -76,9 +77,11 @@ public:
 
     ListIterator iterator();
 
-    void toJson() override;
-    ExecutionResult execute(Command& command);
-    MondisObject* locate(Command& command);
+    void toJson();
+
+    ExecutionResult execute(Command *command);
+
+    MondisObject *locate(Command *command);
 
 private:
     void trim();

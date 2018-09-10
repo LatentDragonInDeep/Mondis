@@ -16,7 +16,7 @@
 
 #define INSERT(TYPE) serverCommand.insert(CommandType::TYPE);
 
-#define CHECK_PARAM_NUM(x) if(command.params.size()!=x) {\
+#define CHECK_PARAM_NUM(x) if(command->params.size()!=x) {\
                              res.res = "arguments num error";\
                              return res;\
                              }
@@ -27,26 +27,26 @@
 #define INVALID_AND_RETURN res.res = "Invalid command";\
                              return res;
 
-#define CHECK_INT_LEGAL(DATA,NAME) if(!toInteger(DATA,NAME)) {\
+#define CHECK_INT_LEGAL(DATA, NAME) if(!util::toInteger(DATA,NAME)) {\
                                     res.res = "argument can not be transformed to int";\
                                     return res;\
                                     }
 
 #define CHECK_INT_START_LEGAL(INDEX) int start;\
-                                      CHECK_INT_LEGAL(command[INDEX].content,start)
+                                      CHECK_INT_LEGAL((*command)[INDEX].content,start)
 
 #define CHECK_INT_END_LEGAL(INDEX) int end;\
-                                      CHECK_INT_LEGAL(command[INDEX].content,end)
+                                      CHECK_INT_LEGAL((*command)[INDEX].content,end)
 
 #define CHECK_AND_DEFINE_INT_LEGAL(INDEX,NAME) int NAME;\
-                                      CHECK_INT_LEGAL(command[INDEX].content,NAME)
+                                      CHECK_INT_LEGAL((*command)[INDEX].content,NAME)
 
 #define CHECK_START if(start<0) {\
                      res.res = "start under zero!";\
                      return res;\
                      }
 
-#define CHECK_END(size) if(end>size) {\
+#define CHECK_END(size) if(end>(int)size) {\
                      res.res = "end over flow!";\
                      return res;\
                      }
@@ -57,38 +57,25 @@
 #define CHECK_END_AND_DEFINE(INDEX,SIZE) CHECK_INT_END_LEGAL(INDEX)\
                              CHECK_END(SIZE)
 
-#define CHECK_PARAM_TYPE(INDEX,TYPE) if(command[INDEX].type!=Command::ParamType::TYPE) {\
+#define CHECK_PARAM_TYPE(INDEX, TYPE) if((*command)[INDEX].type!=Command::ParamType::TYPE) {\
                                         res.res = "Invalid param";\
                                         return res;\
                                         }
 
-#define KEY(INDEX) Key(command[INDEX].content)
+#define KEY(INDEX) Key key((*command)[INDEX].content);
 
-#define CHECK_PARAM_LENGTH(INDEX,LENGTH) if(command[INDEX].content.size()!=LENGTH) { \
+#define CHECK_PARAM_LENGTH(INDEX, LENGTH) if((*command)[INDEX].content.size()!=LENGTH) { \
                                             res.res = "argument length error";\
                                             return res;\
                                             }
 
-bool toInteger(std::string &data, int &res) {
-    static std::stringstream ss;
-    ss<<data;
-    ss>>res;
-    if(!ss.fail()) {
-        ss.clear();
-        return true;
-    }
-    return false;
+namespace util {
+    bool toInteger(std::string &data, int &res);;
+
+    std::string to_string(bool data);;
 };
-
-std::string to_string(bool data) {
-    if(data) {
-        return "true";
-    }
-    return "false";
-}
-
 enum CommandType {
-    SET,
+    BIND,
     DEL,
     EXISTS,
     RENAME,
@@ -151,7 +138,7 @@ enum CommandType {
 //    LIST_GET,
 //    LIST_GETRANGE,//getrange
 
-    //SET
+    //BIND
 //    SET_ADD,//add
 //    SET_REMOVE,//remove
 //    SET_EXISTS,
@@ -215,8 +202,6 @@ public:
     }
 };
 
-std::string ExecutionResult::typeToStr[] = {"OK","SYNTAX_ERROR,INTERNAL_ERROR,LOGIC_ERROR"};
-
 class Command{
 public:
     enum ParamType {
@@ -233,9 +218,6 @@ public:
     std::vector<Param> params;
     Command* next;
     Command() {
-        if(!hasInit) {
-            init();
-        }
     }
 
     Param& operator[](int index) {
@@ -253,54 +235,53 @@ public:
         return res;
     }
     static std::unordered_map<CommandType,std::string> typeToStr;
-    static bool hasInit;
     static void init() {
-                MAP(SET)
-                MAP(DEL)
-                MAP(EXISTS)
-                MAP(RENAME)
-                MAP(TYPE)
-                MAP(GET)
-                MAP(GET_RANGE)
-                MAP(SET_RANGE)
-                MAP(REMOVE_RANGE)
-                MAP(STRLEN)
-                MAP(INCR)
-                MAP(DECR)
-                MAP(INCR_BY)
-                MAP(DECR_BY)
-                MAP(APPEND)
-                MAP(PUSH_FRONT)
-                MAP(PUSH_BACK)
-                MAP(POP_FRONT)
-                MAP(POP_BACK)
-                MAP(ADD)
-                MAP(REMOVE)
-                MAP(SIZE)
-                MAP(REMOVE_BY_RANK)
-                MAP(REMOVE_BY_SCORE)
-                MAP(REMOVE_RANGE_BY_RANK)
-                MAP(REMOVE_RANGE_BY_SCORE)
-                MAP(COUNT_RANGE)
-                MAP(GET_BY_RANK)
-                MAP(GET_BY_SCORE)
-                MAP(GET_RANGE_BY_RANK)
-                MAP(GET_RANGE_BY_SCORE)
-                MAP(READ_FROM)
-                MAP(READ_CHAR)
-                MAP(READ_SHORT)
-                MAP(READ_INT)
-                MAP(READ_LONG)
-                MAP(READ_LONG_LONG)
-                MAP(BACK)
-                MAP(FORWARD)
-                MAP(SET_POSITION)
-                MAP(READ)
-                MAP(WRITE)
-                MAP(LOCATE)
-                MAP(SAVE)
-                MAP(EXIT)
-                MAP(LOGIN)
+        MAP(BIND)
+        MAP(DEL)
+        MAP(EXISTS)
+        MAP(RENAME)
+        MAP(TYPE)
+        MAP(GET)
+        MAP(GET_RANGE)
+        MAP(SET_RANGE)
+        MAP(REMOVE_RANGE)
+        MAP(STRLEN)
+        MAP(INCR)
+        MAP(DECR)
+        MAP(INCR_BY)
+        MAP(DECR_BY)
+        MAP(APPEND)
+        MAP(PUSH_FRONT)
+        MAP(PUSH_BACK)
+        MAP(POP_FRONT)
+        MAP(POP_BACK)
+        MAP(ADD)
+        MAP(REMOVE)
+        MAP(SIZE)
+        MAP(REMOVE_BY_RANK)
+        MAP(REMOVE_BY_SCORE)
+        MAP(REMOVE_RANGE_BY_RANK)
+        MAP(REMOVE_RANGE_BY_SCORE)
+        MAP(COUNT_RANGE)
+        MAP(GET_BY_RANK)
+        MAP(GET_BY_SCORE)
+        MAP(GET_RANGE_BY_RANK)
+        MAP(GET_RANGE_BY_SCORE)
+        MAP(READ_FROM)
+        MAP(READ_CHAR)
+        MAP(READ_SHORT)
+        MAP(READ_INT)
+        MAP(READ_LONG)
+        MAP(READ_LONG_LONG)
+        MAP(BACK)
+        MAP(FORWARD)
+        MAP(SET_POSITION)
+        MAP(READ)
+        MAP(WRITE)
+        MAP(LOCATE)
+        MAP(SAVE)
+        MAP(EXIT)
+        MAP(LOGIN)
     }
 
 };
@@ -333,10 +314,10 @@ private:
         Token nextToken();
 
     };
-    LexicalParser* parser;
+
     Token pre;
+    LexicalParser* parser;
     static std::unordered_map<std::string,CommandType> map;
-    static bool hasInit;
     static void init();
 public:
     CommandInterpreter();

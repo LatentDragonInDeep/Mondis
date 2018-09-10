@@ -12,14 +12,10 @@
 #include <exception>
 #include <sstream>
 
-#include "MondisObject.h"
 #include "Command.h"
-#include "HashMap.h"
 
-#define src (*source)
-
-class MondisObject;
 class HashMap;
+class MondisObject;
 class KeyValue;
 
 enum TokenType {
@@ -36,24 +32,21 @@ enum TokenType {
 class Token {
 public:
     TokenType type;
-    std::string* content;
+    std::string content;
     Token(TokenType type):type(type) {
 
     }
     Token(Token&& other) = default;
-    Token(Token& other):content(other.content),type(other.type) {
-        other.content = nullptr;
-    }
-    Token(std::string& data):type(STRING),content(&data){
+
+    Token(Token &other) = default;
+
+    Token(std::string &data) : type(STRING), content(data) {
 
     }
-    Token& operator=(Token& other) {
-        type = other.type;
-        content = other.content;
-        other.content = nullptr;
 
-        return *this;
-    };
+    Token &operator=(Token &&other) = default;
+
+    Token &operator=(Token &other) = default;
     Token():Token(TERMINATOR){};
     static Token* leftSquareBracket;
     static Token* rightSquareBracket;
@@ -81,28 +74,15 @@ public:
                 return terminator;
         }
     }
-
-    ~Token() {
-        delete content;
-    }
 };
-
-Token* Token::leftSquareBracket = new Token(LEFT_SQAURE_BRACKET);
-Token* Token::rightSquareBracket = new Token(RIGHT_SQUARE_BRACKET);
-Token* Token::leftAngleBracket = new Token(LEFT_ANGLE_BRACKET);
-Token* Token::rightAngleBracket = new Token(RIGHT_ANGLE_BRACKET);
-Token* Token::comma = new Token(COMMA);
-Token* Token::terminator = new Token(TERMINATOR);
-Token* Token::colon = new Token(COLON);
 
 class JSONParser {
 public:
     class LexicalParser{
     private:
-        std::string* source;
+        std::string source;
         unsigned curIndex = 0;
         bool isEnd = false;
-        static bool hasInit;
         static std::unordered_map<char,Token*> directRecognize;
 
         static void initDirect() {
@@ -114,41 +94,33 @@ public:
             directRecognize[':'] = Token::getToken(COLON);
         }
         void skip() {
-            while (src[curIndex] ==' '||src[curIndex]=='\n'||src[curIndex] == '\r'||src[curIndex] == '\t') {
+            while (source[curIndex] == ' ' || source[curIndex] == '\n' || source[curIndex] == '\r' ||
+                   source[curIndex] == '\t') {
                 curIndex++;
-                if(curIndex>source->size()) {
+                if (curIndex > source.size()) {
                     isEnd = true;
                     break;
                 }
             }
         };
     public:
-        LexicalParser(string& source):source(&source) {
-            if(!hasInit) {
-                initDirect();
-                hasInit = true;
-            }
-        };
+        LexicalParser(std::string &s) : source(s) {};
         LexicalParser(const char* filePath){
             struct stat info;
             int fd = open(filePath, O_RDONLY);
             fstat(fd, &info);
 
-            source = new string("");
-            source->reserve(info.st_size);
+            source.reserve(info.st_size);
 
-            ifstream in;
+            std::ifstream in;
             in.open(filePath);
-            string line;
-            while (getline(in,line)) {
-                *source+=line;
-                *source+="\n";
+            std::string line;
+            while (std::getline(in, line)) {
+                source += line;
+                source += "\n";
             }
             close(fd);
             in.close();
-        };
-        ~LexicalParser(){
-            delete source;
         };
         Token nextToken() {
             Token res;
@@ -158,20 +130,20 @@ public:
             skip();
             int start;
             int end;
-            if(directRecognize[src[curIndex]] != nullptr) {
-                res = *directRecognize[src[curIndex]];
+            if (directRecognize.find(source[curIndex]) != directRecognize.end()) {
+                res = *directRecognize[source[curIndex]];
                 curIndex++;
                 return res;
             }
-            if(src[curIndex] == '"') {
+            if (source[curIndex] == '"') {
                 start = curIndex;
                 while (true) {
                     curIndex++;
-                    if(src[curIndex] == '"') {
-                        if(src[curIndex-1]!='\\') {
+                    if (source[curIndex] == '"') {
+                        if (source[curIndex - 1] != '\\') {
                             end = curIndex;
                             res.type = STRING;
-                            res.content = new string(src,start,end-start);
+                            res.content = std::string(source, start, end - start);
                             return res;
                         }
                     }
@@ -181,12 +153,12 @@ public:
         }
 
         void reset() {
-            source = nullptr;
+            source = "";
             curIndex = 0;
             isEnd = false;
         }
 
-        void setSource(std::string* newSrc) {
+        void setSource(std::string newSrc) {
             source = newSrc;
         }
     };
@@ -194,8 +166,10 @@ public:
     JSONParser();
     JSONParser(std::string& filePath);
     void parse(HashMap* keySpace);
-    MondisObject* parseObject(string& content);
-    KeyValue parseEntry(string& content);
+
+    MondisObject *parseObject(std::string &content);
+
+    KeyValue parseEntry(std::string &content);
 private:
     LexicalParser* lexicalParser;
     MondisObject* parseObject(LexicalParser* lp);
@@ -206,8 +180,6 @@ private:
     void matchToken(LexicalParser* lp,TokenType type);
     void matchToken(TokenType type);
 };
-
-bool JSONParser::LexicalParser::hasInit = false;
 
 
 #endif //MONDIS_JSONPARSER_H

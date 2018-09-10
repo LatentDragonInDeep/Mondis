@@ -5,7 +5,7 @@
 #include "Command.h"
 
 void CommandInterpreter::init() {
-    PUT(SET)
+    PUT(BIND)
     PUT(GET)
     PUT(EXISTS)
     PUT(RENAME)
@@ -39,7 +39,6 @@ void CommandInterpreter::init() {
     PUT(LOGIN)
     PUT(EXIT)
     PUT(SAVE)
-    PUT(BGSAVE)
     PUT(PERSIST)
     PUT(READ_FROM)
     PUT(READ_CHAR)
@@ -52,12 +51,9 @@ void CommandInterpreter::init() {
 }
 
 CommandInterpreter::CommandInterpreter() {
-    if(!hasInit) {
-        init();
-    }
 }
 
-Command *CommandInterpreter::getCommand(string &raw) {
+Command *CommandInterpreter::getCommand(std::string &raw) {
     parser = new LexicalParser(raw);
     Command* res = new Command;
     Command* cur = res;
@@ -66,7 +62,7 @@ Command *CommandInterpreter::getCommand(string &raw) {
         if(next.type = END) {
             break;
         }
-        vector<Token> vt;
+        std::vector<Token> vt;
         while(next.type!=END&&next.type!=VERTICAL) {
             vt.push_back(next);
         }
@@ -154,3 +150,22 @@ CommandInterpreter::Token CommandInterpreter::LexicalParser::nextToken() {
 }
 
 
+bool util::toInteger(std::string &data, int &res) {
+    static std::stringstream ss;
+    ss << data;
+    ss >> res;
+    if (!ss.fail()) {
+        ss.clear();
+        return true;
+    }
+    return false;
+}
+
+std::string util::to_string(bool data) {
+    if (data) {
+        return "true";
+    }
+    return "false";
+}
+
+std::string ExecutionResult::typeToStr[] = {"OK", "SYNTAX_ERROR,INTERNAL_ERROR,LOGIC_ERROR"};

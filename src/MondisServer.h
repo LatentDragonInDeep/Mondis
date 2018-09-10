@@ -80,7 +80,7 @@ private:
 
     int daemonize;                  /* True if running as a daemon */
 
-    static JSONParser parser;
+    JSONParser parser;
     ofstream logFileOut;
     ofstream aofFileOut;
     unordered_map<string,string> conf;
@@ -97,8 +97,10 @@ public:
     void appendOnly(Command& command);
     void parseConfFile(string& confFile);
     ExecutionResult execute(string& commandStr);
-    ExecutionResult execute(Command& command);
-    ExecutionResult locateExecute(Command& command);
+
+    ExecutionResult execute(Command *command);
+
+    ExecutionResult locateExecute(Command *command);
     static JSONParser* getJSONParser();
 };
 
@@ -118,19 +120,10 @@ private:
     static Executor* executor;
     MondisServer* server;
     static unordered_set<CommandType> serverCommand;
-    static bool hasInit;
     static void init();
 };
 
-Executor* Executor::executor = new Executor;
 
-void Executor::bindServer(MondisServer *server) {
-    this->server = server;
-}
-
-int main() {
-    return 0;
-}
 
 
 #endif //MONDIS_MONDISSERVER_H

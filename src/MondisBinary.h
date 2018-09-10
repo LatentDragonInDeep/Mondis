@@ -13,7 +13,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#include "MondisData.h"
+#include "MondisObject.h"
 #include "Command.h"
 
 class MondisBinary: public MondisData{
@@ -67,8 +67,9 @@ public:
 
     void toJson();
 
-    ExecutionResult execute(Command& command);
-    MondisObject* locate(Command* command);
+    ExecutionResult execute(Command *command);
+
+    MondisObject *locate(Command *command);
 };
 
 

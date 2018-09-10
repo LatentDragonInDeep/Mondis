@@ -4,7 +4,6 @@
 #include <vector>
 
 #include "MondisList.h"
-#include "Command.h"
 
 MondisList::MondisList ()
 {
@@ -174,77 +173,79 @@ MondisList::~MondisList ()
 }
 
 void MondisList::toJson() {
-    *json+="[\n";
+    json += "[\n";
     ListIterator iterator = this->iterator();
     while (iterator.next()) {
-        *json+=*iterator->data->getJson();
-        *json+="\n";
+        json += iterator->data->getJson();
+        json += "\n";
     }
-    *json+="]\n";
+    json += "]\n";
 }
 
 MondisList::ListIterator MondisList::iterator() {
     return MondisList::ListIterator(this);
 }
 
-MondisObject *MondisList::locate(Command &command) {
-    if(command.params.size()!=1) {
+MondisObject *MondisList::locate(Command *command) {
+    if (command->params.size() != 1) {
         return nullptr;
     }
     if(command[0].type!=Command::ParamType::PLAIN) {
         return nullptr;
     }
     int index;
-    if(!toInteger(command[0].content,&index)) {
+    if (!util::toInteger((*command)[0].content, index)) {
         return nullptr;
     }
 
     return locate(index)->data;
 }
 
-ExecutionResult MondisList::execute(Command &command) {
+ExecutionResult MondisList::execute(Command *command) {
     ExecutionResult res;
-    switch (command.type) {
-        case SET:
+    switch (command->type) {
+        case SET: {
             CHECK_PARAM_NUM(2)
-            CHECK_PARAM_TYPE(0,PLAIN)
-            CHECK_AND_DEFINE_INT_LEGAL(0,index)
-            CHECK_PARAM_TYPE(1,STRING)
-            if(index<0||index>size()) {
+            CHECK_PARAM_TYPE(0, PLAIN)
+            CHECK_AND_DEFINE_INT_LEGAL(0, index)
+            CHECK_PARAM_TYPE(1, STRING)
+            if (index < 0 || index > size()) {
                 res.res = "index out of range";
                 return res;
             }
-            set(index,MondisServer::getJSONParser()->parseObject(command[1].content));
+            set(index, MondisServer::getJSONParser()->parseObject((*command)[1].content));
             OK_AND_RETURN
-        case GET:
+        }
+        case GET: {
             CHECK_PARAM_NUM(1)
-            CHECK_PARAM_TYPE(0,PLAIN)
-            CHECK_AND_DEFINE_INT_LEGAL(0,index)
-            if(index<0||index>size()) {
+            CHECK_PARAM_TYPE(0, PLAIN)
+            CHECK_AND_DEFINE_INT_LEGAL(0, index)
+            if (index < 0 || index > size()) {
                 res.res = "index out of range";
                 return res;
             }
-            res.res = *get(index)->getJson();
+            res.res = get(index)->getJson();
             OK_AND_RETURN
+        }
         case PUSH_FRONT:
             CHECK_PARAM_NUM(1)
             CHECK_PARAM_TYPE(0,STRING)
-            pushFront(MondisServer::getJSONParser()->parseObject(command[0].content));
+            pushFront(MondisServer::getJSONParser()->parseObject((*command)[0].content));
             OK_AND_RETURN
         case PUSH_BACK:
             CHECK_PARAM_NUM(1)
             CHECK_PARAM_TYPE(0,STRING)
-            pushBack(MondisServer::getJSONParser()->parseObject(command[0].content));
+            pushBack(MondisServer::getJSONParser()->parseObject((*command)[0].content));
             OK_AND_RETURN
         case POP_FRONT:
             CHECK_PARAM_NUM(0)
             CHECK_PARAM_TYPE(0,STRING)
-            res.res = *popFront()->getJson();
+            res.res = popFront()->getJson();
             OK_AND_RETURN
         case POP_BACK:
             CHECK_PARAM_NUM(0)
             CHECK_PARAM_TYPE(0,STRING)
-            res.res = *popBack()->getJson();
+            res.res = popBack()->getJson();
             OK_AND_RETURN
         case GET_RANGE:
             CHECK_PARAM_NUM(2)
@@ -255,10 +256,10 @@ ExecutionResult MondisList::execute(Command &command) {
             CHECK_INT_END_LEGAL(1)
             CHECK_END(size())
             std::vector<MondisObject*> data;
-            getRange(start,end,data);
+            getRange(start, end, &data);
             res.res+="{\n";
             for (auto obj:data) {
-                res.res+=*obj->getJson();
+                res.res += obj->getJson();
             }
             res.res+="}\n";
             OK_AND_RETURN

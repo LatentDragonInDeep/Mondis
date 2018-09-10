@@ -8,13 +8,13 @@
 
 void SplayTree::toJson() {
     SplayIterator iterator = this->iterator();
-    *json += "{";
-    *json += "\n";
+    json += "{";
+    json += "\n";
     while (iterator.next()) {
-        *json += *iterator->data->getJson();
-        *json += ",\n";
+        json += iterator->data->getJson();
+        json += ",\n";
     }
-    *json += "}\n";
+    json += "}\n";
 }
 
 SplayTree::SplayIterator SplayTree::iterator() {
@@ -291,11 +291,11 @@ void SplayTree::deleteTree(SplayTreeNode *root) {
 SplayTreeNode *SplayTree::getSuccessor(SplayTreeNode *root) {
     SplayTreeNode* cur = root->right;
     if(cur== nullptr) {
-        SplayTreeNode* parent = root.parent;
+        SplayTreeNode *parent = root->parent;
         SplayTreeNode* ch = root;
         while (parent!= nullptr&&ch == parent->right) {
             ch = parent;
-            parent = parent.parent;
+            parent = parent->parent;
         }
         return parent;
     }
@@ -366,11 +366,11 @@ bool SplayTree::remove(SplayTreeNode *target) {
 SplayTreeNode *SplayTree::getPredecessor(SplayTreeNode *root) {
     SplayTreeNode* cur = root->left;
     if(cur== nullptr) {
-        SplayTreeNode* parent = root.parent;
+        SplayTreeNode *parent = root->parent;
         SplayTreeNode* ch = root;
         while (parent != nullptr&&ch == parent->left) {
             ch = parent;
-            parent = parent.parent;
+            parent = parent->parent;
         }
         return parent;
     }
@@ -481,15 +481,15 @@ SplayTreeNode *SplayTree::getUpperBound(int score) {
     }
 }
 
-ExecutionResult SplayTree::execute(Command &command) {
+ExecutionResult SplayTree::execute(Command *command) {
     ExecutionResult res;
-    switch (command.type) {
+    switch (command->type) {
         case ADD: {
             CHECK_PARAM_NUM(2);
             CHECK_PARAM_TYPE(0, PLAIN)
             CHECK_AND_DEFINE_INT_LEGAL(0, socre)
             CHECK_PARAM_TYPE(1, STRING)
-            MondisObject *data = MondisServer::getJSONParser()->parseObject(command[1].content);
+            MondisObject *data = MondisServer::getJSONParser()->parseObject((*command)[1].content);
             insert(socre, data);
             OK_AND_RETURN
         }
@@ -547,7 +547,7 @@ ExecutionResult SplayTree::execute(Command &command) {
                 res.res += size();
                 return res;
             }
-            res.res = *getByRank(rank)->getJson();
+            res.res = getByRank(rank)->getJson();
             OK_AND_RETURN
         }
         case GET_BY_SCORE: {
@@ -559,7 +559,7 @@ ExecutionResult SplayTree::execute(Command &command) {
                 res.res = "null object";
                 return res;
             }
-            res.res = *data->getJson();
+            res.res = data->getJson();
             OK_AND_RETURN
         }
         case GET_RANGE_BY_RANK: {
@@ -572,7 +572,7 @@ ExecutionResult SplayTree::execute(Command &command) {
             getRangeByRank(start, end, &v);
             res.res += "[\n";
             for (MondisObject *every:v) {
-                res.res += *every->getJson();
+                res.res += every->getJson();
                 res.res += "\n";
             }
             res.res += "]\n";
@@ -588,7 +588,7 @@ ExecutionResult SplayTree::execute(Command &command) {
             getRangeByScore(start, end, &v);
             res.res += "[\n";
             for (MondisObject *every:v) {
-                res.res += *every->getJson();
+                res.res += every->getJson();
                 res.res += "\n";
             }
             res.res += "]\n";
@@ -617,27 +617,27 @@ ExecutionResult SplayTree::execute(Command &command) {
     INVALID_AND_RETURN
 }
 
-MondisObject *SplayTree::locate(Command &command) {
+MondisObject *SplayTree::locate(Command *command) {
     MondisObject* res;
-    if(command.params.size()!=2) {
+    if (command->params.size() != 2) {
         return nullptr;
     }
     if(command[0].type!=Command::ParamType::PLAIN) {
         return nullptr;
     }
-    if(command[1].content=="RANK") {
+    if ((*command)[1].content == "RANK") {
         int rank;
-        if(!toInteger(command[1].content,&rank)) {
+        if (!util::toInteger((*command)[1].content, rank)) {
             return nullptr;
         }
         if(rank<1||rank>size()) {
-            return nullptr
+            return nullptr;
         }
         return getByRank(rank);
     }
-    if(command[1].content=="SCORE") {
+    if ((*command)[1].content == "SCORE") {
         int score;
-        if(!toInteger(command[1].content,&score)) {
+        if (!util::toInteger((*command)[1].content, score)) {
             return nullptr;
         }
         return getByScore(score);

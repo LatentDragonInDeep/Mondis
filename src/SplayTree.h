@@ -7,7 +7,6 @@
 
 #include "MondisObject.h"
 #include "HashMap.h"
-#include "MondisData.h"
 
 class SplayTreeNode {
 public:
@@ -84,8 +83,10 @@ public:
     unsigned size();
     void toJson();
     SplayIterator iterator();
-    ExecutionResult execute(Command& command);
-    MondisObject* locate(Command& command);
+
+    ExecutionResult execute(Command *command);
+
+    MondisObject *locate(Command *command);
 private:
     void splay(SplayTreeNode* cur);
     void sizeUpdate(SplayTreeNode* cur, int delta);

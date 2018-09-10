@@ -8,7 +8,6 @@
 #include <stack>
 
 #include "MondisObject.h"
-#include "MondisData.h"
 #include "Command.h"
 
 using namespace std;
@@ -29,13 +28,14 @@ public:
         return intValue>other.intValue;
     }
     Key(string& k) {
-        if(toInteger(k,intValue)) {
+        if (util::toInteger(k, intValue)) {
             flag = false;
         } else{
             str = k;
         }
-    }
-    Key(int k):key.intValue(k),flag(false){};
+    };
+
+    explicit Key(int k) : intValue(k), flag(false) {};
 
     bool isInteger() {
         return !flag;
@@ -49,7 +49,7 @@ public:
     }
 
     bool toInteger() {
-        bool res = toInteger(str,intValue);
+        bool res = util::toInteger(str, intValue);
         if(res) {
             flag = false;
             return true;
@@ -127,13 +127,13 @@ private:
 
     void toJson() {
         if(flag) {
-            *json+="\"";
-            *json+=key.str;
-            *json+="\"";
+            json += "\"";
+            json += str;
+            json += "\"";
         } else{
-            *json+="\"";
-            *json+=to_string(key.intValue);
-            *json+="\"";
+            json += "\"";
+            json += to_string(intValue);
+            json += "\"";
         }
     }
 };
@@ -142,9 +142,8 @@ class KeyValue :public MondisData{
 public:
     Key* key = nullptr;
     MondisObject* value = nullptr;
-    KeyValue(Key* k,MondisObject* v):key(k),value(v) {
 
-    }
+    KeyValue(Key *k, MondisObject *v) : key(k), value(v) {}
     KeyValue(){};
     KeyValue(KeyValue&& other) = default;
     KeyValue(KeyValue& other):key(other.key),value(other.value) {
@@ -152,11 +151,11 @@ public:
         other.value = nullptr;
     }
     bool compare(KeyValue& other) {
-        return key->compare(other.key);
+        return key->compare(*other.key);
     }
 
     bool equals(KeyValue& other) {
-        return key->equals(other.key);
+        return key->equals(*other.key);
     }
     ~KeyValue() {
         delete key;
@@ -164,10 +163,23 @@ public:
     }
 
     void toJson() {
-        *json+=*key->getJson();
-        *json+=",";
-        *json+=*value->getJson();
-        *json+="\n";
+        json += key->getJson();
+        json += ",";
+        json += value->getJson();
+        json += "\n";
+    }
+
+    KeyValue &operator=(KeyValue &other) {
+        key = other.key;
+        value = other.value;
+        other.key = nullptr;
+        other.value = nullptr;
+        return *this;
+    };
+
+    KeyValue &operator=(KeyValue &&other) {
+        operator=(other);
+        return *this;
     }
 };
 
@@ -177,6 +189,7 @@ public:
     MondisObject* object = nullptr;
     Entry* pre = nullptr;
     Entry* next = nullptr;
+    bool isValueNull;
     bool compare(Entry& other) {
         return key->compare(*other.key);
     }
@@ -198,10 +211,10 @@ public:
     }
 
     void toJson() {
-        *json+=key->getJson();
+        json += key->getJson();
         if(!isValueNull) {
-            *json += " : ";
-            *json += object->getJson();
+            json += " : ";
+            json += object->getJson();
         }
     }
     KeyValue* toKeyValue() {
@@ -242,6 +255,7 @@ public:
             }
         }
     public:
+        AVLIterator() {};
         AVLIterator(AVLTree* avlTree):tree(avlTree),cur(avlTree->root)
         {
            dfs(cur);
@@ -262,20 +276,24 @@ public:
         }
     };
 public:
-    bool insert(Entry& entry);
-    bool insert(KeyValue& kv);
-    bool insert(Key& key,MondisObject* value);
+    bool insert(Entry *entry);
+
+    bool insert(KeyValue *kv);
+
+    bool insert(Key *key, MondisObject *value);
     bool remove(Key& key);
     KeyValue* get(Key& key);
     MondisObject* getValue(Key& key);
     bool containsKey(Key& key);
     AVLIterator iterator();
     ~AVLTree();
-    ExecutionResult execute(Command& command);
-    MondisObject* locate(Command& command);
+
+    ExecutionResult execute(Command *command);
+
+    MondisObject *locate(Command *command);
     unsigned size();
 private:
-    AVLTreeNode* realInsert(KeyValue& kv,AVLTreeNode* root);
+    AVLTreeNode *realInsert(KeyValue *kv, AVLTreeNode *root);
     AVLTreeNode* realRemove(KeyValue& kv,AVLTreeNode* root);
     AVLTreeNode* getSuccessor(AVLTreeNode* root);
     AVLTreeNode* leftRotate(AVLTreeNode* root);
@@ -313,10 +331,11 @@ private:
         unsigned slotIndex = 0;
         AVLTree::AVLIterator avlIterator;
         bool isTree = false;
+        HashMap *map;
 
         bool lookForNext() {
             while (true) {
-                if(slotIndex>capacity) {
+                if (slotIndex > map->capacity) {
                     return false;
                 }
                 Content current = array[slotIndex];
@@ -335,10 +354,9 @@ private:
                 break;
             }
             return true;
-
-        }
+        };
     public:
-        MapIterator(HashMap* map)array(map->arrayFrom) {
+        MapIterator(HashMap *map) : array(map->arrayFrom), map(map) {
             lookForNext();
         };
         bool next() {
@@ -353,9 +371,12 @@ private:
             cur = cur->next;
             return true;
         };
+
         Entry* operator->() {
             if(isTree) {
-                return avlIterator->();
+                KeyValue *kv = avlIterator->data;
+                Entry temp(kv);
+                return &temp;
             }
             return cur;
         };
@@ -364,12 +385,13 @@ public:
     HashMap();
     HashMap(unsigned int capacity, float loadFactor);
 
-    HashMap(float loadFactor, unsigned int capacity, const bool isIntset);
+    HashMap(float loadFactor, unsigned int capacity, bool isIntset, bool isValueNull);
 
     HashMap(const bool isIntset);
 
     ~HashMap();
-    bool put (Key &key, MondisObject *value);
+
+    bool put(Key *key, MondisObject *value);
     MondisObject* get (Key &key);
     bool containsKey (Key &key);
     bool remove (Key &key);
@@ -384,10 +406,13 @@ private:
     int getCapacity (int capa);
     void toJson();
     HashMap::MapIterator iterator();
-    void checkType(Key& key);
 
-    virtual ExecutionResult execute(Command& command);
-    virtual MondisObject* locate(Command& command);
+    void checkType(Key *key);
+
+public:
+    virtual ExecutionResult execute(Command *command);
+
+    virtual MondisObject *locate(Command *command);
 };
 
 

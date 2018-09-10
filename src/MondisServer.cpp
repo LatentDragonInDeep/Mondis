@@ -1,54 +1,65 @@
 //
 // Created by 11956 on 2018/9/5.
 //
+#include <iostream>
 
 #include "Command.h"
-#include <iostream>
 #include "MondisServer.h"
-#include "JSONParser.h"
 
-ExecutionResult MondisServer::execute(Command& command) {
+ExecutionResult MondisServer::execute(Command *command) {
     ExecutionResult res;
-    switch (command.type) {
-        case SET:
+    switch (command->type) {
+        case BIND: {
             CHECK_PARAM_NUM(2);
-            CHECK_PARAM_TYPE(0,PLAIN)
-            CHECK_PARAM_TYPE(1,STRING)
-            curKeySpace->put(*new KEY(0),*parser.parseObject(command[1].content));
+            CHECK_PARAM_TYPE(0, PLAIN)
+            CHECK_PARAM_TYPE(1, STRING)
+            Key *key = new Key((*command)[0].content);
+            curKeySpace->put(key, parser.parseObject((*command)[1].content));
             OK_AND_RETURN
-        case GET:
+        }
+        case GET: {
             CHECK_PARAM_NUM(1)
-            CHECK_PARAM_TYPE(0,PLAIN)
-            res.res = *curKeySpace->get(KEY(0))->getJson();
+            CHECK_PARAM_TYPE(0, PLAIN)
+            KEY(0)
+            res.res = curKeySpace->get(key)->getJson();
             OK_AND_RETURN
-        case DEL:
+        }
+        case DEL: {
             CHECK_PARAM_NUM(1)
-            CHECK_PARAM_TYPE(0,PLAIN)
-            curKeySpace->remove(KEY(0));
+            CHECK_PARAM_TYPE(0, PLAIN)
+            KEY(0)
+            curKeySpace->remove(key);
             OK_AND_RETURN
-        case EXISTS:
+        }
+        case EXISTS: {
             CHECK_PARAM_NUM(1)
-            CHECK_PARAM_TYPE(0,PLAIN)
-            res.res = curKeySpace->containsKey(KEY(0));
+            CHECK_PARAM_TYPE(0, PLAIN)
+            KEY(0)
+            res.res = curKeySpace->containsKey(key);
             OK_AND_RETURN
-        case TYPE:
+        }
+        case TYPE: {
             CHECK_PARAM_NUM(1)
-            CHECK_PARAM_TYPE(0,PLAIN)
-            res.res = curKeySpace->get(KEY(0))->getTypeStr();
+            CHECK_PARAM_TYPE(0, PLAIN)
+            KEY(0)
+            res.res = curKeySpace->get(key)->getTypeStr();
             OK_AND_RETURN;
+        }
         case EXIT:
             CHECK_PARAM_NUM(0)
             system("exit");
+            //TODO
         case SAVE:
         case LOGIN:
+            break;
     }
     INVALID_AND_RETURN
 }
 
-ExecutionResult MondisServer::locateExecute(Command& command) {
+ExecutionResult MondisServer::locateExecute(Command *command) {
     ExecutionResult res;
-    MondisObject* curObj = curKeySpace->locate(&command);
-    Command* curCommand = command.next;
+    MondisObject *curObj = curKeySpace->locate(command);
+    Command *curCommand = command->next;
     while (true) {
         if(curObj == nullptr) {
             res.type = LOGIC_ERROR;
@@ -62,7 +73,7 @@ ExecutionResult MondisServer::locateExecute(Command& command) {
         curCommand = curCommand->next;
     }
 
-    return curObj->execute(*curCommand);
+    return curObj->execute(curCommand);
 
 }
 
@@ -147,9 +158,6 @@ ExecutionResult Executor::execute(Command *command) {
 }
 
 Executor::Executor() {
-    if(!hasInit) {
-        init();
-    }
 }
 
 Executor *Executor::getExecutor() {
@@ -157,7 +165,7 @@ Executor *Executor::getExecutor() {
 }
 
 void Executor::init() {
-    INSERT(SET)
+    INSERT(BIND)
     INSERT(GET)
 
     INSERT(EXISTS)
@@ -181,3 +189,9 @@ void Executor::destroyCommand(Command *command) {
     }
 
 }
+
+void Executor::bindServer(MondisServer *server) {
+    this->server = server;
+}
+
+Executor *Executor::executor = new Executor;

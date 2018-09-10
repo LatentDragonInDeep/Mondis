@@ -3,21 +3,20 @@
 //
 
 #include "HashMap.h"
-#include "Command.h"
 
 HashMap::HashMap ():HashMap(16,0.75f) {}
 
 HashMap::HashMap (unsigned int capacity, float loadFactor): HashMap(capacity,loadFactor, false, false) {}
 
-bool HashMap::put(Key &key, MondisObject *value)
+bool HashMap::put(Key *key, MondisObject *value)
 {
     checkType(key);
-    int index = getIndex(key.hashCode());
+    int index = getIndex(key->hashCode());
     Content content= arrayFrom[index];
     if(content.isList) {
         Entry* cur = content.first;
         for (;cur!=nullptr;cur = cur->next) {
-            if(key.equals(*cur->key)) {
+            if (key->equals(*cur->key)) {
                 delete cur->object;
                 cur->object = value;
                 return true;
@@ -25,7 +24,7 @@ bool HashMap::put(Key &key, MondisObject *value)
         }
         Entry* newEntry = new Entry;
         newEntry->object = value;
-        newEntry->key = &key;
+        newEntry->key = key;
         cur->next = newEntry;
         newEntry->pre = cur;
         content.end = newEntry;
@@ -37,8 +36,8 @@ bool HashMap::put(Key &key, MondisObject *value)
     }
     Entry* newEntry = new Entry;
     newEntry->object = value;
-    newEntry->key = &key;
-    content.tree->insert(*newEntry);
+    newEntry->key = key;
+    content.tree->insert(newEntry);
     _size++;
     if(_size/capacity>loadFactor) {
         rehash();
@@ -128,7 +127,7 @@ void HashMap::toTree (int index)
     Entry* cur = content.first;
     for (;cur!= nullptr;cur = cur->next)
     {
-        tree->insert(*cur);
+        tree->insert(cur);
     }
     content.isList = false;
     content.tree = tree;
@@ -198,56 +197,59 @@ void HashMap::add (int index, Entry *entry)
 }
 
 void HashMap::toJson() {
-    *json+="{\n";
+    json += "{\n";
     auto iter = iterator();
     while (iter.next()) {
-        *json+=*iter->getJson();
-        *json+=",\n";
+        json += iter->getJson();
+        json += ",\n";
     }
-    *json+='}';
+    json += '}';
 }
 
 HashMap::MapIterator HashMap::iterator() {
     return HashMap::MapIterator(this);
 }
 
-HashMap::HashMap(float loadFactor, unsigned int capacity, const bool isIntset) : loadFactor(
-        loadFactor), capacity(getCapacity(capacity)), isIntset(isIntset) {
-    arrayFrom = new Content[capacity];
-}
+HashMap::HashMap(const bool isIntset) : HashMap(1024, 0.75f, isIntset, true) {}
 
-HashMap::HashMap(const bool isIntset) : HashMap(1024,0.75f,isIntset) {}
-
-MondisObject *HashMap::locate(Command& command) {
-    if(command.params.size()!=1) {
+MondisObject *HashMap::locate(Command *command) {
+    if (command->params.size() != 1) {
         return nullptr;
     }
     if(command[0].type!=Command::ParamType::PLAIN) {
         return nullptr;
     }
-    return get(Key(command[0].content));
+    Key key((*command)[0].content);
+    return get(key);
 
 }
 
-ExecutionResult HashMap::execute(Command& command) {
+ExecutionResult HashMap::execute(Command *command) {
     ExecutionResult res;
-    switch (command.type) {
-        case ADD:
+    switch (command->type) {
+        case ADD: {
             CHECK_PARAM_NUM(1)
-            put(KEY(0), nullptr);
+            Key *key = new Key((*command)[0].content);
+            put(key, nullptr);
             OK_AND_RETURN
-        case REMOVE:
+        }
+        case REMOVE: {
             CHECK_PARAM_NUM(1)
-            remove(KEY(0))
+            KEY(0)
+            remove(key);
             OK_AND_RETURN
-        case EXISTS:
+        }
+        case EXISTS: {
             CHECK_PARAM_NUM(1)
-            res.res = to_string(containsKey(KEY(0)));
+            KEY(0)
+            res.res = to_string(containsKey(key));
             OK_AND_RETURN
-        case SIZE:
+        }
+        case SIZE: {
             CHECK_PARAM_NUM(0)
             res.res = to_string(size());
             OK_AND_RETURN
+        }
     }
     INVALID_AND_RETURN
 }
@@ -285,16 +287,20 @@ void HashMap::toStringSet() {
     isIntset = false;
 }
 
-void HashMap::checkType(Key &key) {
+void HashMap::checkType(Key *key) {
     if(isIntset) {
-        if(!key.isInteger()) {
+        if (!key->isInteger()) {
             toStringSet();
         }
-
     }
 }
 
 unsigned HashMap::size() {
     return _size;
+}
+
+HashMap::HashMap(float loadFactor, unsigned int capacity, bool isIntset, bool isValueNull) :
+        loadFactor(loadFactor), capacity(capacity), isIntset(isIntset), isValueNull(isValueNull) {
+
 }
 

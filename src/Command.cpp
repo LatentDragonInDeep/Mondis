@@ -16,7 +16,7 @@ ExecutionResult Executor::execute(Command *command) {
         res.type = LOGIC_ERROR;
         res.res = "invalid pipeline command";
         return res;
-    } else if(command->type = LOCATE) {
+    } else if(command->type == LOCATE) {
         ExecutionResult res = server->locateExecute(command);
         destroyCommand(command);
         return res;
@@ -87,7 +87,7 @@ Command *CommandInterpreter::getCommand(string &raw) {
     Command* cur = res;
     while (true) {
         Token next = parser->nextToken();
-        if(next.type = END) {
+        if(next.type == END) {
             break;
         }
         vector<Token> vt;
@@ -95,7 +95,7 @@ Command *CommandInterpreter::getCommand(string &raw) {
             vt.push_back(next);
         }
         pre = next;
-        for (int i = 0; i <vt.size(); ++i) {
+        for (int i = 0; i < vt.size(); ++i) {
             if(i == 1) {
                 if(vt[i].type!=PLAIN_PARAM) {
                     cur->type = ERROR;

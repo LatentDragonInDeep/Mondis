@@ -11,6 +11,8 @@
 #include <fstream>
 #include <exception>
 #include <sstream>
+#include <unordered_map>
+#include <unordered_set>
 
 #include "Command.h"
 
@@ -85,7 +87,7 @@ public:
         bool isEnd = false;
         static std::unordered_map<char,Token*> directRecognize;
 
-        static void initDirect() {
+        static void init() {
             directRecognize['['] = Token::getToken(LEFT_SQAURE_BRACKET);
             directRecognize[']'] = Token::getToken(RIGHT_SQUARE_BRACKET);
             directRecognize['{'] = Token::getToken(LEFT_ANGLE_BRACKET);

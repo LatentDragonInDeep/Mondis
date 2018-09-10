@@ -4,6 +4,7 @@
 
 #include <limits>
 #include "SplayTree.h"
+#include "MondisServer.h"
 
 
 void SplayTree::toJson() {

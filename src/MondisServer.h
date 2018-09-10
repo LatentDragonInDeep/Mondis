@@ -80,7 +80,7 @@ private:
 
     int daemonize;                  /* True if running as a daemon */
 
-    JSONParser parser;
+    static JSONParser parser;
     ofstream logFileOut;
     ofstream aofFileOut;
     unordered_map<string,string> conf;

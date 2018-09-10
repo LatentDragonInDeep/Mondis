@@ -6,6 +6,10 @@
 #include "Command.h"
 #include "MondisServer.h"
 
+unordered_set<CommandType> Executor::serverCommand;
+
+JSONParser MondisServer::parser;
+
 ExecutionResult MondisServer::execute(Command *command) {
     ExecutionResult res;
     switch (command->type) {

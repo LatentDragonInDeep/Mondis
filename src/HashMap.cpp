@@ -301,6 +301,6 @@ unsigned HashMap::size() {
 
 HashMap::HashMap(float loadFactor, unsigned int capacity, bool isIntset, bool isValueNull) :
         loadFactor(loadFactor), capacity(capacity), isIntset(isIntset), isValueNull(isValueNull) {
-
+    arrayFrom = new Content[capacity];
 }
 

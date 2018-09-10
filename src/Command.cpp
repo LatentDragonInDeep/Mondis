@@ -4,51 +4,9 @@
 
 #include "Command.h"
 
-void CommandInterpreter::init() {
-    PUT(BIND)
-    PUT(GET)
-    PUT(EXISTS)
-    PUT(RENAME)
-    PUT(TYPE)
-    PUT(GET)
-    PUT(GET_RANGE)
-    PUT(SET_RANGE)
-    PUT(REMOVE_RANGE)
-    PUT(STRLEN)
-    PUT(INCR)
-    PUT(DECR)
-    PUT(INCR_BY)
-    PUT(DECR_BY)
-    PUT(APPEND)
-    PUT(PUSH_FRONT)
-    PUT(PUSH_BACK)
-    PUT(POP_FRONT)
-    PUT(POP_BACK)
-    PUT(ADD)
-    PUT(REMOVE)
-    PUT(SIZE)
-    PUT(REMOVE_BY_RANK)
-    PUT(REMOVE_BY_SCORE)
-    PUT(REMOVE_RANGE_BY_RANK)
-    PUT(REMOVE_RANGE_BY_SCORE)
-    PUT(COUNT_RANGE)
-    PUT(GET_BY_RANK)
-    PUT(GET_BY_SCORE)
-    PUT(GET_RANGE_BY_RANK)
-    PUT(GET_RANGE_BY_SCORE)
-    PUT(LOGIN)
-    PUT(EXIT)
-    PUT(SAVE)
-    PUT(PERSIST)
-    PUT(READ_FROM)
-    PUT(READ_CHAR)
-    PUT(READ_SHORT)
-    PUT(READ_INT)
-    PUT(READ_LONG)
-    PUT(READ_LONG_LONG)
-    PUT(BACK)
-    PUT(FORWARD)
-}
+std::unordered_map<CommandType, std::string> Command::typeToStr;
+
+std::unordered_map<std::string, CommandType> CommandInterpreter::map;
 
 CommandInterpreter::CommandInterpreter() {
 }

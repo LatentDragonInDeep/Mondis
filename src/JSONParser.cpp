@@ -7,7 +7,6 @@
 #include "MondisBinary.h"
 #include "MondisList.h"
 
-#define src (*source)
 
 JSONParser::JSONParser(std::string &filePath) {
 
@@ -220,3 +219,5 @@ Token *Token::rightAngleBracket = new Token(RIGHT_ANGLE_BRACKET);
 Token *Token::comma = new Token(COMMA);
 Token *Token::terminator = new Token(TERMINATOR);
 Token *Token::colon = new Token(COLON);
+
+std::unordered_map<char, Token *> JSONParser::LexicalParser::directRecognize;

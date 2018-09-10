@@ -10,6 +10,7 @@
 
 #include "MondisObject.h"
 #include "MondisData.h"
+#include "Command.h"
 
 using namespace std;
 
@@ -77,10 +78,10 @@ public:
 
     void toJson() override;
     ExecutionResult execute(Command& command);
-    MondisObject* locate(Command& command) override;
+    MondisObject* locate(Command& command);
 
 private:
-    void trim ();
+    void trim();
     MondisListNode* locate (int index);
 
 };

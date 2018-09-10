@@ -17,8 +17,7 @@ public:
     SplayTreeNode* right = nullptr;
     SplayTreeNode* parent = nullptr;
     unsigned treeSize = 0;
-    SplayTreeNode(){};
-    SplayTreeNode(int sc,MondisObject* d):score(sc):data(d){};
+    SplayTreeNode(int sc,MondisObject* d):score(sc),data(d){};
     ~SplayTreeNode() {
         delete data;
     }

@@ -2,6 +2,7 @@
 // Created by caesarschen on 2018/8/21.
 //
 
+#include <limits>
 #include "SplayTree.h"
 
 
@@ -478,6 +479,171 @@ SplayTreeNode *SplayTree::getUpperBound(int score) {
             cur = cur->left;
         }
     }
+}
+
+ExecutionResult SplayTree::execute(Command &command) {
+    ExecutionResult res;
+    switch (command.type) {
+        case ADD: {
+            CHECK_PARAM_NUM(2);
+            CHECK_PARAM_TYPE(0, PLAIN)
+            CHECK_AND_DEFINE_INT_LEGAL(0, socre)
+            CHECK_PARAM_TYPE(1, STRING)
+            MondisObject *data = MondisServer::getJSONParser()->parseObject(command[1].content);
+            insert(socre, data);
+            OK_AND_RETURN
+        }
+        case REMOVE_BY_RANK: {
+            CHECK_PARAM_NUM(1)
+            CHECK_PARAM_TYPE(0, PLAIN)
+            CHECK_AND_DEFINE_INT_LEGAL(0, rank)
+            if (rank < 1) {
+                res.res = "can not remove under rank 1";
+                return res;
+            }
+            if (rank > size()) {
+                res.res = "can not remove over rank ";
+                res.res += size();
+                return res;
+            }
+            removeByRank(rank);
+            OK_AND_RETURN
+        }
+        case REMOVE_BY_SCORE: {
+            CHECK_PARAM_NUM(1)
+            CHECK_PARAM_TYPE(0, PLAIN)
+            CHECK_AND_DEFINE_INT_LEGAL(0, score)
+            removeByScore(score);
+            OK_AND_RETURN
+        }
+        case REMOVE_RANGE_BY_RANK: {
+            CHECK_PARAM_NUM(2)
+            CHECK_PARAM_TYPE(0, PLAIN)
+            CHECK_PARAM_TYPE(1, PLAIN)
+            CHECK_START_AND_DEFINE(0)
+            CHECK_END_AND_DEFINE(1, size())
+            removeRangeByRank(start, end);
+            OK_AND_RETURN
+        }
+        case REMOVE_RANGE_BY_SCORE: {
+            CHECK_PARAM_NUM(2)
+            CHECK_PARAM_TYPE(0, PLAIN)
+            CHECK_PARAM_TYPE(1, PLAIN)
+            CHECK_AND_DEFINE_INT_LEGAL(0, start)
+            CHECK_AND_DEFINE_INT_LEGAL(1, end)
+            removeRangeByScore(start, end);
+            OK_AND_RETURN
+        }
+        case GET_BY_RANK: {
+            CHECK_PARAM_NUM(1)
+            CHECK_PARAM_TYPE(0, PLAIN)
+            CHECK_AND_DEFINE_INT_LEGAL(0, rank)
+            if (rank < 1) {
+                res.res = "can not remove under rank 1";
+                return res;
+            }
+            if (rank > size()) {
+                res.res = "can not remove over rank ";
+                res.res += size();
+                return res;
+            }
+            res.res = *getByRank(rank)->getJson();
+            OK_AND_RETURN
+        }
+        case GET_BY_SCORE: {
+            CHECK_PARAM_NUM(1)
+            CHECK_PARAM_TYPE(0, PLAIN)
+            CHECK_AND_DEFINE_INT_LEGAL(0, score)
+            MondisObject *data = getByScore(score);
+            if(data== nullptr) {
+                res.res = "null object";
+                return res;
+            }
+            res.res = *data->getJson();
+            OK_AND_RETURN
+        }
+        case GET_RANGE_BY_RANK: {
+            CHECK_PARAM_NUM(2)
+            CHECK_PARAM_TYPE(0, PLAIN)
+            CHECK_PARAM_TYPE(1, PLAIN)
+            CHECK_START_AND_DEFINE(0)
+            CHECK_END_AND_DEFINE(1, size())
+            vector<MondisObject *> v;
+            getRangeByRank(start, end, &v);
+            res.res += "[\n";
+            for (MondisObject *every:v) {
+                res.res += *every->getJson();
+                res.res += "\n";
+            }
+            res.res += "]\n";
+            OK_AND_RETURN
+        }
+        case GET_RANGE_BY_SCORE:{
+            CHECK_PARAM_NUM(2)
+            CHECK_PARAM_TYPE(0, PLAIN)
+            CHECK_PARAM_TYPE(1, PLAIN)
+            CHECK_AND_DEFINE_INT_LEGAL(0, start)
+            CHECK_AND_DEFINE_INT_LEGAL(1, end)
+            vector<MondisObject *> v;
+            getRangeByScore(start, end, &v);
+            res.res += "[\n";
+            for (MondisObject *every:v) {
+                res.res += *every->getJson();
+                res.res += "\n";
+            }
+            res.res += "]\n";
+            OK_AND_RETURN
+        }
+        case EXISTS: {
+            CHECK_PARAM_NUM(1)
+            CHECK_PARAM_TYPE(0, PLAIN)
+            CHECK_AND_DEFINE_INT_LEGAL(0, score)
+            res.res = to_string(contains(score));
+            OK_AND_RETURN
+        }
+        case SIZE:
+            CHECK_PARAM_NUM(0)
+            res.res = to_string(size());
+            OK_AND_RETURN
+        case COUNT:
+            CHECK_PARAM_NUM(2)
+            CHECK_PARAM_TYPE(0, PLAIN)
+            CHECK_PARAM_TYPE(1, PLAIN)
+            CHECK_AND_DEFINE_INT_LEGAL(0, start)
+            CHECK_AND_DEFINE_INT_LEGAL(1, end)
+            res.res = to_string(count(start,end));
+            OK_AND_RETURN
+    }
+    INVALID_AND_RETURN
+}
+
+MondisObject *SplayTree::locate(Command &command) {
+    MondisObject* res;
+    if(command.params.size()!=2) {
+        return nullptr;
+    }
+    if(command[0].type!=Command::ParamType::PLAIN) {
+        return nullptr;
+    }
+    if(command[1].content=="RANK") {
+        int rank;
+        if(!toInteger(command[1].content,&rank)) {
+            return nullptr;
+        }
+        if(rank<1||rank>size()) {
+            return nullptr
+        }
+        return getByRank(rank);
+    }
+    if(command[1].content=="SCORE") {
+        int score;
+        if(!toInteger(command[1].content,&score)) {
+            return nullptr;
+        }
+        return getByScore(score);
+    }
+
+    return nullptr;
 }
 
 

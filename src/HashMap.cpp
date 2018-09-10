@@ -216,7 +216,7 @@ HashMap::HashMap(float loadFactor, unsigned int capacity, const bool isIntset) :
     arrayFrom = new Content[capacity];
 }
 
-HashMap::HashMap(const bool isValueNull, const bool isIntset) : HashMap(1024,0.75f,isValueNull,isIntset) {}
+HashMap::HashMap(const bool isIntset) : HashMap(1024,0.75f,isIntset) {}
 
 MondisObject *HashMap::locate(Command& command) {
     if(command.params.size()!=1) {

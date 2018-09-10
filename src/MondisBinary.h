@@ -53,7 +53,7 @@ public:
 
     template <typename T>
     T readType() {
-        if(position+ sizeof(T)>=limit) {
+        if(position+ sizeof(T)>=capacity) {
             throw new std::invalid_argument("read out of range");
         }
         T res =  *((T*)(heapBuffer+position));

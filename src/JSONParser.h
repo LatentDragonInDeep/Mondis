@@ -14,9 +14,13 @@
 
 #include "MondisObject.h"
 #include "Command.h"
+#include "HashMap.h"
 
 #define src (*source)
 
+class MondisObject;
+class HashMap;
+class KeyValue;
 
 enum TokenType {
     LEFT_SQAURE_BRACKET,
@@ -26,7 +30,7 @@ enum TokenType {
     STRING,
     COMMA,
     COLON,
-    TERMINATOR,
+    TERMINATOR
 };
 
 class Token {
@@ -95,11 +99,11 @@ class JSONParser {
 public:
     class LexicalParser{
     private:
-        string* source;
+        std::string* source;
         unsigned curIndex = 0;
         bool isEnd = false;
         static bool hasInit;
-        static unordered_map<char,Token*> directRecognize;
+        static std::unordered_map<char,Token*> directRecognize;
 
         static void initDirect() {
             directRecognize['['] = Token::getToken(LEFT_SQAURE_BRACKET);
@@ -117,14 +121,14 @@ public:
                     break;
                 }
             }
-        }
+        };
     public:
         LexicalParser(string& source):source(&source) {
             if(!hasInit) {
                 initDirect();
                 hasInit = true;
             }
-        }
+        };
         LexicalParser(const char* filePath){
             struct stat info;
             int fd = open(filePath, O_RDONLY);
@@ -142,10 +146,10 @@ public:
             }
             close(fd);
             in.close();
-        }
+        };
         ~LexicalParser(){
             delete source;
-        }
+        };
         Token nextToken() {
             Token res;
             if(isEnd) {
@@ -182,7 +186,7 @@ public:
             isEnd = false;
         }
 
-        void setSource(string* newSrc) {
+        void setSource(std::string* newSrc) {
             source = newSrc;
         }
     };

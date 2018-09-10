@@ -44,8 +44,6 @@ class MondisObject
 public:
     MondisObjectType type = MondisObjectType::EMPTY;
     void * objectData;
-    long lastAccessTime;//上次修改时间
-    long ttl;//单位秒
 
     ~MondisObject(){
         switch (type){
@@ -163,7 +161,7 @@ private:
             case SET_RANGE:
                 CHECK_PARAM_NUM(3)
                 CHECK_START(0)
-                CHECK_END(1,data->size())
+                CHECK_END_AND_DEFINE(1,data->size())
                 if(command.third.size()!=end-start) {
                     res.res = "data length error!";
                     return res;
@@ -175,7 +173,7 @@ private:
             case GET_RANGE:
                 CHECK_PARAM_NUM(2)
                 CHECK_START(0)
-                CHECK_END(1,data->size())
+                CHECK_END_AND_DEFINE(1,data->size())
 
                 res.res = data->substr(start,end-start);
 

@@ -4,30 +4,6 @@
 
 #include "Command.h"
 
-ExecutionResult Executor::execute(Command *command) {
-    if(serverCommand.find(command->type)!=serverCommand.end()) {
-        if(command->next == nullptr) {
-            ExecutionResult res = server->execute(command);
-            destroyCommand(command);
-            return res;
-        }
-        destroyCommand(command);
-        ExecutionResult res;
-        res.type = LOGIC_ERROR;
-        res.res = "invalid pipeline command";
-        return res;
-    } else if(command->type = LOCATE) {
-        ExecutionResult res = server->locateExecute(command);
-        destroyCommand(command);
-        return res;
-    }
-    destroyCommand(command);
-    ExecutionResult res;
-    res.type = LOGIC_ERROR;
-    res.res = "unsuitable command";
-    return res;
-}
-
 void CommandInterpreter::init() {
     PUT(SET)
     PUT(GET)
@@ -178,39 +154,3 @@ CommandInterpreter::Token CommandInterpreter::LexicalParser::nextToken() {
 }
 
 
-Executor::Executor() {
-    if(!hasInit) {
-        init();
-    }
-}
-
-Executor *Executor::getExecutor() {
-    return executor;
-}
-
-void Executor::init() {
-    INSERT(SET)
-    INSERT(GET)
-
-    INSERT(EXISTS)
-    INSERT(RENAME)
-    INSERT(TYPE)
-
-    INSERT(SAVE)
-    INSERT(BGSAVE)
-    INSERT(EXIT)
-    INSERT(LOGIN)
-}
-
-void Executor::destroyCommand(Command *command) {
-    if(command == nullptr) {
-        return;
-    }
-    Command* cur = command;
-    while (cur!= nullptr) {
-        Command* temp = cur;
-        cur = cur->next;
-        delete temp;
-    }
-
-}

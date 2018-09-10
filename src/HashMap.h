@@ -16,25 +16,23 @@ using namespace std;
 
 class Key :public MondisData{
 public:
-    union {
-        string str;
-        int intValue;
-    } key;
+    string str;
+    int intValue;
     bool flag = true;
     bool compare(Key& other) {
         if(flag!=other.flag) {
             return false;
         }
         if(flag) {
-            return key.str.compare(other.key.str);
+            return str.compare(other.str);
         }
-        return key.intValue>other.key.intValue;
+        return intValue>other.intValue;
     }
     Key(string& k) {
-        if(toInteger(k,key.intValue)) {
+        if(toInteger(k,intValue)) {
             flag = false;
         } else{
-            key.str = k;
+            str = k;
         }
     }
     Key(int k):key.intValue(k),flag(false){};
@@ -46,12 +44,12 @@ public:
         if(flag) {
             return;
         }
-        key.str = to_string(key.intValue);
+        str = to_string(intValue);
         flag = true;
     }
 
     bool toInteger() {
-        bool res = toInteger(key.str,key.intValue);
+        bool res = toInteger(str,intValue);
         if(res) {
             flag = false;
             return true;
@@ -63,17 +61,17 @@ public:
             return false;
         }
         if(flag) {
-            return key.str == other.key.str;
+            return str == other.str;
         }
-        return key.intValue == other.key.intValue;
+        return intValue == other.intValue;
     }
 
     unsigned int hashCode() {
         if(flag) {
-            return strHash(key.str);
+            return strHash(str);
         }
         else  {
-            return intHash(key.intValue);
+            return intHash(intValue);
         }
     }
 
@@ -332,7 +330,7 @@ private:
                     break;
                 }
                 avlIterator = current.tree->iterator();
-                cur = avlIterator.next();
+                avlIterator.next();
                 isTree = true;
                 break;
             }

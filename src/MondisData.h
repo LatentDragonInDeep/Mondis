@@ -28,8 +28,13 @@ public:
          delete json;
      };
 
-     virtual ExecutionResult execute(Command& command);
-     virtual MondisObject* locate(Command& command);
+     virtual ExecutionResult execute(Command& command) {
+         return ExecutionResult();
+     };
+
+    virtual MondisObject* locate(Command& command) {
+        return nullptr;
+     };
 
 };
 

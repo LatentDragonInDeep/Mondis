@@ -7,10 +7,12 @@
 
 #include <string>
 #include <sstream>
-
-#include "MondisServer.h"
+#include <vector>
+#include <unordered_map>
 
 #define PUT(TYPE) map[#TYPE] = CommandType::TYPE;
+
+#define MAP(TYPE) typeToStr[TYPE] = #TYPE;
 
 #define INSERT(TYPE) serverCommand.insert(CommandType::TYPE);
 
@@ -31,13 +33,13 @@
                                     }
 
 #define CHECK_INT_START_LEGAL(INDEX) int start;\
-                                      CHECK_INT_LEGAL(command[INDEX].content,&start)
+                                      CHECK_INT_LEGAL(command[INDEX].content,start)
 
 #define CHECK_INT_END_LEGAL(INDEX) int end;\
-                                      CHECK_INT_LEGAL(command[INDEX].content,&end)
+                                      CHECK_INT_LEGAL(command[INDEX].content,end)
 
 #define CHECK_AND_DEFINE_INT_LEGAL(INDEX,NAME) int NAME;\
-                                      CHECK_INT_LEGAL(command[INDEX].content,&##NAME)
+                                      CHECK_INT_LEGAL(command[INDEX].content,NAME)
 
 #define CHECK_START if(start<0) {\
                      res.res = "start under zero!";\
@@ -49,10 +51,10 @@
                      return res;\
                      }
 
-#define CHECK_START(INDEX) CHECK_INT_START_LEGAL(INDEX)\
+#define CHECK_START_AND_DEFINE(INDEX) CHECK_INT_START_LEGAL(INDEX)\
                              CHECK_START
 
-#define CHECK_END(INDEX,SIZE) CHECK_INT_END_LEGAL(INDEX)\
+#define CHECK_END_AND_DEFINE(INDEX,SIZE) CHECK_INT_END_LEGAL(INDEX)\
                              CHECK_END(SIZE)
 
 #define CHECK_PARAM_TYPE(INDEX,TYPE) if(command[INDEX].type!=Command::ParamType::TYPE) {\
@@ -67,11 +69,10 @@
                                             return res;\
                                             }
 
-bool toInteger(string& data,int* res) {
-    static stringstream ss;
+bool toInteger(std::string &data, int &res) {
+    static std::stringstream ss;
     ss<<data;
-    int res;
-    ss>>*res;
+    ss>>res;
     if(!ss.fail()) {
         ss.clear();
         return true;
@@ -79,7 +80,7 @@ bool toInteger(string& data,int* res) {
     return false;
 };
 
-string to_string(bool data) {
+std::string to_string(bool data) {
     if(data) {
         return "true";
     }
@@ -109,6 +110,7 @@ enum CommandType {
     ADD,
     REMOVE,
     SIZE,
+    COUNT,
     REMOVE_BY_RANK,
     REMOVE_BY_SCORE,
     REMOVE_RANGE_BY_RANK,
@@ -181,7 +183,6 @@ enum CommandType {
 
     //persistence
     SAVE,
-    BGSAVE,
 
     //control
     EXIT,
@@ -201,12 +202,20 @@ enum ExecutionResultType {
 
 class ExecutionResult {
 public:
+    static std::string typeToStr[];
     ExecutionResultType type;
     std::string res;
     ExecutionResult():type(LOGIC_ERROR){};
-private:
-
+    std::string toString() {
+        std::string res;
+        res+=typeToStr[type];
+        res+=" ";
+        res+=this->res;
+        return res;
+    }
 };
+
+std::string ExecutionResult::typeToStr[] = {"OK","SYNTAX_ERROR,INTERNAL_ERROR,LOGIC_ERROR"};
 
 class Command{
 public:
@@ -221,11 +230,77 @@ public:
         ParamType type;
     };
     CommandType type = VACANT;
-    vector<Param> params;
+    std::vector<Param> params;
     Command* next;
+    Command() {
+        if(!hasInit) {
+            init();
+        }
+    }
 
     Param& operator[](int index) {
         return params[index];
+    }
+
+    std::string toString() {
+        std::string res;
+        res+=typeToStr[type];
+        res+=" ";
+        for(Param& param:params) {
+            res+=param.content;
+            res+=" ";
+        }
+        return res;
+    }
+    static std::unordered_map<CommandType,std::string> typeToStr;
+    static bool hasInit;
+    static void init() {
+                MAP(SET)
+                MAP(DEL)
+                MAP(EXISTS)
+                MAP(RENAME)
+                MAP(TYPE)
+                MAP(GET)
+                MAP(GET_RANGE)
+                MAP(SET_RANGE)
+                MAP(REMOVE_RANGE)
+                MAP(STRLEN)
+                MAP(INCR)
+                MAP(DECR)
+                MAP(INCR_BY)
+                MAP(DECR_BY)
+                MAP(APPEND)
+                MAP(PUSH_FRONT)
+                MAP(PUSH_BACK)
+                MAP(POP_FRONT)
+                MAP(POP_BACK)
+                MAP(ADD)
+                MAP(REMOVE)
+                MAP(SIZE)
+                MAP(REMOVE_BY_RANK)
+                MAP(REMOVE_BY_SCORE)
+                MAP(REMOVE_RANGE_BY_RANK)
+                MAP(REMOVE_RANGE_BY_SCORE)
+                MAP(COUNT_RANGE)
+                MAP(GET_BY_RANK)
+                MAP(GET_BY_SCORE)
+                MAP(GET_RANGE_BY_RANK)
+                MAP(GET_RANGE_BY_SCORE)
+                MAP(READ_FROM)
+                MAP(READ_CHAR)
+                MAP(READ_SHORT)
+                MAP(READ_INT)
+                MAP(READ_LONG)
+                MAP(READ_LONG_LONG)
+                MAP(BACK)
+                MAP(FORWARD)
+                MAP(SET_POSITION)
+                MAP(READ)
+                MAP(WRITE)
+                MAP(LOCATE)
+                MAP(SAVE)
+                MAP(EXIT)
+                MAP(LOGIN)
     }
 
 };
@@ -242,17 +317,17 @@ private:
     class Token{
     public:
         TokenType type;
-        string content;
+        std::string content;
         Token():type(END) {};
     };
     class LexicalParser {
     private:
-        string raw;
+        std::string raw;
         int curIndex;
         bool isEnd = false;
         void skip();
     public:
-        explicit LexicalParser(string& raw):raw(raw){
+        explicit LexicalParser(std::string& raw):raw(raw){
 
         }
         Token nextToken();
@@ -260,35 +335,13 @@ private:
     };
     LexicalParser* parser;
     Token pre;
-    static unordered_map<string,CommandType> map;
+    static std::unordered_map<std::string,CommandType> map;
     static bool hasInit;
     static void init();
 public:
     CommandInterpreter();
-    Command* getCommand(string& raw);
+    Command* getCommand(std::string& raw);
 };
-
-class Executor {
-public:
-
-    ExecutionResult execute(Command* command);
-    static Executor* getExecutor();
-    static void destroyCommand(Command* command);
-private:
-    Executor();
-    Executor(Executor&) = default;
-    Executor(Executor&&) = default;
-    Executor&operator=(Executor&) = default;
-    Executor&operator=(Executor&&) = default;
-    static Executor* executor;
-    MondisServer* server;
-    static unordered_set<CommandType> serverCommand;
-    bool hasInit;
-    static void init();
-};
-
-Executor* Executor::executor = new Executor;
-
 
 
 #endif //MONDIS_COMMANDEXECUTOR_H

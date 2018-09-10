@@ -8,18 +8,38 @@
 
 #include <sys/types.h>
 #include <string>
-
+#include <time.h>
+#include <fstream>
 #include "HashMap.h"
 #include "MondisClient.h"
 #include "Command.h"
 #include "JSONParser.h"
 
 class Log{
+private:
     string currentTime;
-    Command command;
-    ExecutionResult res;
-};
+    Command& command;
+    ExecutionResult& res;
+public:
+    Log(Command& command,ExecutionResult& res):command(command),res(res) {
+        time_t t = time(0);
+        char ch[64];
+        strftime(ch, sizeof(ch), "%Y-%m-%d %H-%M-%S", localtime(&t));
+        currentTime = ch;
+    }
+    string toString() {
+        string res;
+        res+=currentTime;
+        res+='\t';
+        res+=command.toString();
+        res+='\t';
+        res+=this->res.toString();
 
+        return res;
+    }
+
+};
+class Executor;
 class MondisServer {
 private:
     /* General */
@@ -27,16 +47,11 @@ private:
     std::string configfile;           /* Absolute config file path, or NULL */
     std::string executable;           /* Absolute executable file path. */
     std::string logFile;
-    char **exec_argv;           /* Executable argv vector (copy). */
-              /* serverCron() calls frequency in hertz */
+    char **execArgs;           /* Executable argv vector (copy). */
+
     HashMap* curKeySpace;
     HashMap** allDbs;
     int curDbIndex = 0;
-
-    HashMap *commands;             /* Command table */
-
-    size_t initial_memory_usage; /* Bytes used after initialization. */
-    int always_show_logo;       /* Show logo even for non-stdout logging. */
 
     /* Networking */
     int port;                   /* TCP listening port */
@@ -56,15 +71,9 @@ private:
 
     /* RDB / AOF loading information */
     bool loading;                /* We are loading data from disk if true */
+    bool isJSONSerialization = false;
+    bool isAOFSerialization  = false;
 
-    off_t loading_total_bytes;
-    off_t loading_loaded_bytes;
-    time_t loading_start_time;
-    off_t loading_process_events_interval_bytes;
-    /* Fast pointers to often looked up command */
-
-
-    /* Configuration */
     int verbosity;                  /* Loglevel in redis.conf */
     int maxidletime;                /* Client timeout in seconds */
     bool tcpkeepalive;               /* Set SO_KEEPALIVE if non-zero. */
@@ -72,17 +81,56 @@ private:
     int daemonize;                  /* True if running as a daemon */
 
     static JSONParser parser;
+    ofstream logFileOut;
+    ofstream aofFileOut;
+    unordered_map<string,string> conf;
+    Executor* executor;
+    CommandInterpreter* interpreter;
 
 public:
     int start(string& confFile);
     int runAsDaemon();
     int save();
     int startEventLoop();
+    void applyConf();
     int appendLog(Log& log);
+    void appendOnly(Command& command);
+    void parseConfFile(string& confFile);
+    ExecutionResult execute(string& commandStr);
     ExecutionResult execute(Command& command);
     ExecutionResult locateExecute(Command& command);
     static JSONParser* getJSONParser();
 };
+
+class Executor {
+public:
+
+    ExecutionResult execute(Command* command);
+    static Executor* getExecutor();
+    static void destroyCommand(Command* command);
+    void bindServer(MondisServer* server);
+private:
+    Executor();
+    Executor(Executor&) = default;
+    Executor(Executor&&) = default;
+    Executor&operator=(Executor&) = default;
+    Executor&operator=(Executor&&) = default;
+    static Executor* executor;
+    MondisServer* server;
+    static unordered_set<CommandType> serverCommand;
+    static bool hasInit;
+    static void init();
+};
+
+Executor* Executor::executor = new Executor;
+
+void Executor::bindServer(MondisServer *server) {
+    this->server = server;
+}
+
+int main() {
+    return 0;
+}
 
 
 #endif //MONDIS_MONDISSERVER_H

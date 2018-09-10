@@ -39,7 +39,7 @@ AVLTreeNode *AVLTree::realInsert (KeyValue &kv, AVLTreeNode *root)
         root->left = realInsert(kv,root->left);
         if(getHeight(root->left)-getHeight(root->right) == 2) {
             if(kv.compare(*root->left->data)) {
-                root=leftRightRotate(root)
+                root=leftRightRotate(root);
             }
             else{
                 root = rightRotate(root);
@@ -174,7 +174,6 @@ AVLTreeNode *AVLTree::getSuccessor (AVLTreeNode *root)
 void AVLTree::toJson() {
     AVLIterator iterator = this->iterator();
     *json+="{\n";
-    *json+="\"InMemoryType\":\"HASH\"";
     while (iterator.next()) {
         *json+=*iterator->data->getJson();
         *json+=",";

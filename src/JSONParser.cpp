@@ -221,3 +221,12 @@ Token *Token::terminator = new Token(TERMINATOR);
 Token *Token::colon = new Token(COLON);
 
 std::unordered_map<char, Token *> JSONParser::LexicalParser::directRecognize;
+
+void JSONParser::LexicalParser::init() {
+    directRecognize['['] = Token::getToken(LEFT_SQAURE_BRACKET);
+    directRecognize[']'] = Token::getToken(RIGHT_SQUARE_BRACKET);
+    directRecognize['{'] = Token::getToken(LEFT_ANGLE_BRACKET);
+    directRecognize['}'] = Token::getToken(RIGHT_ANGLE_BRACKET);
+    directRecognize[','] = Token::getToken(COMMA);
+    directRecognize[':'] = Token::getToken(COLON);
+}

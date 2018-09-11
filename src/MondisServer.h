@@ -39,67 +39,56 @@ public:
     }
 
 };
+
 class Executor;
 class MondisServer {
 private:
-    /* General */
-    pid_t pid;                  /* Main process pid. */
-    std::string configfile;           /* Absolute config file path, or NULL */
-    std::string executable;           /* Absolute executable file path. */
-    std::string logFile;
-    char **execArgs;           /* Executable argv vector (copy). */
-
+    pid_t pid;
+    std::string configfile;
+    std::string executable;
+    int port = 6379;
+    int databaseNum = 16;
+    bool aof = true;
+    string aofSyncStrategy = "osDefault";
+    bool json = true;
+    int jsonDuration = 10;
+    string slaveof = "127.0.0.1";
+    string workDir;
+    string logFile = "D:\\MondisWork\\log.txt";
     HashMap* curKeySpace;
-    HashMap** allDbs;
+    vector<HashMap *> dbs;
     int curDbIndex = 0;
-
-    /* Networking */
-    int port;                   /* TCP listening port */
-    int tcp_backlog;            /* TCP listen() backlog */
-    int bindaddr_count;         /* Number of addresses in server.bindaddr[] */
-    char *unixsocket;           /* UNIX socket path */
-    mode_t unixsocketperm;      /* UNIX socket permission */
-    vector<int> tcpFds; /* TCP socket file descriptors */
-    int ipfd_count;             /* Used slots in ipfd[] */
-    int sofd;                   /* Unix socket file descriptor */
-
-    vector<MondisClient*> *clients;              /* List of active clients */
-    vector<MondisClient*> *clients_to_close;     /* Clients to close asynchronously */
-    vector<MondisClient*> *clients_pending_write; /* There is to write or install handler. */
-
-    MondisClient *current_client; /* Current client, only used on crash report */
-
-    /* RDB / AOF loading information */
-    bool loading;                /* We are loading data from disk if true */
-    bool isJSONSerialization = false;
-    bool isAOFSerialization  = false;
-
-    int verbosity;                  /* Loglevel in redis.conf */
-    int maxidletime;                /* Client timeout in seconds */
-    bool tcpkeepalive;               /* Set SO_KEEPALIVE if non-zero. */
-
-    int daemonize;                  /* True if running as a daemon */
-
+    int daemonize = false;
     static JSONParser parser;
     ofstream logFileOut;
     ofstream aofFileOut;
+    ofstream jsonFileOut;
     unordered_map<string,string> conf;
     Executor* executor;
     CommandInterpreter* interpreter;
+    string username = "root";
+    string password = "admin";
 
+    string aofFile;
+    string jsonFile;
+    bool isLoading;
+    bool isRecovering;
+
+    bool hasLogin = true;
 public:
     int start(string& confFile);
     int runAsDaemon();
-    int save();
+
+    void init();
+
+    int save(string &jsonFile);
     int startEventLoop();
     void applyConf();
     int appendLog(Log& log);
     void appendOnly(Command& command);
     void parseConfFile(string& confFile);
     ExecutionResult execute(string& commandStr);
-
     ExecutionResult execute(Command *command);
-
     ExecutionResult locateExecute(Command *command);
     static JSONParser* getJSONParser();
 };
@@ -110,7 +99,8 @@ public:
     ExecutionResult execute(Command* command);
     static Executor* getExecutor();
     static void destroyCommand(Command* command);
-    void bindServer(MondisServer* server);
+
+    static void bindServer(MondisServer *server);
 private:
     Executor();
     Executor(Executor&) = default;
@@ -118,8 +108,9 @@ private:
     Executor&operator=(Executor&) = default;
     Executor&operator=(Executor&&) = default;
     static Executor* executor;
-    MondisServer* server;
+    static MondisServer *server;
     static unordered_set<CommandType> serverCommand;
+public:
     static void init();
 };
 

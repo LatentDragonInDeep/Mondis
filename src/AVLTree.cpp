@@ -3,6 +3,7 @@
 //
 
 #include "HashMap.h"
+#include "MondisServer.h"
 
 using namespace std;
 

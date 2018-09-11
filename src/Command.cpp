@@ -17,20 +17,22 @@ Command *CommandInterpreter::getCommand(std::string &raw) {
     Command* cur = res;
     while (true) {
         Token next = parser->nextToken();
-        if(next.type = END) {
-            break;
-        }
         std::vector<Token> vt;
+        if (next.type == END) {
+            return res;
+        }
         while(next.type!=END&&next.type!=VERTICAL) {
             vt.push_back(next);
+            next = parser->nextToken();
         }
         pre = next;
         for (int i = 0; i <vt.size(); ++i) {
-            if(i == 1) {
+            if (i == 0) {
                 if(vt[i].type!=PLAIN_PARAM) {
                     cur->type = ERROR;
                     return res;
                 }
+                util::toUpperCase(vt[i].content);
                 if(map.find(vt[i].content)==map.end()) {
                     cur->type = ERROR;
                     return res;
@@ -60,6 +62,53 @@ Command *CommandInterpreter::getCommand(std::string &raw) {
     delete parser;
 }
 
+void CommandInterpreter::init() {
+    PUT(BIND)
+    PUT(GET)
+    PUT(EXISTS)
+    PUT(RENAME)
+    PUT(TYPE)
+    PUT(GET)
+    PUT(GET_RANGE)
+    PUT(SET_RANGE)
+    PUT(REMOVE_RANGE)
+    PUT(STRLEN)
+    PUT(INCR)
+    PUT(DECR)
+    PUT(INCR_BY)
+    PUT(DECR_BY)
+    PUT(APPEND)
+    PUT(PUSH_FRONT)
+    PUT(PUSH_BACK)
+    PUT(POP_FRONT)
+    PUT(POP_BACK)
+    PUT(ADD)
+    PUT(REMOVE)
+    PUT(SIZE)
+    PUT(REMOVE_BY_RANK)
+    PUT(REMOVE_BY_SCORE)
+    PUT(REMOVE_RANGE_BY_RANK)
+    PUT(REMOVE_RANGE_BY_SCORE)
+    PUT(COUNT_RANGE)
+    PUT(GET_BY_RANK)
+    PUT(GET_BY_SCORE)
+    PUT(GET_RANGE_BY_RANK)
+    PUT(GET_RANGE_BY_SCORE)
+    PUT(LOGIN)
+    PUT(EXIT)
+    PUT(SAVE)
+    PUT(PERSIST)
+    PUT(READ_FROM)
+    PUT(READ_CHAR)
+    PUT(READ_SHORT)
+    PUT(READ_INT)
+    PUT(READ_LONG)
+    PUT(READ_LONG_LONG)
+    PUT(BACK)
+    PUT(FORWARD)
+    PUT(SELECT)
+}
+
 void CommandInterpreter::LexicalParser::skip() {
     while (raw[curIndex] ==' '||raw[curIndex]=='\n'||raw[curIndex] == '\r'||raw[curIndex] == '\t') {
         curIndex++;
@@ -81,11 +130,10 @@ CommandInterpreter::Token CommandInterpreter::LexicalParser::nextToken() {
     }
     int start;
     if (raw[curIndex] == '"') {
-        if (*raw.end() == '"') {
-            start = curIndex;
-            curIndex = raw.size();
+        if (raw[raw.size() - 1] == '"') {
             res.type = STRING_PARAM;
-            res.content = raw.substr(start);
+            res.content = raw.substr(curIndex + 1, raw.size() - (curIndex + 2));
+            isEnd = true;
             return res;
         }
         res.type = END;
@@ -99,7 +147,7 @@ CommandInterpreter::Token CommandInterpreter::LexicalParser::nextToken() {
     while (true) {
         if (raw[curIndex] == ' ') {
             res.type = PLAIN_PARAM;
-            res.content = raw.substr(start, curIndex);
+            res.content = raw.substr(start, curIndex - start);
             curIndex++;
             return res;
         }
@@ -126,4 +174,61 @@ std::string util::to_string(bool data) {
     return "false";
 }
 
+void util::toUpperCase(std::string &data) {
+    for (auto &ch:data) {
+        if (ch >= 'a' && ch <= 'z') {
+            ch -= 32;
+        }
+    }
+}
+
 std::string ExecutionResult::typeToStr[] = {"OK", "SYNTAX_ERROR,INTERNAL_ERROR,LOGIC_ERROR"};
+
+void Command::init() {
+    MAP(BIND)
+    MAP(DEL)
+    MAP(EXISTS)
+    MAP(RENAME)
+    MAP(TYPE)
+    MAP(GET)
+    MAP(GET_RANGE)
+    MAP(SET_RANGE)
+    MAP(REMOVE_RANGE)
+    MAP(STRLEN)
+    MAP(INCR)
+    MAP(DECR)
+    MAP(INCR_BY)
+    MAP(DECR_BY)
+    MAP(APPEND)
+    MAP(PUSH_FRONT)
+    MAP(PUSH_BACK)
+    MAP(POP_FRONT)
+    MAP(POP_BACK)
+    MAP(ADD)
+    MAP(REMOVE)
+    MAP(SIZE)
+    MAP(REMOVE_BY_RANK)
+    MAP(REMOVE_BY_SCORE)
+    MAP(REMOVE_RANGE_BY_RANK)
+    MAP(REMOVE_RANGE_BY_SCORE)
+    MAP(COUNT_RANGE)
+    MAP(GET_BY_RANK)
+    MAP(GET_BY_SCORE)
+    MAP(GET_RANGE_BY_RANK)
+    MAP(GET_RANGE_BY_SCORE)
+    MAP(READ_FROM)
+    MAP(READ_CHAR)
+    MAP(READ_SHORT)
+    MAP(READ_INT)
+    MAP(READ_LONG)
+    MAP(READ_LONG_LONG)
+    MAP(BACK)
+    MAP(FORWARD)
+    MAP(SET_POSITION)
+    MAP(READ)
+    MAP(WRITE)
+    MAP(LOCATE)
+    MAP(SAVE)
+    MAP(EXIT)
+    MAP(LOGIN)
+}

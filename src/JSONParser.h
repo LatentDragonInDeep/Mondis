@@ -86,15 +86,10 @@ public:
         unsigned curIndex = 0;
         bool isEnd = false;
         static std::unordered_map<char,Token*> directRecognize;
+    public:
+        static void init();
 
-        static void init() {
-            directRecognize['['] = Token::getToken(LEFT_SQAURE_BRACKET);
-            directRecognize[']'] = Token::getToken(RIGHT_SQUARE_BRACKET);
-            directRecognize['{'] = Token::getToken(LEFT_ANGLE_BRACKET);
-            directRecognize['}'] = Token::getToken(RIGHT_ANGLE_BRACKET);
-            directRecognize[','] = Token::getToken(COMMA);
-            directRecognize[':'] = Token::getToken(COLON);
-        }
+    private:
         void skip() {
             while (source[curIndex] == ' ' || source[curIndex] == '\n' || source[curIndex] == '\r' ||
                    source[curIndex] == '\t') {

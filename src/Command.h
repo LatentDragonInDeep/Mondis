@@ -70,9 +70,11 @@
                                             }
 
 namespace util {
-    bool toInteger(std::string &data, int &res);;
+    bool toInteger(std::string &data, int &res);
 
-    std::string to_string(bool data);;
+    std::string to_string(bool data);
+
+    void toUpperCase(std::string &data);
 };
 enum CommandType {
     BIND,
@@ -174,6 +176,7 @@ enum CommandType {
     //control
     EXIT,
     LOGIN,
+    SELECT,
 
 
     VACANT,
@@ -235,55 +238,8 @@ public:
         return res;
     }
     static std::unordered_map<CommandType,std::string> typeToStr;
-    static void init() {
-        MAP(BIND)
-        MAP(DEL)
-        MAP(EXISTS)
-        MAP(RENAME)
-        MAP(TYPE)
-        MAP(GET)
-        MAP(GET_RANGE)
-        MAP(SET_RANGE)
-        MAP(REMOVE_RANGE)
-        MAP(STRLEN)
-        MAP(INCR)
-        MAP(DECR)
-        MAP(INCR_BY)
-        MAP(DECR_BY)
-        MAP(APPEND)
-        MAP(PUSH_FRONT)
-        MAP(PUSH_BACK)
-        MAP(POP_FRONT)
-        MAP(POP_BACK)
-        MAP(ADD)
-        MAP(REMOVE)
-        MAP(SIZE)
-        MAP(REMOVE_BY_RANK)
-        MAP(REMOVE_BY_SCORE)
-        MAP(REMOVE_RANGE_BY_RANK)
-        MAP(REMOVE_RANGE_BY_SCORE)
-        MAP(COUNT_RANGE)
-        MAP(GET_BY_RANK)
-        MAP(GET_BY_SCORE)
-        MAP(GET_RANGE_BY_RANK)
-        MAP(GET_RANGE_BY_SCORE)
-        MAP(READ_FROM)
-        MAP(READ_CHAR)
-        MAP(READ_SHORT)
-        MAP(READ_INT)
-        MAP(READ_LONG)
-        MAP(READ_LONG_LONG)
-        MAP(BACK)
-        MAP(FORWARD)
-        MAP(SET_POSITION)
-        MAP(READ)
-        MAP(WRITE)
-        MAP(LOCATE)
-        MAP(SAVE)
-        MAP(EXIT)
-        MAP(LOGIN)
-    }
 
+    static void init();
 };
 
 class CommandInterpreter {
@@ -304,7 +260,7 @@ private:
     class LexicalParser {
     private:
         std::string raw;
-        int curIndex;
+        int curIndex = 0;
         bool isEnd = false;
         void skip();
     public:
@@ -318,52 +274,8 @@ private:
     Token pre;
     LexicalParser* parser;
     static std::unordered_map<std::string,CommandType> map;
-
-    static void init() {
-        PUT(BIND)
-        PUT(GET)
-        PUT(EXISTS)
-        PUT(RENAME)
-        PUT(TYPE)
-        PUT(GET)
-        PUT(GET_RANGE)
-        PUT(SET_RANGE)
-        PUT(REMOVE_RANGE)
-        PUT(STRLEN)
-        PUT(INCR)
-        PUT(DECR)
-        PUT(INCR_BY)
-        PUT(DECR_BY)
-        PUT(APPEND)
-        PUT(PUSH_FRONT)
-        PUT(PUSH_BACK)
-        PUT(POP_FRONT)
-        PUT(POP_BACK)
-        PUT(ADD)
-        PUT(REMOVE)
-        PUT(SIZE)
-        PUT(REMOVE_BY_RANK)
-        PUT(REMOVE_BY_SCORE)
-        PUT(REMOVE_RANGE_BY_RANK)
-        PUT(REMOVE_RANGE_BY_SCORE)
-        PUT(COUNT_RANGE)
-        PUT(GET_BY_RANK)
-        PUT(GET_BY_SCORE)
-        PUT(GET_RANGE_BY_RANK)
-        PUT(GET_RANGE_BY_SCORE)
-        PUT(LOGIN)
-        PUT(EXIT)
-        PUT(SAVE)
-        PUT(PERSIST)
-        PUT(READ_FROM)
-        PUT(READ_CHAR)
-        PUT(READ_SHORT)
-        PUT(READ_INT)
-        PUT(READ_LONG)
-        PUT(READ_LONG_LONG)
-        PUT(BACK)
-        PUT(FORWARD)
-    }
+public:
+    static void init();
 public:
     CommandInterpreter();
     Command* getCommand(std::string& raw);

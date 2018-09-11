@@ -1,8 +1,10 @@
 //
 // Created by 11956 on 2018/9/10.
 //
-
+#include "MondisServer.h"
 int main() {
-    return 0;
+    MondisServer *server = new MondisServer;
+    string confFile = "mondis.conf";
+    server->start(confFile);
 }
 

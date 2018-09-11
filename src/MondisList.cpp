@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "MondisList.h"
+#include "MondisServer.h"
 
 MondisList::MondisList ()
 {

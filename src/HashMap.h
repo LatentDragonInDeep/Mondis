@@ -189,7 +189,7 @@ public:
     MondisObject* object = nullptr;
     Entry* pre = nullptr;
     Entry* next = nullptr;
-    bool isValueNull;
+    bool isValueNull = false;
     bool compare(Entry& other) {
         return key->compare(*other.key);
     }
@@ -315,13 +315,32 @@ private:
     const int treeThreshold = 8;
     const bool isValueNull = false;
     bool isIntset = true;
-    typedef struct {
-        Entry * first;
-        AVLTree* tree;
-        Entry* end;
+
+    struct Content {
+        Entry *head = new Entry;
+        Entry *tail = new Entry;
+        AVLTree *tree = nullptr;
         int listLen = 0;
         bool isList = true;
-    } Content;
+
+        Content() {
+            head->next = tail;
+            tail->pre = head;
+        }
+
+        ~Content() {
+            Entry *cur = head;
+            while (true) {
+                Entry *next = cur->next;
+                delete cur;
+                if (next == nullptr) {
+                    break;
+                }
+                cur = next;
+            }
+
+        }
+    };
     Content * arrayFrom;
     Content * arrayTo;
     class MapIterator{
@@ -340,11 +359,11 @@ private:
                 }
                 Content current = array[slotIndex];
                 if(current.isList) {
-                    if(current.first == nullptr) {
+                    if (current.head == nullptr) {
                         slotIndex++;
                         continue;
                     }
-                    cur = current.first;
+                    cur = current.head;
                     isTree = false;
                     break;
                 }
@@ -400,7 +419,8 @@ private:
     void rehash();
     void toStringSet();
     void toTree (int index);
-    int getIndex (int hash);
+
+    unsigned getIndex(unsigned hash);
     void add(int index,Entry* entry);
 
     int getCapacity (int capa);

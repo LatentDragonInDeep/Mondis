@@ -219,7 +219,7 @@ public:
     };
     CommandType type = VACANT;
     std::vector<Param> params;
-    Command* next;
+    Command *next = nullptr;
     Command() {
     }
 

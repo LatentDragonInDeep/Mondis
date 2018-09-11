@@ -27,7 +27,12 @@ ExecutionResult MondisServer::execute(Command *command) {
             CHECK_PARAM_NUM(1)
             CHECK_PARAM_TYPE(0, PLAIN)
             KEY(0)
-            res.res = curKeySpace->get(key)->getJson();
+            MondisObject *data = curKeySpace->get(key);
+            if (data == nullptr) {
+                res.res = "the key does not exists";
+                OK_AND_RETURN
+            }
+            res.res = data->getJson();
             OK_AND_RETURN
         }
         case DEL: {
@@ -243,7 +248,7 @@ void MondisServer::init() {
     CommandInterpreter::init();
     interpreter = new CommandInterpreter;
     for (int i = 0; i < databaseNum; ++i) {
-        dbs.push_back(new HashMap(16, 0.75f, false, false));
+        dbs.push_back(new HashMap(0.75, 16, false, false));
     }
     curKeySpace = dbs[curDbIndex];
     if (aof) {
@@ -266,7 +271,7 @@ ExecutionResult Executor::execute(Command *command) {
         res.type = LOGIC_ERROR;
         res.res = "invalid pipeline command";
         return res;
-    } else if(command->type = LOCATE) {
+    } else if (command->type == LOCATE) {
         ExecutionResult res = server->locateExecute(command);
         destroyCommand(command);
         return res;
@@ -274,7 +279,7 @@ ExecutionResult Executor::execute(Command *command) {
     destroyCommand(command);
     ExecutionResult res;
     res.type = LOGIC_ERROR;
-    res.res = "unsuitable command";
+    res.res = "Invalid command";
     return res;
 }
 
@@ -297,6 +302,7 @@ void Executor::init() {
     INSERT(SAVE)
     INSERT(EXIT)
     INSERT(SELECT)
+    INSERT(DEL)
 }
 
 void Executor::destroyCommand(Command *command) {

@@ -12,10 +12,10 @@ bool HashMap::put(Key *key, MondisObject *value)
 {
     checkType(key);
     int index = getIndex(key->hashCode());
-    Content content= arrayFrom[index];
+    Content &content = arrayFrom[index];
     if(content.isList) {
-        Entry* cur = content.first;
-        for (;cur!=nullptr;cur = cur->next) {
+        Entry *cur = content.head->next;
+        for (; cur != content.tail; cur = cur->next) {
             if (key->equals(*cur->key)) {
                 delete cur->object;
                 cur->object = value;
@@ -25,21 +25,26 @@ bool HashMap::put(Key *key, MondisObject *value)
         Entry* newEntry = new Entry;
         newEntry->object = value;
         newEntry->key = key;
+        cur = content.head;
+        Entry *next = cur->next;
         cur->next = newEntry;
         newEntry->pre = cur;
-        content.end = newEntry;
+        newEntry->next = next;
+        next->pre = newEntry;
         content.listLen++;
+        _size++;
         if(content.listLen>treeThreshold) {
             toTree(index);
             content.isList = false;
         }
+        return true;
     }
     Entry* newEntry = new Entry;
     newEntry->object = value;
     newEntry->key = key;
     content.tree->insert(newEntry);
     _size++;
-    if(_size/capacity>loadFactor) {
+    if (((double) _size) / capacity > loadFactor) {
         rehash();
         return true;
     }
@@ -54,10 +59,10 @@ MondisObject *HashMap::get (Key &key)
         key.toString();
     }
     int index = getIndex(key.hashCode());
-    Content content= arrayFrom[index];
+    Content &content = arrayFrom[index];
     if(content.isList) {
-        Entry* cur = content.first;
-        for (;cur!=nullptr;cur = cur->next) {
+        Entry *cur = content.head->next;
+        for (; cur != content.tail; cur = cur->next) {
             if(key.equals(*cur->key))
             {
                 return cur->object;
@@ -66,7 +71,11 @@ MondisObject *HashMap::get (Key &key)
         return nullptr;
     }
 
-    return content.tree->get(key)->value;
+    KeyValue *kv = content.tree->get(key);
+    if (kv == nullptr) {
+        return nullptr;
+    }
+    return kv->value;
 }
 
 bool HashMap::containsKey (Key &key)
@@ -74,7 +83,7 @@ bool HashMap::containsKey (Key &key)
     return get(key) == nullptr;
 }
 
-int HashMap::getIndex (int hash)
+unsigned HashMap::getIndex(unsigned hash)
 {
     return hash&(capacity-1);
 }
@@ -98,10 +107,10 @@ bool HashMap::remove (Key &key)
         key.toString();
     }
     int index = getIndex(key.hashCode());
-    Content content= arrayFrom[index];
+    Content &content = arrayFrom[index];
     if(content.isList) {
-        Entry* cur = content.first;
-        for (;cur!=nullptr;cur = cur->next) {
+        Entry *cur = content.head->next;
+        for (; cur != content.tail; cur = cur->next) {
             if(key.equals(*cur->key)) {
                 Entry* pre = cur->pre;
                 pre->next = cur->next;
@@ -124,7 +133,7 @@ void HashMap::toTree (int index)
 {
     AVLTree * tree = new AVLTree;
     Content content = arrayFrom[index];
-    Entry* cur = content.first;
+    Entry *cur = content.head;
     for (;cur!= nullptr;cur = cur->next)
     {
         tree->insert(cur);
@@ -140,7 +149,7 @@ void HashMap::rehash ()
     for (int i = 0; i < capacity>>1;++i)
     {
         if(arrayFrom[i].isList) {
-            for (Entry* cur = arrayFrom[i].first;cur!= nullptr;)
+            for (Entry *cur = arrayFrom[i].head; cur != nullptr;)
             {
                 Entry* next = cur->next;
                 int index = cur->key->hashCode()&(capacity-1);
@@ -165,7 +174,7 @@ HashMap::~HashMap ()
     for (int i = 0; i <capacity; ++i)
     {
         if(arrayFrom[i].isList) {
-            for (Entry* cur = arrayFrom[i].first;cur!= nullptr;)
+            for (Entry *cur = arrayFrom[i].head; cur != nullptr;)
             {
                 Entry* next = cur->next;
                 delete cur;
@@ -183,15 +192,15 @@ HashMap::~HashMap ()
 void HashMap::add (int index, Entry *entry)
 {
     Entry* cur = entry;
-    if(arrayTo[index].first == nullptr) {
-        arrayTo[index].first = cur;
-        arrayTo[index].end = cur;
+    if (arrayTo[index].head == nullptr) {
+        arrayTo[index].head = cur;
+        arrayTo[index].tail = cur;
     }
     else{
-        Entry* pre = arrayTo[index].end->pre;
+        Entry *pre = arrayTo[index].tail->pre;
         pre->next = cur;
         cur->pre = pre;
-        arrayTo[index].end = cur;
+        arrayTo[index].tail = cur;
         arrayTo[index].listLen++;
     }
 }
@@ -262,7 +271,7 @@ void HashMap::toStringSet() {
     for (int i = 0; i < capacity;++i)
     {
         if(arrayFrom[i].isList) {
-            for (Entry* cur = arrayFrom[i].first;cur!= nullptr;)
+            for (Entry *cur = arrayFrom[i].head; cur != nullptr;)
             {
                 Entry* next = cur->next;
                 Key* k = cur->key;
@@ -299,8 +308,8 @@ unsigned HashMap::size() {
     return _size;
 }
 
-HashMap::HashMap(float loadFactor, unsigned int capacity, bool isIntset, bool isValueNull) :
-        loadFactor(loadFactor), capacity(capacity), isIntset(isIntset), isValueNull(isValueNull) {
+HashMap::HashMap(float loadFactor, unsigned int capa, bool isIntset, bool isValueNull) :
+        loadFactor(loadFactor), capacity(capa), isIntset(isIntset), isValueNull(isValueNull) {
     arrayFrom = new Content[capacity];
 }
 

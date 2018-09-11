@@ -20,6 +20,11 @@ class HashMap;
 class MondisObject;
 class KeyValue;
 
+namespace util {
+    void eraseBackSlash(std::string &data);
+}
+
+
 enum TokenType {
     LEFT_SQAURE_BRACKET,
     RIGHT_SQUARE_BRACKET,
@@ -94,13 +99,14 @@ public:
             while (source[curIndex] == ' ' || source[curIndex] == '\n' || source[curIndex] == '\r' ||
                    source[curIndex] == '\t') {
                 curIndex++;
-                if (curIndex > source.size()) {
+                if (curIndex >= source.size()) {
                     isEnd = true;
                     break;
                 }
             }
         };
     public:
+        LexicalParser() {};
         LexicalParser(std::string &s) : source(s) {};
         LexicalParser(const char* filePath){
             struct stat info;
@@ -121,10 +127,10 @@ public:
         };
         Token nextToken() {
             Token res;
+            skip();
             if(isEnd) {
                 return res;
             }
-            skip();
             int start;
             int end;
             if (directRecognize.find(source[curIndex]) != directRecognize.end()) {
@@ -140,7 +146,9 @@ public:
                         if (source[curIndex - 1] != '\\') {
                             end = curIndex;
                             res.type = STRING;
-                            res.content = std::string(source, start, end - start);
+                            std::string raw(source, start + 1, end - start - 1);
+                            util::eraseBackSlash(raw);
+                            res.content = raw;
                             return res;
                         }
                     }
@@ -168,13 +176,17 @@ public:
 
     KeyValue parseEntry(std::string &content);
 private:
-    LexicalParser* lexicalParser;
-    MondisObject* parseObject(LexicalParser* lp);
-    MondisObject *parseJSONObject(JSONParser::LexicalParser *lp, bool isNeedNext, bool isInteger);
-    MondisObject* parseJSONArray(LexicalParser* lp, bool isNeedNext);
+    LexicalParser lexicalParser;
 
-    KeyValue parseEntry(LexicalParser* lp);
-    void matchToken(LexicalParser* lp,TokenType type);
+    MondisObject *parseObject(LexicalParser &lp);
+
+    MondisObject *parseJSONObject(LexicalParser &lp, bool isNeedNext, bool isInteger);
+
+    MondisObject *parseJSONArray(LexicalParser &lp, bool isNeedNext);
+
+    KeyValue parseEntry(LexicalParser &lp);
+
+    void matchToken(LexicalParser &lp, TokenType type);
     void matchToken(TokenType type);
 };
 

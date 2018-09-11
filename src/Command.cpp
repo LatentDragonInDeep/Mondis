@@ -12,18 +12,18 @@ CommandInterpreter::CommandInterpreter() {
 }
 
 Command *CommandInterpreter::getCommand(std::string &raw) {
-    parser = new LexicalParser(raw);
+    LexicalParser parser(raw);
     Command* res = new Command;
     Command* cur = res;
     while (true) {
-        Token next = parser->nextToken();
+        Token next = parser.nextToken();
         std::vector<Token> vt;
         if (next.type == END) {
             return res;
         }
         while(next.type!=END&&next.type!=VERTICAL) {
             vt.push_back(next);
-            next = parser->nextToken();
+            next = parser.nextToken();
         }
         pre = next;
         for (int i = 0; i <vt.size(); ++i) {
@@ -59,12 +59,11 @@ Command *CommandInterpreter::getCommand(std::string &raw) {
         cur->next = new Command;
         cur = cur->next;
     }
-    delete parser;
 }
 
 void CommandInterpreter::init() {
     PUT(BIND)
-    PUT(GET)
+    PUT(DEL)
     PUT(EXISTS)
     PUT(RENAME)
     PUT(TYPE)
@@ -132,7 +131,7 @@ CommandInterpreter::Token CommandInterpreter::LexicalParser::nextToken() {
     if (raw[curIndex] == '"') {
         if (raw[raw.size() - 1] == '"') {
             res.type = STRING_PARAM;
-            res.content = raw.substr(curIndex + 1, raw.size() - (curIndex + 2));
+            res.content = raw.substr(curIndex + 1, (raw.size() - curIndex - 2));
             isEnd = true;
             return res;
         }
@@ -182,7 +181,7 @@ void util::toUpperCase(std::string &data) {
     }
 }
 
-std::string ExecutionResult::typeToStr[] = {"OK", "SYNTAX_ERROR,INTERNAL_ERROR,LOGIC_ERROR"};
+std::string ExecutionResult::typeToStr[] = {"OK", "SYNTAX_ERROR", "INTERNAL_ERROR", "LOGIC_ERROR"};
 
 void Command::init() {
     MAP(BIND)

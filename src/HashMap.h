@@ -23,7 +23,7 @@ public:
             return false;
         }
         if(flag) {
-            return str.compare(other.str);
+            return str.compare(other.str) > 0;
         }
         return intValue>other.intValue;
     }
@@ -164,9 +164,8 @@ public:
 
     void toJson() {
         json += key->getJson();
-        json += ",";
+        json += ":";
         json += value->getJson();
-        json += "\n";
     }
 
     KeyValue &operator=(KeyValue &other) {
@@ -241,12 +240,11 @@ class AVLTree:public MondisData
 {
 private:
     AVLTreeNode *root = nullptr;
-    unsigned _size;
+    unsigned _size = 0;
 public:
     class AVLIterator {
     private:
-        AVLTree* tree;
-        AVLTreeNode* cur;
+        AVLTreeNode *cur = nullptr;
         stack<AVLTreeNode*> s;
         void dfs(AVLTreeNode* cur) {
             while (cur!= nullptr) {
@@ -256,7 +254,8 @@ public:
         }
     public:
         AVLIterator() {};
-        AVLIterator(AVLTree* avlTree):tree(avlTree),cur(avlTree->root)
+
+        AVLIterator(AVLTree *avlTree) : cur(avlTree->root)
         {
            dfs(cur);
         }
@@ -296,7 +295,7 @@ public:
 
     bool isModified();
 private:
-    void realInsert(KeyValue *kv, AVLTreeNode *root);
+    void realInsert(KeyValue *kv);
 
     void realRemove(KeyValue &kv, AVLTreeNode *root);
     AVLTreeNode* getSuccessor(AVLTreeNode* root);
@@ -334,21 +333,46 @@ private:
         bool isList = true;
 
         Content() {
+            reset();
+        }
+
+        void reset() {
             head->next = tail;
             tail->pre = head;
         }
 
-        ~Content() {
-            Entry *cur = head;
-            while (true) {
-                Entry *next = cur->next;
-                delete cur;
-                if (next == nullptr) {
-                    break;
+        void clear() {
+            if (isList) {
+                Entry *cur = head->next;
+                while (true) {
+                    Entry *next = cur->next;
+                    delete cur;
+                    if (next == tail) {
+                        break;
+                    }
+                    cur = next;
                 }
-                cur = next;
+                head->next = tail;
+                tail->pre = head;
+            } else {
+                delete tree;
             }
+        }
 
+        ~Content() {
+            if (isList) {
+                Entry *cur = head;
+                while (true) {
+                    Entry *next = cur->next;
+                    delete cur;
+                    if (next == nullptr) {
+                        break;
+                    }
+                    cur = next;
+                }
+            } else {
+                delete tree;
+            }
         }
     };
     Content * arrayFrom;
@@ -425,6 +449,8 @@ public:
     bool containsKey (Key &key);
     bool remove (Key &key);
     unsigned size();
+
+    void clear();
 private:
     void rehash();
     void toStringSet();

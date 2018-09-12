@@ -14,32 +14,43 @@ JSONParser::JSONParser(std::string &filePath) {
 }
 
 void JSONParser::parse(HashMap *keySpace) {
-    matchToken(LEFT_ANGLE_BRACKET);
+    Token next = lexicalParser.nextToken();
+    if (next.type != LEFT_ANGLE_BRACKET) {
+        return;
+    }
     KeyValue cur;
     while(true) {
         cur = parseEntry(lexicalParser);
         if(cur.key == nullptr) {
-            return;
+            break;
         }
         keySpace->put(cur.key,cur.value);
     }
-}
-
-void JSONParser::matchToken(TokenType type) {
-    matchToken(lexicalParser,type);
+    Token end = lexicalParser.nextToken();
+    if (end.type != RIGHT_ANGLE_BRACKET) {
+        keySpace->clear();
+        throw new std::invalid_argument("unexpected token!");
+    }
+    Token ter = lexicalParser.nextToken();
+    if (ter.type != TERMINATOR) {
+        keySpace->clear();
+        throw new std::invalid_argument("unexpected token!");
+    }
 }
 
 KeyValue JSONParser::parseEntry(LexicalParser &lp) {
+    Token next = lp.nextToken();
     KeyValue res;
     res.key = nullptr;
-    Token next = lp.nextToken();
     if (next.type != STRING) {
+        lp.back();
         return res;
     }
     Key *key = new Key(current.content);
     res.key = key;
     matchToken(lp,COLON);
     res.value = parseObject(lp);
+    matchToken(lp, COMMA);
 
     return res;
 }
@@ -85,12 +96,15 @@ MondisObject *JSONParser::parseObject(LexicalParser &lp) {
         res->type = RAW_INT;
         res->objectData = (void*)data;
         return res;
+    } else {
+        lp.back();
+        return nullptr;
     }
-    return nullptr;
 }
 
 MondisObject *JSONParser::parseJSONObject(LexicalParser &lp, bool isNeedNext, bool isInteger) {
     if(isNeedNext) {
+        Token next = lp.nextToken();
         matchToken(lp,LEFT_ANGLE_BRACKET);
     }
     MondisObject* res = new MondisObject;
@@ -103,17 +117,10 @@ MondisObject *JSONParser::parseJSONObject(LexicalParser &lp, bool isNeedNext, bo
             break;
         }
         tree->insert(new KeyValue(cur.key, cur.value));
-        matchToken(lp,COMMA);
     }
     res->objectData = (void*)tree;
+    matchToken(lp, RIGHT_ANGLE_BRACKET);
     return res;
-}
-
-void JSONParser::matchToken(LexicalParser &lp, TokenType type) {
-    current = lp.nextToken();
-    if(current.type != type) {
-        throw invalid_argument("unexpected token!");
-    };
 }
 
 MondisObject *JSONParser::parseJSONArray(LexicalParser &lp, bool isNeedNext) {
@@ -121,12 +128,6 @@ MondisObject *JSONParser::parseJSONArray(LexicalParser &lp, bool isNeedNext) {
         matchToken(lp,LEFT_SQAURE_BRACKET);
     }
     MondisObject* res = new MondisObject;
-    Token next = lp.nextToken();
-    if(next.type == RIGHT_SQUARE_BRACKET) {
-        res->type = LIST;
-        res->objectData = new MondisList;
-        return res;
-    }
     MondisObject* first = parseJSONObject(lp, false, false);
     if(first->type !=RAW_STRING ||first->type !=RAW_INT ||
        (first->type == RAW_STRING && first->getJson() != "SET")) {
@@ -176,6 +177,13 @@ MondisObject *JSONParser::parseJSONArray(LexicalParser &lp, bool isNeedNext) {
 }
 
 JSONParser::JSONParser() {}
+
+void JSONParser::matchToken(JSONParser::LexicalParser &lp, TokenType type) {
+    Token next = lp.nextToken();
+    if (next.type != type) {
+        throw new std::invalid_argument("unexpected token!");
+    }
+}
 
 Token *Token::leftSquareBracket = new Token(LEFT_SQAURE_BRACKET);
 Token *Token::rightSquareBracket = new Token(RIGHT_SQUARE_BRACKET);

@@ -8,10 +8,10 @@
 using namespace std;
 
 void AVLTree::insert(Entry *entry) {
-    realInsert(entry->toKeyValue(), root);
+    realInsert(entry->toKeyValue());
 }
 
-void AVLTree::realInsert(KeyValue *kv, AVLTreeNode *root) {
+void AVLTree::realInsert(KeyValue *kv) {
     bool leftOrRight = true;
     AVLTreeNode *cur = root;
     AVLTreeNode *parent = nullptr;
@@ -28,6 +28,9 @@ void AVLTree::realInsert(KeyValue *kv, AVLTreeNode *root) {
                 } else {
                     parent->right = cur;
                 }
+            }
+            if (parent == nullptr) {
+                root = cur;
             }
             reBalance(cur);
             return;
@@ -173,6 +176,7 @@ void AVLTree::realRemove(KeyValue &kv, AVLTreeNode *root) {
                 delete cur;
                 modified();
                 _size--;
+                return;
             } else if (cur->left != nullptr && cur->right == nullptr) {
                 if (cur->parent != nullptr) {
                     if (cur == cur->parent->left) {
@@ -191,6 +195,7 @@ void AVLTree::realRemove(KeyValue &kv, AVLTreeNode *root) {
                 delete cur;
                 modified();
                 _size--;
+                return;
             } else if (cur->left == nullptr && cur->right != nullptr) {
                 if (cur->parent != nullptr) {
                     if (cur == cur->parent->left) {
@@ -209,6 +214,7 @@ void AVLTree::realRemove(KeyValue &kv, AVLTreeNode *root) {
                 delete cur;
                 modified();
                 _size--;
+                return;
             } else {
                 AVLTreeNode *successor = getSuccessor(root);
                 root->data = successor->data;
@@ -249,7 +255,7 @@ AVLTree::~AVLTree() {
 }
 
 void AVLTree::insert(KeyValue *kv) {
-    realInsert(kv, root);
+    realInsert(kv);
 }
 
 KeyValue *AVLTree::get(Key &key) {
@@ -282,7 +288,7 @@ MondisObject *AVLTree::getValue(Key &key) {
 }
 
 bool AVLTree::containsKey(Key &key) {
-    return get(key) == nullptr;
+    return get(key) != nullptr;
 }
 
 MondisObject *AVLTree::locate(Command *command) {
@@ -328,7 +334,7 @@ ExecutionResult AVLTree::execute(Command *command) {
             CHECK_PARAM_NUM(1)
             CHECK_PARAM_TYPE(0, PLAIN)
             KEY(0)
-            res.res = to_string(containsKey(key));
+            res.res = util::to_string(containsKey(key));
             OK_AND_RETURN
         }
         case SIZE: {
@@ -365,7 +371,7 @@ void AVLTree::reBalance(AVLTreeNode *root) {
         if (cur == nullptr) {
             return;
         }
-        int balanceFactor = getHeight(root->left) - getHeight(root->right);
+        int balanceFactor = getHeight(cur->left) - getHeight(cur->right);
         if (balanceFactor == 2) {
             AVLTreeNode *left = cur->left;
             int leftFactor = getHeight(left->left) - getHeight(left->right);

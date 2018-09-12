@@ -138,14 +138,15 @@ bool HashMap::remove (Key &key)
 void HashMap::toTree (int index)
 {
     AVLTree * tree = new AVLTree;
-    Content content = arrayFrom[index];
+    Content &content = arrayFrom[index];
     Entry *cur = content.head;
-    for (;cur!= nullptr;cur = cur->next)
+    for (; cur != content.tail; cur = cur->next)
     {
         tree->insert(cur);
     }
     content.isList = false;
     content.tree = tree;
+    content.reset();
 }
 
 void HashMap::rehash ()
@@ -177,21 +178,6 @@ void HashMap::rehash ()
 
 HashMap::~HashMap ()
 {
-    for (int i = 0; i <capacity; ++i)
-    {
-        if(arrayFrom[i].isList) {
-            for (Entry *cur = arrayFrom[i].head; cur != nullptr;)
-            {
-                Entry* next = cur->next;
-                delete cur;
-                cur = next;
-            }
-        }
-        else{
-            delete arrayFrom[i].tree;
-        }
-    }
-
     delete[] arrayFrom;
 }
 
@@ -316,5 +302,11 @@ unsigned HashMap::size() {
 HashMap::HashMap(float loadFactor, unsigned int capa, bool isIntset, bool isValueNull) :
         loadFactor(loadFactor), capacity(capa), isIntset(isIntset), isValueNull(isValueNull) {
     arrayFrom = new Content[capacity];
+}
+
+void HashMap::clear() {
+    for (int i = 0; i < capacity; ++i) {
+        arrayFrom[i].clear();
+    }
 }
 

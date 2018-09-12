@@ -89,6 +89,8 @@ public:
     private:
         std::string source;
         unsigned curIndex = 0;
+        unsigned preIndex = 0;
+        bool hasBacked = false;
         bool isEnd = false;
         static std::unordered_map<char,Token*> directRecognize;
     public:
@@ -126,6 +128,7 @@ public:
             in.close();
         };
         Token nextToken() {
+            preIndex = curIndex;
             Token res;
             skip();
             if(isEnd) {
@@ -155,6 +158,15 @@ public:
                 }
             }
 
+        }
+
+        bool back() {
+            if (hasBacked) {
+                return false;
+            }
+            curIndex = preIndex;
+            hasBacked = true;
+            return true;
         }
 
         void reset() {
@@ -187,7 +199,6 @@ private:
     KeyValue parseEntry(LexicalParser &lp);
 
     void matchToken(LexicalParser &lp, TokenType type);
-    void matchToken(TokenType type);
 };
 
 

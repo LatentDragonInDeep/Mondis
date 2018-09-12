@@ -41,9 +41,11 @@ public:
 
     virtual ~MondisData();;
 
-    virtual ExecutionResult execute(Command *command);;
+    virtual ExecutionResult execute(Command *command);
 
-    virtual MondisObject *locate(Command *command);;
+    virtual MondisObject *locate(Command *command);
+
+    bool modified();
 
 };
 

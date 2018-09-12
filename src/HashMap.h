@@ -93,7 +93,7 @@ private:
         const uint32_t m = 0x5bd1e995;
         const int r = 24;
 
-        uint32_t h = seed ^ len;    //初始化
+        uint32_t h = seed ^len;
 
         const unsigned char *data = (const unsigned char *)key;
 
@@ -240,7 +240,7 @@ public:
 class AVLTree:public MondisData
 {
 private:
-    AVLTreeNode* root;
+    AVLTreeNode *root = nullptr;
     unsigned _size;
 public:
     class AVLIterator {
@@ -276,12 +276,13 @@ public:
         }
     };
 public:
-    bool insert(Entry *entry);
+    void insert(Entry *entry);
 
-    bool insert(KeyValue *kv);
+    void insert(KeyValue *kv);
 
-    bool insert(Key *key, MondisObject *value);
-    bool remove(Key& key);
+    void insert(Key *key, MondisObject *value);
+
+    void remove(Key &key);
     KeyValue* get(Key& key);
     MondisObject* getValue(Key& key);
     bool containsKey(Key& key);
@@ -292,16 +293,25 @@ public:
 
     MondisObject *locate(Command *command);
     unsigned size();
+
+    bool isModified();
 private:
-    AVLTreeNode *realInsert(KeyValue *kv, AVLTreeNode *root);
-    AVLTreeNode* realRemove(KeyValue& kv,AVLTreeNode* root);
+    void realInsert(KeyValue *kv, AVLTreeNode *root);
+
+    void realRemove(KeyValue &kv, AVLTreeNode *root);
     AVLTreeNode* getSuccessor(AVLTreeNode* root);
-    AVLTreeNode* leftRotate(AVLTreeNode* root);
-    AVLTreeNode* rightRotate(AVLTreeNode* root);
-    AVLTreeNode* leftRightRotate(AVLTreeNode* root);
-    AVLTreeNode* rightLeftRotate(AVLTreeNode* root);
+
+    void leftRotate(AVLTreeNode *root);
+
+    void rightRotate(AVLTreeNode *root);
+
+    void leftRightRotate(AVLTreeNode *root);
+
+    void rightLeftRotate(AVLTreeNode *root);
     int getHeight(AVLTreeNode* root);
     void deleteTree(AVLTreeNode* root);
+
+    void reBalance(AVLTreeNode *root);
 
     void toJson();
 };

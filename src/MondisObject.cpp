@@ -25,6 +25,10 @@ MondisObject *MondisData::locate(Command *command) {
     return nullptr;
 }
 
+bool MondisData::modified() {
+    hasSerialized = false;
+}
+
 void handleEscapeChar(string &raw) {
     int modCount = 0;
     for (int i = 0; i < raw.size() + modCount; ++i) {
@@ -155,9 +159,14 @@ ExecutionResult MondisObject::executeInteger(Command *command) {
 }
 
 ExecutionResult MondisObject::execute(Command *command) {
-    if (type = RAW_STRING) {
+    if (command->type == TYPE) {
+        ExecutionResult res;
+        res.res = typeStrs[type];
+        return res;
+    }
+    if (type == RAW_STRING) {
         return executeString(command);
-    } else if (type = RAW_INT) {
+    } else if (type == RAW_INT) {
         return executeInteger(command);
     } else {
         MondisData *data = (MondisData *) objectData;

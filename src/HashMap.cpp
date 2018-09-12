@@ -19,6 +19,7 @@ bool HashMap::put(Key *key, MondisObject *value)
             if (key->equals(*cur->key)) {
                 delete cur->object;
                 cur->object = value;
+                modified();
                 return true;
             }
         }
@@ -33,17 +34,22 @@ bool HashMap::put(Key *key, MondisObject *value)
         next->pre = newEntry;
         content.listLen++;
         _size++;
+        modified();
         if(content.listLen>treeThreshold) {
             toTree(index);
             content.isList = false;
         }
         return true;
     }
+    _size -= content.tree->size();
     Entry* newEntry = new Entry;
     newEntry->object = value;
     newEntry->key = key;
     content.tree->insert(newEntry);
-    _size++;
+    if (content.tree->modified()) {
+        modified();
+    }
+    _size += content.tree->size();
     if (((double) _size) / capacity > loadFactor) {
         rehash();
         return true;
@@ -80,7 +86,7 @@ MondisObject *HashMap::get (Key &key)
 
 bool HashMap::containsKey (Key &key)
 {
-    return get(key) == nullptr;
+    return get(key) != nullptr;
 }
 
 unsigned HashMap::getIndex(unsigned hash)
@@ -225,12 +231,11 @@ MondisObject *HashMap::locate(Command *command) {
     if (command->params.size() != 1) {
         return nullptr;
     }
-    if(command[0].type!=Command::ParamType::PLAIN) {
+    if ((*command)[0].type != Command::ParamType::PLAIN) {
         return nullptr;
     }
     Key key((*command)[0].content);
     return get(key);
-
 }
 
 ExecutionResult HashMap::execute(Command *command) {

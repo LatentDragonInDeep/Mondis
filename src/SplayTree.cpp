@@ -33,7 +33,8 @@ SplayTree::~SplayTree() {
 }
 
 bool SplayTree::insert(int score, MondisObject *obj) {
-    bool leftOrRight;
+    modified();
+    bool leftOrRight = true;
     SplayTreeNode* cur =root;
     SplayTreeNode* parent = nullptr;
     while (true) {
@@ -316,6 +317,7 @@ bool SplayTree::remove(SplayTreeNode *target) {
     if(target == nullptr||target == head||target == tail) {
         return false;
     }
+    modified();
     if(target->left == nullptr&&target->right == nullptr) {
         sizeUpdate(target,-1);
         delete target;
@@ -386,6 +388,7 @@ void SplayTree::removeRangeByRank(int start, int end) {
     if(start == end||start+1 == end) {
         return;
     }
+    modified();
     SplayTreeNode* from = getNodeByRank(root,start);
     SplayTreeNode* to = getNodeByRank(root,end);
     splay(from);
@@ -418,6 +421,7 @@ void SplayTree::removeRangeByScore(int startScore, int endScore) {
     if(startScore == endScore) {
         return;
     }
+    modified();
     SplayTreeNode* from = getLowerBound(startScore);
     SplayTreeNode* to = getUpperBound(endScore);
     if(from == tail||to == head) {
@@ -623,7 +627,7 @@ MondisObject *SplayTree::locate(Command *command) {
     if (command->params.size() != 2) {
         return nullptr;
     }
-    if(command[0].type!=Command::ParamType::PLAIN) {
+    if ((*command)[0].type != Command::ParamType::PLAIN) {
         return nullptr;
     }
     if ((*command)[1].content == "RANK") {

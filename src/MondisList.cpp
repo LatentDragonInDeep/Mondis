@@ -26,6 +26,7 @@ int MondisList::pushBack (MondisObject *object)
     nextSize++;
     nodeToIndex[newNode] = nextSize+headModifyNum;
     indexToNode[nextSize+headModifyNum] = newNode;
+    modified();
 }
 
 MondisObject *MondisList::popBack ()
@@ -43,6 +44,7 @@ MondisObject *MondisList::popBack ()
 
     MondisObject* obj = last->data;
     delete last;
+    modified();
 
     return obj;
 }
@@ -93,6 +95,7 @@ int MondisList::pushFront (MondisObject *object)
         indexToNode[-preSize] = newNode;
         nodeToIndex[newNode] = -preSize;
     }
+    modified();
 
 }
 
@@ -106,6 +109,7 @@ MondisObject *MondisList::popFront ()
         temp->pre = head;
         MondisObject* obj = res->data;
         delete res;
+        modified();
         return obj;
     }
     else{
@@ -117,6 +121,7 @@ MondisObject *MondisList::popFront ()
         MondisObject* obj = res->data;
         headModifyNum++;
         delete res;
+        modified();
         return obj;
     }
 }
@@ -154,14 +159,9 @@ int MondisList::size()
 int MondisList::set (int index, MondisObject *object)
 {
     locate(index)->data = object;
+    modified();
 }
 
-int MondisList::add (vector<MondisObject *> *data)
-{
-    for(MondisObject* pObj:*data) {
-        pushBack(pObj);
-    }
-}
 
 MondisList::~MondisList ()
 {
@@ -191,7 +191,7 @@ MondisObject *MondisList::locate(Command *command) {
     if (command->params.size() != 1) {
         return nullptr;
     }
-    if(command[0].type!=Command::ParamType::PLAIN) {
+    if ((*command)[0].type != Command::ParamType::PLAIN) {
         return nullptr;
     }
     int index;

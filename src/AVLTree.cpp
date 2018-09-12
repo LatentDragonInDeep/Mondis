@@ -7,53 +7,54 @@
 
 using namespace std;
 
-bool AVLTree::insert(Entry *entry) {
-    return realInsert(entry->toKeyValue(), root) == nullptr;
+void AVLTree::insert(Entry *entry) {
+    realInsert(entry->toKeyValue(), root);
 }
 
-AVLTreeNode *AVLTree::realInsert(KeyValue *kv, AVLTreeNode *root)
-{
-    if(root == nullptr) {
-        root = new AVLTreeNode;
-        root->data = kv;
-        _size++;
-    } else if (kv->compare(*root->data)) {
-        root->right = realInsert(kv,root->right);
-        if(getHeight(root->right)-getHeight(root->left) == 2) {
-            if (kv->compare(*root->right->data)) {
-                root=leftRotate(root);
+void AVLTree::realInsert(KeyValue *kv, AVLTreeNode *root) {
+    bool leftOrRight = true;
+    AVLTreeNode *cur = root;
+    AVLTreeNode *parent = nullptr;
+    while (true) {
+        if (cur == nullptr) {
+            cur = new AVLTreeNode;
+            cur->data = kv;
+            _size++;
+            modified();
+            cur->parent = parent;
+            if (parent != nullptr) {
+                if (leftOrRight) {
+                    parent->left = cur;
+                } else {
+                    parent->right = cur;
+                }
             }
-            else{
-                root = rightLeftRotate(root);
-            }
+            reBalance(cur);
+            return;
+        } else if (kv->compare(*cur->data)) {
+            parent = cur;
+            cur = cur->right;
+            leftOrRight = false;
+        } else if (kv->equals(*cur->data)) {
+            delete cur->data->value;
+            cur->data->value = kv->value;
+            kv->value = nullptr;
+            modified();
+            return;
+        } else {
+            parent = cur;
+            cur = cur->left;
+            leftOrRight = true;
         }
-    } else if (kv->equals(*root->data)) {
-        delete root->data;
-        root->data = kv;
-    }
-    else{
-        root->left = realInsert(kv,root->left);
-        if(getHeight(root->left)-getHeight(root->right) == 2) {
-            if (kv->compare(*root->left->data)) {
-                root=leftRightRotate(root);
-            }
-            else{
-                root = rightRotate(root);
-            }
-        }
-    }
-    root->height = max(getHeight(root->left),getHeight(root->right))+1;
 
-    return root;
+    }
 }
 
-bool AVLTree::remove (Key &key)
-{
-    KeyValue* temp = new KeyValue;
-    temp->key = &key;
-    bool res = realRemove(*temp,root)==nullptr;
-    delete temp;
-    return res;
+void AVLTree::remove(Key &key) {
+    KeyValue temp;
+    temp.key = &key;
+    realRemove(temp, root);
+    temp.key = nullptr;
 }
 
 AVLTree::AVLIterator AVLTree::iterator ()
@@ -61,37 +62,84 @@ AVLTree::AVLIterator AVLTree::iterator ()
     return AVLTree::AVLIterator(this);
 }
 
-AVLTreeNode *AVLTree::leftRotate (AVLTreeNode *root)
-{
+void AVLTree::leftRotate(AVLTreeNode *root) {
+    AVLTreeNode *parent = root->parent;
+    int state;
+    if (parent == nullptr) {
+        state = 0;
+    } else if (root == root->parent->left) {
+        state = 1;
+    } else {
+        state = 2;
+    }
     AVLTreeNode* right = root->right;
     AVLTreeNode* rightLeft = right->left;
     right->left = root;
+    root->parent = right;
     root->right = rightLeft;
-
-    return right;
+    root->height = max(getHeight(root->left), getHeight(root->right)) + 1;
+    right->height = max(getHeight(right->left), getHeight(right->right)) + 1;
+    if (rightLeft != nullptr) {
+        rightLeft->parent = root;
+    }
+    switch (state) {
+        case 0:
+            right->parent = nullptr;
+            break;
+        case 1:
+            right->parent = parent;
+            parent->left = right;
+            break;
+        case 2:
+            right->parent = parent;
+            parent->right = right;
+            break;
+    }
 }
 
-AVLTreeNode *AVLTree::rightRotate (AVLTreeNode *root)
-{
+void AVLTree::rightRotate(AVLTreeNode *root) {
+    AVLTreeNode *parent = root->parent;
+    int state;
+    if (parent == nullptr) {
+        state = 0;
+    } else if (root == root->parent->left) {
+        state = 1;
+    } else {
+        state = 2;
+    }
     AVLTreeNode* left = root->left;
     AVLTreeNode* leftRight = left->right;
     left->right = root;
+    root->parent = left;
     root->left = leftRight;
-
-    return left;
+    root->height = max(getHeight(root->left), getHeight(root->right)) + 1;
+    left->height = max(getHeight(left->left), getHeight(left->right)) + 1;
+    if (leftRight != nullptr) {
+        leftRight->parent = root;
+    }
+    switch (state) {
+        case 0:
+            left->parent = nullptr;
+            break;
+        case 1:
+            left->parent = parent;
+            parent->left = left;
+            break;
+        case 2:
+            left->parent = parent;
+            parent->right = left;
+            break;
+    }
 }
 
-AVLTreeNode *AVLTree::leftRightRotate (AVLTreeNode *root)
-{
-    root->left = leftRotate(root->left);
-    return rightRotate(root);
+void AVLTree::leftRightRotate(AVLTreeNode *root) {
+    leftRotate(root->left);
+    rightRotate(root);
 }
 
-AVLTreeNode *AVLTree::rightLeftRotate (AVLTreeNode *root)
-{
-    root->right = rightRotate(root->right);
-
-    return leftRotate(root);
+void AVLTree::rightLeftRotate(AVLTreeNode *root) {
+    rightRotate(root->right);
+    leftRotate(root);
 }
 
 int AVLTree::getHeight (AVLTreeNode *root)
@@ -102,58 +150,76 @@ int AVLTree::getHeight (AVLTreeNode *root)
     return root->height;
 }
 
-AVLTreeNode *AVLTree::realRemove (KeyValue &kv, AVLTreeNode *root)
-{
-    if(root == nullptr) {
-        return nullptr;
-    }
-    if(kv.equals(*root->data)) {
-        if(root->left == nullptr&&root->right == nullptr) {
-            delete root;
-            _size--;
-            return nullptr;
+void AVLTree::realRemove(KeyValue &kv, AVLTreeNode *root) {
+    AVLTreeNode *cur = root;
+    while (true) {
+        if (cur == nullptr) {
+            return;
         }
-        else if(root->left!= nullptr&&root->right== nullptr) {
-            AVLTreeNode* res = root->left;
-            delete root;
-            _size--;
-            return res;
-        }
-        else if(root->left== nullptr&&root->right!= nullptr) {
-            AVLTreeNode* res = root->right;
-            delete root;
-            _size--;
-            return res;
-        }
-        else{
-            AVLTreeNode* successor = getSuccessor(root);
-            root->data = successor->data;
-            kv.key = successor->data->key;
-            root->right = realRemove(kv,root->right);
-            if(getHeight(root->left)-getHeight(root->right) == 2) {
-                root = rightRotate(root);
+        if (kv.equals(*cur->data)) {
+            if (cur->left == nullptr && cur->right == nullptr) {
+                if (cur->parent != nullptr) {
+                    if (cur == cur->parent->left) {
+                        cur->parent->left = nullptr;
+                    }
+                    if (cur == cur->parent->right) {
+                        cur->parent->right = nullptr;
+                    }
+                }
+                reBalance(cur->parent);
+                if (cur == root) {
+                    root = nullptr;
+                }
+                delete cur;
+                modified();
+                _size--;
+            } else if (cur->left != nullptr && cur->right == nullptr) {
+                if (cur->parent != nullptr) {
+                    if (cur == cur->parent->left) {
+                        cur->parent->left = cur->left;
+                        cur->left->parent = cur->parent;
+                    }
+                    if (cur == cur->parent->right) {
+                        cur->parent->right = cur->left;
+                        cur->left->parent = cur->parent;
+                    }
+                }
+                reBalance(cur->parent);
+                if (cur == root) {
+                    root = cur->left;
+                }
+                delete cur;
+                modified();
+                _size--;
+            } else if (cur->left == nullptr && cur->right != nullptr) {
+                if (cur->parent != nullptr) {
+                    if (cur == cur->parent->left) {
+                        cur->parent->left = cur->right;
+                        cur->right->parent = cur->parent;
+                    }
+                    if (cur == cur->parent->right) {
+                        cur->parent->right = cur->right;
+                        cur->right->parent = cur->parent;
+                    }
+                }
+                reBalance(cur->parent);
+                if (cur == root) {
+                    root = cur->right;
+                }
+                delete cur;
+                modified();
+                _size--;
+            } else {
+                AVLTreeNode *successor = getSuccessor(root);
+                root->data = successor->data;
+                kv.key = successor->data->key;
+                realRemove(kv, root->right);
             }
-            _size--;
-            return root;
+        } else if (kv.compare(*root->data)) {
+            cur = cur->right;
+        } else {
+            cur = cur->left;
         }
-    }
-    else if(kv.compare(*root->data)){
-        root->right = realRemove(kv,root->right);
-        if(getHeight(root->left)-getHeight(root->right) == 2) {
-            root = rightRotate(root);
-        }
-        root->height = max(getHeight(root->left),getHeight(root->right))+1;
-
-        return root;
-    }
-    else{
-        root->right = realRemove(kv,root->right);
-        if(getHeight(root->left)-getHeight(root->right) == 2) {
-            root = rightRotate(root);
-        }
-        root->height = max(getHeight(root->left),getHeight(root->right))+1;
-
-        return root;
     }
 }
 
@@ -182,8 +248,8 @@ AVLTree::~AVLTree() {
     deleteTree(root);
 }
 
-bool AVLTree::insert(KeyValue *kv) {
-    return realInsert(kv,root) == nullptr;
+void AVLTree::insert(KeyValue *kv) {
+    realInsert(kv, root);
 }
 
 KeyValue *AVLTree::get(Key &key) {
@@ -220,6 +286,12 @@ bool AVLTree::containsKey(Key &key) {
 }
 
 MondisObject *AVLTree::locate(Command *command) {
+    if (command->params.size() != 1) {
+        return nullptr;
+    }
+    if ((*command)[0].type != Command::ParamType::PLAIN) {
+        return nullptr;
+    }
     KEY(0)
     return getValue(key);
 }
@@ -227,7 +299,7 @@ MondisObject *AVLTree::locate(Command *command) {
 ExecutionResult AVLTree::execute(Command *command) {
     ExecutionResult res;
     switch (command->type) {
-        case SET: {
+        case BIND: {
             CHECK_PARAM_NUM(2);
             CHECK_PARAM_TYPE(0, PLAIN)
             CHECK_PARAM_TYPE(1, STRING)
@@ -268,8 +340,8 @@ ExecutionResult AVLTree::execute(Command *command) {
     INVALID_AND_RETURN
 }
 
-bool AVLTree::insert(Key *key, MondisObject *value) {
-    return insert(new KeyValue(key, value));
+void AVLTree::insert(Key *key, MondisObject *value) {
+    insert(new KeyValue(key, value));
 }
 
 unsigned AVLTree::size() {
@@ -285,5 +357,37 @@ void AVLTree::deleteTree(AVLTreeNode *root) {
     delete root;
     deleteTree(left);
     deleteTree(right);
+}
+
+void AVLTree::reBalance(AVLTreeNode *root) {
+    AVLTreeNode *cur = root;
+    while (true) {
+        if (cur == nullptr) {
+            return;
+        }
+        int balanceFactor = getHeight(root->left) - getHeight(root->right);
+        if (balanceFactor == 2) {
+            AVLTreeNode *left = cur->left;
+            int leftFactor = getHeight(left->left) - getHeight(left->right);
+            if (leftFactor == 0 || leftFactor == 1) {
+                rightRotate(cur);
+            } else if (leftFactor == -1) {
+                leftRightRotate(cur);
+            }
+        } else if (balanceFactor == -2) {
+            AVLTreeNode *right = cur->right;
+            int leftFactor = getHeight(right->left) - getHeight(right->right);
+            if (leftFactor == 0 || leftFactor == -1) {
+                leftRotate(cur);
+            } else if (leftFactor == 1) {
+                rightLeftRotate(cur);
+            }
+        }
+        cur = cur->parent;
+    }
+}
+
+bool AVLTree::isModified() {
+    return !hasSerialized;
 }
 

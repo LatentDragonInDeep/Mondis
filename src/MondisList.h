@@ -73,8 +73,6 @@ public:
 
     int set (int index, MondisObject *object);
 
-    int add (vector<MondisObject *> *data);
-
     ListIterator iterator();
 
     void toJson();

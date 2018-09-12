@@ -33,12 +33,10 @@ KeyValue JSONParser::parseEntry(LexicalParser &lp) {
     KeyValue res;
     res.key = nullptr;
     Token next = lp.nextToken();
-    if(next.type == COMMA) {
+    if (next.type != STRING) {
         return res;
     }
-    matchToken(lp,STRING);
     Key *key = new Key(current.content);
-    key->flag = true;
     res.key = key;
     matchToken(lp,COLON);
     res.value = parseObject(lp);
@@ -96,46 +94,18 @@ MondisObject *JSONParser::parseJSONObject(LexicalParser &lp, bool isNeedNext, bo
         matchToken(lp,LEFT_ANGLE_BRACKET);
     }
     MondisObject* res = new MondisObject;
-    Token next = lp.nextToken();
-    if(next.type = STRING) {
-        if(isInteger) {
-            res->type = RAW_INT;
-            int * data = new int;
-            bool to = util::toInteger(next.content, *data);
-            if (!to) {
-                delete data;
-                throw std::invalid_argument("parse json:transform string to integer error");
-            }
-            res->objectData = data;
-        } else {
-            res->type = RAW_STRING;
-            res->objectData = new std::string(next.content);
-        }
-        res->objectData = new std::string(next.content);
-        next.content = nullptr;
-        return res;
-    }
-    auto first = parseEntry(lp);
-    if(first.key = nullptr) {
-        res->type = HASH;
-        res->objectData = (void*)new AVLTree;
-        return res;
-    }
     res->type = HASH;
     AVLTree* tree = new AVLTree;
-    matchToken(lp,COMMA);
     KeyValue cur;
     while (true) {
         cur = parseEntry(lp);
-        if(cur.key = nullptr) {
+        if (cur.key == nullptr) {
             break;
         }
         tree->insert(new KeyValue(cur.key, cur.value));
-        cur = parseEntry(lp);
         matchToken(lp,COMMA);
     }
     res->objectData = (void*)tree;
-
     return res;
 }
 

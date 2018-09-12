@@ -19,6 +19,7 @@ char MondisBinary::get(unsigned i) {
 
 void MondisBinary::put(unsigned i, char data) {
     heapBuffer[i] = data;
+    modified();
 }
 
 unsigned MondisBinary::read(unsigned length, char *buffer) {
@@ -49,6 +50,7 @@ unsigned MondisBinary::write(unsigned length, char *buffer) {
     int writable = capacity-position;
     memcpy(heapBuffer+position,buffer,writable);
     position = capacity;
+    modified();
 
     return writable;
 }

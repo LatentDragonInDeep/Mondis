@@ -54,7 +54,7 @@ Command *CommandInterpreter::getCommand(std::string &raw) {
                     break;
             }
             param.content = vt[i].content;
-            res->params.push_back(param);
+            cur->params.push_back(param);
         }
         cur->next = new Command;
         cur = cur->next;
@@ -62,7 +62,7 @@ Command *CommandInterpreter::getCommand(std::string &raw) {
 }
 
 void CommandInterpreter::init() {
-    PUT(BIND)
+    map["SET"] = CommandType::BIND;
     PUT(DEL)
     PUT(EXISTS)
     PUT(RENAME)
@@ -106,6 +106,7 @@ void CommandInterpreter::init() {
     PUT(BACK)
     PUT(FORWARD)
     PUT(SELECT)
+    PUT(LOCATE)
 }
 
 void CommandInterpreter::LexicalParser::skip() {
@@ -149,6 +150,10 @@ CommandInterpreter::Token CommandInterpreter::LexicalParser::nextToken() {
             res.content = raw.substr(start, curIndex - start);
             curIndex++;
             return res;
+        } else if (raw[curIndex] == '|') {
+            res.type = PLAIN_PARAM;
+            res.content = raw.substr(start, curIndex - start);
+            return res;
         }
         curIndex++;
     }
@@ -156,14 +161,15 @@ CommandInterpreter::Token CommandInterpreter::LexicalParser::nextToken() {
 
 
 bool util::toInteger(std::string &data, int &res) {
-    static std::stringstream ss;
-    ss << data;
-    ss >> res;
-    if (!ss.fail()) {
-        ss.clear();
-        return true;
+    try {
+        res = std::stoi(data, 0, 10);
+    } catch (std::invalid_argument &) {
+        return false;
     }
-    return false;
+    catch (std::out_of_range &) {
+        return false;
+    }
+    return true;
 }
 
 std::string util::to_string(bool data) {

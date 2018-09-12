@@ -46,14 +46,19 @@ ExecutionResult MondisServer::execute(Command *command) {
             CHECK_PARAM_NUM(1)
             CHECK_PARAM_TYPE(0, PLAIN)
             KEY(0)
-            res.res = curKeySpace->containsKey(key);
+            res.res = util::to_string(curKeySpace->containsKey(key));
             OK_AND_RETURN
         }
         case TYPE: {
             CHECK_PARAM_NUM(1)
             CHECK_PARAM_TYPE(0, PLAIN)
             KEY(0)
-            res.res = curKeySpace->get(key)->getTypeStr();
+            MondisObject *data = curKeySpace->get(key);
+            if (data == nullptr) {
+                res.res = "the key does not exists";
+                OK_AND_RETURN
+            }
+            res.res = data->getTypeStr();
             OK_AND_RETURN;
         }
         case EXIT: {

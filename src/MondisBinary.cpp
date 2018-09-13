@@ -170,27 +170,27 @@ ExecutionResult MondisBinary::execute(Command *command) {
         }
         case READ_CHAR: {
             CHECK_PARAM_NUM(0)
-            res.res = std::to_string(readType<char>());
+            res.res = readType<char>();
             OK_AND_RETURN
         }
         case READ_SHORT: {
             CHECK_PARAM_NUM(0)
-            res.res = std::to_string(readType<short>());
+            res.res = readType<short>();
             OK_AND_RETURN
         }
         case READ_INT: {
             CHECK_PARAM_NUM(0)
-            res.res = std::to_string(readType<int>());
+            res.res = readType<int>();
             OK_AND_RETURN
         }
         case READ_LONG: {
             CHECK_PARAM_NUM(0)
-            res.res = std::to_string(readType<long>());
+            res.res = readType<long>();
             OK_AND_RETURN
         }
         case READ_LONG_LONG: {
             CHECK_PARAM_NUM(0)
-            res.res = std::to_string(readType<long long>());
+            res.res = readType<long long>();
             OK_AND_RETURN
         }
         case BACK: {

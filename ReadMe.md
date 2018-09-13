@@ -168,15 +168,15 @@ read系列命令在剩余长度小于想要读取的长度时，会读到末尾�
 从当前读写指针读十六个字节
 ### read &lt;length&gt;
 从当前读写指针读length个字节
-### write &lt;length&gt: [data]
+### write &lt;length&gt; [data]
 从当前读写指针开始从data里面读取length个字节长度的数据到binary里面。data的长度必须大于等于length，
 如果剩余可读区间小于length，则length多余的部分会被截断。
 
 
 ## list命令
-### set &lt;index&gt: [data]
+### set &lt;index&gt; [data]
 将list的第index个元素设为data。
-### get &lt;index&gt:
+### get &lt;index&gt;
 获取list的第index个元素
 ### size
 返回list中元素数量
@@ -188,7 +188,7 @@ read系列命令在剩余长度小于想要读取的长度时，会读到末尾�
 从list开头弹出并返回这个元素。如果list为空，则返回一个错误。
 ### pop_back 
 从list末尾弹出并返回这个元素。如果list为空，则返回一个错误。
-### get_range &lt;from&gt: &lt;to&gt:
+### get_range &lt;from&gt; &lt;to&gt;
 获取并返回list下标从from到to之间的所有元素。包括from处的元素，不包括to。返回的格式是json数组。
 
 ## set命令
@@ -202,39 +202,39 @@ read系列命令在剩余长度小于想要读取的长度时，会读到末尾�
 检查set中是否存在data
 
 ## zset命令
-### get_by_score &lt;score&gt:
+### get_by_score &lt;score&gt;
 获得zset里面分数等于score的元素
-### get_by_rank &lt;rank&gt:
+### get_by_rank &lt;rank&gt;
 获得zset里面排名等于rank的元素
-### remove_by_score &lt;score&gt:
+### remove_by_score &lt;score&gt;
 删去zset里面分数为score的元素
-### remove_by_rank &lt;rank&gt:
+### remove_by_rank &lt;rank&gt;
 删去排名为rank的元素。
-### get_range_by_score &lt;from&gt: &lt;to&gt:
+### get_range_by_score &lt;from&gt; &lt;to&gt;
 获得分数在from与to之间的所有元素。包括from，不包括to
-### get_range_by_rank &lt;from&gt: &lt;to&gt:
+### get_range_by_rank &lt;from&gt; &lt;to&gt;
 获得排名在from与to之间的所有元素。包括from，不包括to
-### remove_range_by_score &lt;from&gt: &lt;to&gt:
+### remove_range_by_score &lt;from&gt; &lt;to&gt;
 删除分数在from与to之间的所有元素。包括from，不包括to
-### remove_range_by_rank &lt;from&gt: &lt;to&gt:
+### remove_range_by_rank &lt;from&gt; &lt;to&gt;
 删除排名在from与to之间的所有元素。包括from，不包括to
-### set &lt;score&gt: [data]
+### set &lt;score&gt; [data]
 添加一个分数为score的元素进zset。如果该score已存在，则覆盖。
-### exists &lt;score&gt:
+### exists &lt;score&gt;
 检查是否存在分数为score的元素。
 ### size
 返回zset中元素数量
-### change &lt;old&gt: &lt;new&gt:
+### change &lt;old&gt; &lt;new&gt;
 将分数为old的元素的分数变为new。如果分数为old的元素不存在，或者分数为new的元素已存在，则出错。
 
 ## hash命令
-### set &lt;key&gt: [value]
+### set &lt;key&gt; [value]
 添加一个键值对。如果key已存在，则覆盖。
-### remove &lt;key&gt:
+### remove &lt;key&gt;
 删除一个键值对。
-### get &lt;key&gt:
+### get &lt;key&gt;
 返回key所对应的value。
-### exists &lt;key&gt:
+### exists &lt;key&gt;
 检查是否存在key。
 ### size
 返回键值对的数量。
@@ -248,11 +248,11 @@ locate a|locate 1|get 1。locate a在键空间中定位到a，locate 1定位到a
 ### string,binary，set
 string，binary与set无法locate，如果尝试执行，将会出现一个错误。
 ### list
-list的locate命令格式是locate &lt;index&gt:。
+list的locate命令格式是locate &lt;index&gt;。
 ### zset
-zset的locate命令格式是locate "RANK" &lt;rank&gt:或者locate "SCORE" &lt;score&gt:
+zset的locate命令格式是locate "RANK" &lt;rank&gt;或者locate "SCORE" &lt;score&gt;
 ### hash
-hash的locate命令格式是locate &lt;key&gt:。
+hash的locate命令格式是locate &lt;key&gt;。
 ### 键空间
 与hash相同。
 

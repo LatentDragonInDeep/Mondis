@@ -32,7 +32,7 @@ void AVLTree::realInsert(KeyValue *kv) {
             if (parent == nullptr) {
                 root = cur;
             }
-            reBalance(cur);
+            rebalance(cur);
             return;
         } else if (kv->compare(*cur->data)) {
             parent = cur;
@@ -169,7 +169,7 @@ void AVLTree::realRemove(KeyValue &kv, AVLTreeNode *root) {
                         cur->parent->right = nullptr;
                     }
                 }
-                reBalance(cur->parent);
+                rebalance(cur->parent);
                 if (cur == root) {
                     root = nullptr;
                 }
@@ -188,7 +188,7 @@ void AVLTree::realRemove(KeyValue &kv, AVLTreeNode *root) {
                         cur->left->parent = cur->parent;
                     }
                 }
-                reBalance(cur->parent);
+                rebalance(cur->parent);
                 if (cur == root) {
                     root = cur->left;
                 }
@@ -207,7 +207,7 @@ void AVLTree::realRemove(KeyValue &kv, AVLTreeNode *root) {
                         cur->right->parent = cur->parent;
                     }
                 }
-                reBalance(cur->parent);
+                rebalance(cur->parent);
                 if (cur == root) {
                     root = cur->right;
                 }
@@ -365,7 +365,7 @@ void AVLTree::deleteTree(AVLTreeNode *root) {
     deleteTree(right);
 }
 
-void AVLTree::reBalance(AVLTreeNode *root) {
+void AVLTree::rebalance(AVLTreeNode *root) {
     AVLTreeNode *cur = root;
     while (true) {
         if (cur == nullptr) {
@@ -388,6 +388,10 @@ void AVLTree::reBalance(AVLTreeNode *root) {
             } else if (leftFactor == 1) {
                 rightLeftRotate(cur);
             }
+        }
+        if (cur->parent == nullptr) {
+            root = cur;
+            return;
         }
         cur = cur->parent;
     }

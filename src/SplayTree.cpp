@@ -18,6 +18,7 @@ void SplayTree::toJson() {
     json += "}\n";
 }
 
+
 SplayTree::SplayIterator SplayTree::iterator() {
     return SplayIterator(this);
 }
@@ -390,7 +391,7 @@ void SplayTree::removeRangeByRank(int start, int end) {
     }
     modified();
     SplayTreeNode* from = getNodeByRank(root,start);
-    SplayTreeNode* to = getNodeByRank(root,end);
+    SplayTreeNode *to = getNodeByRank(root, end + 1);
     splay(from);
     splay(to);
     sizeUpdate(root->right,-getSize(root->right->left));
@@ -402,7 +403,7 @@ void SplayTree::getRangeByRank(int start, int end, vector<MondisObject*> *res) {
         return;
     }
     SplayTreeNode* from = getNodeByRank(root,start);
-    SplayTreeNode* to = getNodeByRank(root,end);
+    SplayTreeNode *to = getNodeByRank(root, end + 1);
     splay(from);
     splay(to);
     inOrderTraversal(root->right->left,res);
@@ -606,18 +607,42 @@ ExecutionResult SplayTree::execute(Command *command) {
             res.res = to_string(contains(score));
             OK_AND_RETURN
         }
-        case SIZE:
+        case SIZE: {
             CHECK_PARAM_NUM(0)
             res.res = to_string(size());
             OK_AND_RETURN
-        case COUNT:
+        }
+        case COUNT: {
             CHECK_PARAM_NUM(2)
             CHECK_PARAM_TYPE(0, PLAIN)
             CHECK_PARAM_TYPE(1, PLAIN)
             CHECK_AND_DEFINE_INT_LEGAL(0, start)
             CHECK_AND_DEFINE_INT_LEGAL(1, end)
-            res.res = to_string(count(start,end));
+            res.res = to_string(count(start, end));
             OK_AND_RETURN
+        }
+        case CHANGE_SCORE: {
+            CHECK_PARAM_NUM(2)
+            CHECK_PARAM_TYPE(0, PLAIN)
+            CHECK_PARAM_TYPE(1, PLAIN)
+            CHECK_AND_DEFINE_INT_LEGAL(0, oldScore)
+            CHECK_AND_DEFINE_INT_LEGAL(1, newScore)
+            SplayTreeNode *oldNode = getNodeByScore(oldScore);
+            if (oldNode == nullptr) {
+                res.res == "element whose score is" + PARAM(0) + "does not exists";
+                return res;
+            }
+            SplayTreeNode *newNode = getNodeByScore(newScore);
+            if (newNode != nullptr) {
+                res.res == "element whose score is" + PARAM(1) + "has existed";
+                return res;
+            }
+            MondisObject *data = oldNode->data;
+            oldNode->data = nullptr;
+            removeByScore(oldScore);
+            insert(newScore, data);
+            OK_AND_RETURN
+        }
     }
     INVALID_AND_RETURN
 }
@@ -649,6 +674,22 @@ MondisObject *SplayTree::locate(Command *command) {
     }
 
     return nullptr;
+}
+
+string SplayTree::toJsonWithScore() {
+    string res;
+    SplayIterator iterator = this->iterator();
+    res += "{";
+    res += "\n";
+    while (iterator.next()) {
+        string score = "\"" + to_string(iterator->score) + "\"";
+        res += score;
+        res += ",\n";
+        res += iterator->data->getJson();
+        res += ",\n";
+    }
+    res += "}\n";
+    return res;
 }
 
 

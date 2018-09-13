@@ -68,6 +68,7 @@
                                             res.res = "argument length error";\
                                             return res;\
                                             }
+#define PARAM(INDEX) (*command)[INDEX].content
 
 namespace util {
     bool toInteger(std::string &data, int &res);
@@ -121,6 +122,9 @@ enum CommandType {
     SET_POSITION,
     READ,
     WRITE,
+    TO_STRING,
+    CHECK_POS,
+    CHANGE_SCORE,
 
     //key space command
 //    KEYSPACE_SET,//set

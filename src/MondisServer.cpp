@@ -97,6 +97,23 @@ ExecutionResult MondisServer::execute(Command *command) {
             curKeySpace = dbs[curDbIndex];
             OK_AND_RETURN
         }
+        case RENAME: {
+            CHECK_PARAM_NUM(2)
+            CHECK_PARAM_TYPE(0, PLAIN)
+            CHECK_PARAM_TYPE(1, PLAIN)
+            Key *key1 = new Key(PARAM(0));
+            Key *key2 = new Key(PARAM(1));
+            MondisObject *data = curKeySpace->get(*key1);
+            if (data == nullptr) {
+                res.res = "the object whose key is" + PARAM(0) + "does not exists";
+                return res;
+            }
+            curKeySpace->put(key1, nullptr);
+            curKeySpace->remove(*key1);
+            curKeySpace->put(key2, data);
+            OK_AND_RETURN
+
+        }
     }
     INVALID_AND_RETURN
 }

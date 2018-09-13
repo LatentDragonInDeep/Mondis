@@ -95,8 +95,8 @@ ExecutionResult MondisObject::executeString(Command *command) {
             CHECK_PARAM_NUM(3)
             CHECK_START_AND_DEFINE(0)
             CHECK_END_AND_DEFINE(1, data->size())
-            if ((*command)[2].content.size() != end - start) {
-                res.res = "data length error!";
+            if ((*command)[2].content.size() < end - start) {
+                res.res = "data length too short!";
                 return res;
             }
             for (int i = start; i < end; ++i) {
@@ -149,11 +149,19 @@ ExecutionResult MondisObject::executeInteger(Command *command) {
             (*data) += delta;
             OK_AND_RETURN
         }
-        case DECR_BY:
+        case DECR_BY: {
             CHECK_PARAM_NUM(1)
             CHECK_AND_DEFINE_INT_LEGAL(0, delta)
             (*data) -= delta;
             OK_AND_RETURN
+        }
+        case TO_STRING: {
+            string *str = new string(getJson());
+            type = RAW_STRING;
+            delete data;
+            objectData = str;
+            OK_AND_RETURN
+        }
     }
     INVALID_AND_RETURN
 }

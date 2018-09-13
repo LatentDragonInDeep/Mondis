@@ -6,6 +6,7 @@
 #include "HashMap.h"
 #include "MondisBinary.h"
 #include "MondisList.h"
+#include "SplayTree.h"
 
 
 JSONParser::JSONParser(std::string &filePath) {
@@ -50,7 +51,12 @@ KeyValue JSONParser::parseEntry(LexicalParser &lp) {
     res.key = key;
     matchToken(lp,COLON);
     res.value = parseObject(lp);
-    matchToken(lp, COMMA);
+    Token n = lp.nextToken();
+    if (n.type == RIGHT_ANGLE_BRACKET) {
+        lp.back();
+    } else if (n.type != COMMA) {
+        throw std::invalid_argument("unexpected token!");
+    }
 
     return res;
 }
@@ -129,51 +135,76 @@ MondisObject *JSONParser::parseJSONArray(LexicalParser &lp, bool isNeedNext) {
     }
     MondisObject* res = new MondisObject;
     MondisObject* first = parseJSONObject(lp, false, false);
-    if(first->type !=RAW_STRING ||first->type !=RAW_INT ||
-       (first->type == RAW_STRING && first->getJson() != "SET")) {
-        delete first;
-        MondisObject* second = parseJSONObject(lp, true, false);
-        bool isInteger = false;
-        if (second->getJson() == "INT") {
-            isInteger = true;
-            delete second;
-        }
-        res->type = LIST;
-        MondisList* data = new MondisList;
-        data->pushBack(first);
-        MondisObject* cur;
-        while (true) {
-            cur = parseJSONObject(lp, true, isInteger);
-            if(cur->type!=EMPTY) {
-                data->pushBack(cur);
-            } else{
-                break;
+    if (first != nullptr) {
+        if (first->type == RAW_STRING) {
+            if (first->getJson() == "LIST") {
+                list:
+                res->type = LIST;
+                MondisList *data = new MondisList;
+                res->objectData = data;
+                MondisObject *cur = nullptr;
+                while (true) {
+                    cur = parseObject(lp);
+                    if (cur != nullptr) {
+                        data->pushBack(cur);
+                    } else {
+                        break;
+                    }
+                }
+                delete first;
+                return res;
+            } else if (first->getJson() == "SET") {
+                res->type = SET;
+                HashMap *data = new HashMap(true, true);
+                res->objectData = data;
+                MondisObject *cur = nullptr;
+                while (true) {
+                    cur = parseObject(lp);
+                    if (cur != nullptr) {
+                        if (cur->type != RAW_STRING || cur->type != RAW_INT) {
+                            throw "unexpected element";
+                        }
+                        string json = cur->getJson();
+                        Key *key = new Key(json);
+                        data->put(key, nullptr);
+                    } else {
+                        break;
+                    }
+                }
+                delete first;
+                return res;
             }
+        } else if (first->getJson() == "ZSET") {
+            res->type = ZSET;
+            SplayTree *data = new SplayTree;
+            res->objectData = data;
+            MondisObject *cur = nullptr;
+            MondisObject *next = nullptr;
+            while (true) {
+                cur = parseObject(lp);
+                next = parseObject(lp);
+                if (cur == nullptr) {
+                    break;
+                }
+                if (cur->type != RAW_INT) {
+                    throw "unexpected element";
+                }
+                string curScore = cur->getJson();
+                int score = *reinterpret_cast<int *>(curScore.data());
+                delete cur;
+                data->insert(score, next);
+            }
+            delete first;
+            return res;
+        } else {
+            goto list;
         }
-        res->objectData = data;
+
+    } else {
+        res->type = LIST;
+        res->objectData = new MondisList;
         return res;
     }
-    delete first;
-    MondisObject* second = parseJSONObject(lp, true, false);
-    bool isInteger = false;
-    if (second->getJson() == "INT") {
-        isInteger = true;
-        delete second;
-    }
-    res->type = SET;
-    HashMap* data = new HashMap(true, isInteger);
-    MondisObject* cur;
-    while (true) {
-        cur = parseJSONObject(lp, true, isInteger);
-        if(cur->type!=EMPTY) {
-            Key *key = new Key(*(int *) cur->objectData);
-            data->put(key, nullptr);
-        } else{
-            break;
-        }
-    }
-    res->objectData = data;
-    return res;
 }
 
 JSONParser::JSONParser() {}

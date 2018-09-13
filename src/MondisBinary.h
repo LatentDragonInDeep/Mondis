@@ -52,11 +52,11 @@ public:
     void reset();
 
     template <typename T>
-    T readType() {
+    string readType() {
         if(position+ sizeof(T)>=capacity) {
             throw new std::invalid_argument("read out of range");
         }
-        T res =  *((T*)(heapBuffer+position));
+        string res(heapBuffer + position, sizeof(T));
         position+=sizeof(T);
 
         return res;

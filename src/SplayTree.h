@@ -82,11 +82,14 @@ public:
     void getRangeByScore(int startScore, int endScore,vector<MondisObject*>* res);
     unsigned size();
     void toJson();
+
+    string toJsonWithScore();
     SplayIterator iterator();
 
     ExecutionResult execute(Command *command);
 
     MondisObject *locate(Command *command);
+
 private:
     void splay(SplayTreeNode* cur);
     void sizeUpdate(SplayTreeNode* cur, int delta);

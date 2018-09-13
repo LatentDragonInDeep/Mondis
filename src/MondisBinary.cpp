@@ -146,6 +146,10 @@ ExecutionResult MondisBinary::execute(Command *command) {
                 res.res = "read or write out of range";
                 return res;
             }
+            if (PARAM(2).size() < end - start) {
+                res.res = "data length too shrot!";
+                return res;
+            }
             memcpy(heapBuffer + start, (*command)[0].content.data(), end - start);
             OK_AND_RETURN
         }
@@ -224,6 +228,11 @@ ExecutionResult MondisBinary::execute(Command *command) {
             CHECK_PARAM_TYPE(0, PLAIN);
             CHECK_AND_DEFINE_INT_LEGAL(0, pos)
             setPosition(pos);
+            OK_AND_RETURN
+        }
+        case CHECK_POS: {
+            CHECK_PARAM_NUM(0)
+            res.res = to_string(position);
             OK_AND_RETURN
         }
 

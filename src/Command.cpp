@@ -107,6 +107,9 @@ void CommandInterpreter::init() {
     PUT(FORWARD)
     PUT(SELECT)
     PUT(LOCATE)
+    PUT(TO_STRING)
+    PUT(CHECK_POS)
+    PUT(CHANGE_SCORE)
 }
 
 void CommandInterpreter::LexicalParser::skip() {

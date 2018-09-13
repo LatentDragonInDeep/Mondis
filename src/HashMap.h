@@ -310,7 +310,7 @@ private:
     int getHeight(AVLTreeNode* root);
     void deleteTree(AVLTreeNode* root);
 
-    void reBalance(AVLTreeNode *root);
+    void rebalance(AVLTreeNode *root);
 
     void toJson();
 };

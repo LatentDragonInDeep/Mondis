@@ -171,6 +171,8 @@ read系列命令在剩余长度小于想要读取的长度时，会读到末尾�
 ### write &lt;length&gt; [data]
 从当前读写指针开始从data里面读取length个字节长度的数据到binary里面。data的长度必须大于等于length，
 如果剩余可读区间小于length，则length多余的部分会被截断。
+### check_pos
+返回当前读写指针的位置。
 
 ## list命令
 ### set &lt;index&gt; [data]

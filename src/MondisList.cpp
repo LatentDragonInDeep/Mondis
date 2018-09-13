@@ -174,6 +174,7 @@ MondisList::~MondisList ()
 }
 
 void MondisList::toJson() {
+    json = "";
     json += "[\n";
     ListIterator iterator = this->iterator();
     while (iterator.next()) {

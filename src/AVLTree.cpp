@@ -240,6 +240,7 @@ AVLTreeNode *AVLTree::getSuccessor (AVLTreeNode *root)
 }
 
 void AVLTree::toJson() {
+    json = "";
     AVLIterator iterator = this->iterator();
     json += "{\n";
     while (iterator.next()) {

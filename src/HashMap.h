@@ -126,6 +126,7 @@ private:
     }
 
     void toJson() {
+        json = "";
         if(flag) {
             json += "\"";
             json += str;
@@ -163,6 +164,7 @@ public:
     }
 
     void toJson() {
+        json = "";
         json += key->getJson();
         json += ":";
         json += value->getJson();
@@ -210,6 +212,7 @@ public:
     }
 
     void toJson() {
+        json = "";
         json += key->getJson();
         if(!isValueNull) {
             json += " : ";

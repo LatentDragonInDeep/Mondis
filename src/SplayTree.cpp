@@ -8,6 +8,7 @@
 
 
 void SplayTree::toJson() {
+    json = "";
     SplayIterator iterator = this->iterator();
     json += "{";
     json += "\n";

@@ -198,6 +198,7 @@ void HashMap::add (int index, Entry *entry)
 }
 
 void HashMap::toJson() {
+    json = "";
     json += "{\n";
     auto iter = iterator();
     while (iter.next()) {

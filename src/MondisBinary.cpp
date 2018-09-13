@@ -101,6 +101,7 @@ void MondisBinary::persist(std::string &filePath, int start, int end) {
 }
 
 void MondisBinary::toJson() {
+    json = "";
     json += "\"";
     json += "LatentDragon";
     json += string(heapBuffer, capacity);

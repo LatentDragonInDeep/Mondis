@@ -3,6 +3,37 @@ Mondis is a key-value database powered by redis and add some new feature。
 # 什么是Mondis
 Mondis是一个key-value数据库，它很像redis，但是支持许多redis不支持的新特性。实际上，它的名字mondis就是取自mongodb与redis。后面将会说明这样做的原因。
 下面，让我们学习如何来使用它。
+# 选择mondis的理由
+## mondis嵌套
+mondis支持数据结构的任意嵌套，mondis键的取值只能是字符串，但是值的取值可以是string,list,set,zset,hash的任意一种。
+mondis嵌套意味着list,zset的元素与hash类型键值对的值可以是另一个list,set,zset或者hash，就像json
+那样。注意，set类型的元素只能是string，这是因为set底层采用hash表进行实现，而list,zset与hash没有默认的哈希函数。
+## mondis多态命令
+在redis里面，我们在操作的时候必须指定底层数据的类型，比如list命令全部以l开头，zset命令全部以z开头，hash命令全部以hash开头，
+但是在mondis里面，这些统统不需要。mondis命令具有多态性，相同的命令在不同数据结构上的效果是不同的，只需要执行命令而无需关心底层数据结构是
+什么。如果执行了不合适的命令，mondis会处理这种情况，不用担心崩溃。
+## mondis定位命令
+由于mondis支持任意嵌套，有时候我们要操作一个嵌套层数很深的数据对象，此时就需要用到定位命令。
+定位命令是locate，它可以具有不定数量的参数。它的作用就是定位到当前要操作的数据对象上，然后执行操作命令。
+多个locate命令之间需要以|分隔，看上去就像linux的管道命令。
+## mondis查询
+mondis查询类似于redis查询，但是不同的是mondis查询返回的格式是json。这使得mondis更方便使用。
+## mondis持久化
+mondis支持两种持久化方式，json与aof。json类似于rdb，但是持久化的格式是完全兼容的json，
+这使得持久化文件方便迁移并解析。aof持久化则与redis的aof完全相同，除了命令格式。但是目前mondis还不支持aof重写。
+## mondis底层实现相对于redis的改进
+### list
+在mondis里面，list还是用链表实现。不同的是mondis保存了对象指针与索引的双向映射，这样虽然多占用了一些空间，不过可以方便的定位到所需元素。
+### set
+mondis的set采用的是value为空的hash表进行实现，听起来似乎与redis没什么不同，但是mondis的hashmap采用avl树解决哈希冲突，减小了哈希表操作的常数因子。
+### zset
+redis的zset采用跳表+哈希表实现，编码异常复杂，空间占用也没很大优势。
+mondis的zset采用伸展树实现，在时间与空间复杂度上进行了很好的权衡，而且伸展树方便的支持区间操作。
+### hash
+redis的hash在键值对数量不多时采用ziplist，虽然空间
+占用小，但是查询时必须线性扫描，而且插入时有可能连锁更新影响性能。
+在键值对数量较多时采用哈希表，浪费大量空间。
+mondis的hash采用平衡树实现，在时间与空间复杂度上进行了很好的权衡。
 # 开始使用Mondis
 使用Mondis非常简单，首先需要取得Mondis的可执行文件，然后在终端输入./mondis xxx.conf。这时候可以
 看到终端上打印出启动信息，表示Mondis启动成功。xxx.conf即配置文件路径，如果不指定配置文件，Mondis将
@@ -28,9 +59,11 @@ push_bakc,pop_front和pop_back。list里面的元素可以是任意类型。序�
 "SET"字符串，表明这是一个SET序列化的结果，用于反序列化时参考。
 ## zset
 即有序集合，在存取元素时需要指定一个int的score，内部元素根据score从小到大有序。但是score不能指定int类型的极值。
-zset里面的元素可以是任意类型，支持set的所有操作，同时支持根据rank的区间访问，区间删除和根据score的区间访问，区间删除。
-序列化结果是一个json数组，元素是内部元素，顺序按score从大到小排列。但是第一个元素是一个"ZSET"字符串，表明这是一个ZSET序列化的
-结果，用于反序列化时参考。反序列化时，键的score将按照顺序从1开始指定。
+zset里面的元素可以是任意类型，支持set的所有操作，同时支持根据rank的区间访问，区间删除和根据score的区间访问，区间删除，
+还有更改一个元素的score。序列化结果是一个json数组，元素是内部元素，顺序按score从大到小排列。但是第一个元素是一个"ZSET"字符串，表明这是一个ZSET序列化的
+结果，用于反序列化时参考。zset的序列化分为带score与不带score的两种，带score的序列化为把四个字节的score添加到对应元素
+序列化结果的前面，不带score的序列化不包括score。默认序列化方式为不带score，当执行get命令获取zset时采用的就是这种。
+但是在json持久化时必须采用带score的版本。
 ## hash
 即键值对的集合，key只能是RAW_STRING编码的string，值可以是任意类型。支持add,remove,size和exists操作。
 序列化结果是一个json对象，键值对即hash的键值对。
@@ -65,13 +98,13 @@ json字符串表示法的引号。"{}"将会被解析成没有键值对的hash�
 ### select &lt;db&gt;
 修改当前键空间为编号为db的键空间。
 ### save &lt;filepath&gt;
-将当前键空间所有键值对以json持久化到filepath文件里面。
+将整个当前键空间以json持久化到file里面。save命令的默认实现是开启子进程持久化，因此不需要担心性能问题。
+mondis不提供bgsave。
 ### login &lt;username&gt; &lt;password&gt;
 以username和password登录
 ### exit
 退出登录并退出Mondis server。
 ### slaveof &lt;ip:port&gt;
-让当前数据库成为ip:port的从数据库并自动同步。
 
 ## string命令
 string命令分为两大类，有些只能在RAW_INT上执行，有些可以在RAW_STRING上执行。下面分别介绍
@@ -135,41 +168,91 @@ read系列命令在剩余长度小于想要读取的长度时，会读到末尾�
 从当前读写指针读十六个字节
 ### read &lt;length&gt;
 从当前读写指针读length个字节
+### write &lt;length&gt: [data]
+从当前读写指针开始从data里面读取length个字节长度的数据到binary里面。data的长度必须大于等于length，
+如果剩余可读区间小于length，则length多余的部分会被截断。
+
 
 ## list命令
-//...待续
+### set &lt;index&gt: [data]
+将list的第index个元素设为data。
+### get &lt;index&gt:
+获取list的第index个元素
+### size
+返回list中元素数量
+### push_front [data]
+将data添加到list开头
+### push_back [data]
+将data添加到list末尾
+### pop_front
+从list开头弹出并返回这个元素。如果list为空，则返回一个错误。
+### pop_back 
+从list末尾弹出并返回这个元素。如果list为空，则返回一个错误。
+### get_range &lt;from&gt: &lt;to&gt:
+获取并返回list下标从from到to之间的所有元素。包括from处的元素，不包括to。返回的格式是json数组。
 
+## set命令
+### add [data]
+将data添加到list里面。data的反序列化结果的编码只能是RAW_INT或者RAW_STRING，否则会出错。下同。
+### remove [data]
+从set里面删除data。
+### size
+返回set中元素数量
+### exists [data]
+检查set中是否存在data
 
-mondis的二进制数据类似于java里面的bytebuffer，一个高效的内存缓冲区。它支持bytebuffer支持的几乎所有操作，但是不支持offset,limit有关操作。
-# mondis嵌套
-mondis支持数据结构的任意嵌套，mondis键的取值只能是字符串，但是值的取值可以是string,list,set,zset,hash的任意一种。
-mondis嵌套意味着list,zset的元素与hash类型键值对的值可以是另一个list,set,zset或者hash，就像json
-那样。注意，set类型的元素只能是string，这是因为set底层采用hash表进行实现，而list,zset与hash没有默认的哈希函数。
-# mondis多态命令
-在redis里面，我们在操作的时候必须指定底层数据的类型，比如list命令全部以l开头，zset命令全部以z开头，hash命令全部以hash开头，
-但是在mondis里面，这些统统不需要。mondis命令具有多态性，相同的命令在不同数据结构上的效果是不同的，只需要执行命令而无需关心底层数据结构是
-什么。如果执行了不合适的命令，mondis会处理这种情况，不用担心崩溃。
-# mondis定位命令
-由于mondis支持任意嵌套，有时候我们要操作一个嵌套层数很深的数据对象，此时就需要用到定位命令。
-定位命令是locate，它可以具有不定数量的参数。它的作用就是定位到当前要操作的数据对象上，然后执行操作命令。
-多个locate命令之间需要以|分隔，看上去就像linux的管道命令。
-# mondis查询
-mondis查询类似于redis查询，但是不同的是mondis查询返回的格式是json。这使得mondis更方便使用。
-# mondis持久化
-mondis支持两种持久化方式，json与aof。json类似于rdb，但是持久化的格式是完全兼容的json，
-这使得持久化文件方便迁移并解析。aof持久化则与redis的aof完全相同，除了命令格式。但是目前mondis还不支持aof重写。
-# mondis底层实现相对于redis的改进
-## list
-在mondis里面，list还是用链表实现。不同的是mondis保存了对象指针与索引的双向映射，这样虽然多占用了一些空间，不过可以方便的定位到所需元素。
-## set
-mondis的set采用的是value为空的hash表进行实现，听起来似乎与redis没什么不同，但是mondis的hashmap采用avl树解决哈希冲突，减小了哈希表操作的常数因子。
-## zset
-redis的zset采用跳表+哈希表实现，编码异常复杂，空间占用也没很大优势。
-mondis的zset采用伸展树实现，在时间与空间复杂度上进行了很好的权衡，而且伸展树方便的支持区间操作。
-## hash
-redis的hash在键值对数量不多时采用ziplist，虽然空间
-占用小，但是查询时必须线性扫描，而且插入时有可能连锁更新影响性能。
-在键值对数量较多时采用哈希表，浪费大量空间。
-mondis的hash采用平衡树实现，在时间与空间复杂度上进行了很好的权衡。
+## zset命令
+### get_by_score &lt;score&gt:
+获得zset里面分数等于score的元素
+### get_by_rank &lt;rank&gt:
+获得zset里面排名等于rank的元素
+### remove_by_score &lt;score&gt:
+删去zset里面分数为score的元素
+### remove_by_rank &lt;rank&gt:
+删去排名为rank的元素。
+### get_range_by_score &lt;from&gt: &lt;to&gt:
+获得分数在from与to之间的所有元素。包括from，不包括to
+### get_range_by_rank &lt;from&gt: &lt;to&gt:
+获得排名在from与to之间的所有元素。包括from，不包括to
+### remove_range_by_score &lt;from&gt: &lt;to&gt:
+删除分数在from与to之间的所有元素。包括from，不包括to
+### remove_range_by_rank &lt;from&gt: &lt;to&gt:
+删除排名在from与to之间的所有元素。包括from，不包括to
+### set &lt;score&gt: [data]
+添加一个分数为score的元素进zset。如果该score已存在，则覆盖。
+### exists &lt;score&gt:
+检查是否存在分数为score的元素。
+### size
+返回zset中元素数量
+### change &lt;old&gt: &lt;new&gt:
+将分数为old的元素的分数变为new。如果分数为old的元素不存在，或者分数为new的元素已存在，则出错。
 
-//...待续
+## hash命令
+### set &lt;key&gt: [value]
+添加一个键值对。如果key已存在，则覆盖。
+### remove &lt;key&gt:
+删除一个键值对。
+### get &lt;key&gt:
+返回key所对应的value。
+### exists &lt;key&gt:
+检查是否存在key。
+### size
+返回键值对的数量。
+
+## locate命令
+locate命令用于定位要操作的数据对象。下面是一个简单的示例。
+执行set a "{"test"}"以后，a就是一个有一个元素的list，这个元素是"test"。那么我们要操作test，就要定位到
+这个元素。首先在键空间中定位a，然后在a中定位"test"。假如我们要获得test的第一个字符，那么应该执行如下命令：
+locate a|locate 1|get 1。locate a在键空间中定位到a，locate 1定位到a的第一个元素，然后获得test的第一个字符。
+竖线的作用是分隔locate命令。相邻的locate命令之间必须有竖线。下面详细介绍各个数据结构的locate。
+### string,binary，set
+string，binary与set无法locate，如果尝试执行，将会出现一个错误。
+### list
+list的locate命令格式是locate &lt;index&gt:。
+### zset
+zset的locate命令格式是locate "RANK" &lt;rank&gt:或者locate "SCORE" &lt;score&gt:
+### hash
+hash的locate命令格式是locate &lt;key&gt:。
+### 键空间
+与hash相同。
+

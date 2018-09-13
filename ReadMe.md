@@ -61,7 +61,7 @@ push_bakc,pop_front和pop_back。list里面的元素可以是任意类型。序�
 即有序集合，在存取元素时需要指定一个int的score，内部元素根据score从小到大有序。但是score不能指定int类型的极值。
 zset里面的元素可以是任意类型，支持set的所有操作，同时支持根据rank的区间访问，区间删除和根据score的区间访问，区间删除，
 还有更改一个元素的score。序列化结果是一个json数组，元素是内部元素，顺序按score从大到小排列。但是第一个元素是一个"ZSET"字符串，表明这是一个ZSET序列化的
-结果，用于反序列化时参考。zset的序列化分为带score与不带score的两种，带score的序列化为把四个字节的score添加到对应元素
+结果，用于反序列化时参考。zset的序列化分为带score与不带score的两种，带score的序列化为把四个字节的score作为一个元素以string形式添加到对应元素
 序列化结果的前面，不带score的序列化不包括score。默认序列化方式为不带score，当执行get命令获取zset时采用的就是这种。
 但是在json持久化时必须采用带score的版本。
 ## hash

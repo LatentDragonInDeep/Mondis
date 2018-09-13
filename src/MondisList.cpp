@@ -206,7 +206,7 @@ MondisObject *MondisList::locate(Command *command) {
 ExecutionResult MondisList::execute(Command *command) {
     ExecutionResult res;
     switch (command->type) {
-        case SET: {
+        case BIND: {
             CHECK_PARAM_NUM(2)
             CHECK_PARAM_TYPE(0, PLAIN)
             CHECK_AND_DEFINE_INT_LEGAL(0, index)

@@ -70,8 +70,8 @@ MondisObject *MondisObject::locate(Command *command) {
 ExecutionResult MondisObject::executeString(Command *command) {
     string *data = (string *) objectData;
     ExecutionResult res;
-    switch (type) {
-        case SET: {
+    switch (command->type) {
+        case BIND: {
             CHECK_PARAM_NUM(2)
             CHECK_PARAM_TYPE(0, PLAIN)
             CHECK_PARAM_TYPE(1, STRING)
@@ -80,10 +80,11 @@ ExecutionResult MondisObject::executeString(Command *command) {
                 res.res = "error data";
             }
             (*data)[index] = (*command)[1].content[0];
+            modified();
             OK_AND_RETURN
         }
         case GET: {
-            CHECK_PARAM_NUM(2)
+            CHECK_PARAM_NUM(1)
             CHECK_AND_DEFINE_INT_LEGAL(0, index)
             if ((*command)[1].content.size() != 1) {
                 res.res = "error data";
@@ -102,6 +103,7 @@ ExecutionResult MondisObject::executeString(Command *command) {
             for (int i = start; i < end; ++i) {
                 (*data)[i] = (*command)[2].content[i - start];
             }
+            modified();
             OK_AND_RETURN
         }
         case GET_RANGE: {
@@ -122,7 +124,7 @@ ExecutionResult MondisObject::executeString(Command *command) {
         case APPEND: {
             CHECK_PARAM_NUM(1)
             (*data) += (*command)[0].content;
-
+            modified();
             OK_AND_RETURN
         }
     }
@@ -138,28 +140,33 @@ ExecutionResult MondisObject::executeInteger(Command *command) {
         case INCR:
             CHECK_PARAM_NUM(0)
             (*data)++;
+            modified();
             OK_AND_RETURN
         case DECR:
             CHECK_PARAM_NUM(0)
             (*data)--;
+            modified();
             OK_AND_RETURN
         case INCR_BY: {
             CHECK_PARAM_NUM(1)
             CHECK_AND_DEFINE_INT_LEGAL(0, delta)
             (*data) += delta;
+            modified();
             OK_AND_RETURN
         }
         case DECR_BY: {
             CHECK_PARAM_NUM(1)
             CHECK_AND_DEFINE_INT_LEGAL(0, delta)
             (*data) -= delta;
+            modified();
             OK_AND_RETURN
         }
         case TO_STRING: {
-            string *str = new string(getJson());
+            string *str = new string(to_string(*data));
             type = RAW_STRING;
             delete data;
             objectData = str;
+            modified();
             OK_AND_RETURN
         }
     }
@@ -169,6 +176,7 @@ ExecutionResult MondisObject::executeInteger(Command *command) {
 ExecutionResult MondisObject::execute(Command *command) {
     if (command->type == TYPE) {
         ExecutionResult res;
+        res.type = OK;
         res.res = typeStrs[type];
         return res;
     }
@@ -186,6 +194,7 @@ string MondisObject::getJson() {
     if (hasSerialized) {
         return json;
     }
+    json = "";
     switch (type) {
         case MondisObjectType::RAW_STRING:
             handleEscapeChar(*(string *) objectData);
@@ -219,3 +228,7 @@ MondisObject *MondisObject::getNullObject() {
 
 string MondisObject::typeStrs[] = {"RAW_STRING", "RAW_INT", "RAW_BIN", "LIST", "BIND", "ZSET", "HASH", "EMPTY"};
 MondisObject *MondisObject::nullObj = new MondisObject;
+
+bool MondisObject::modified() {
+    hasSerialized = false;
+}

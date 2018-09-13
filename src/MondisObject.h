@@ -76,6 +76,8 @@ private:
     ExecutionResult executeString(Command *command);;
 public:
     MondisObject *locate(Command *command);
+
+    bool modified();
 };
 
 

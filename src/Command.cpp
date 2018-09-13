@@ -113,6 +113,10 @@ void CommandInterpreter::init() {
 }
 
 void CommandInterpreter::LexicalParser::skip() {
+    if (curIndex >= raw.size()) {
+        isEnd = true;
+        return;
+    }
     while (raw[curIndex] ==' '||raw[curIndex]=='\n'||raw[curIndex] == '\r'||raw[curIndex] == '\t') {
         curIndex++;
         if(curIndex>=raw.size()) {
@@ -148,6 +152,11 @@ CommandInterpreter::Token CommandInterpreter::LexicalParser::nextToken() {
     }
     start = curIndex;
     while (true) {
+        if (curIndex >= raw.size()) {
+            res.type = PLAIN_PARAM;
+            res.content = raw.substr(start);
+            return res;
+        }
         if (raw[curIndex] == ' ') {
             res.type = PLAIN_PARAM;
             res.content = raw.substr(start, curIndex - start);

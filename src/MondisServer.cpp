@@ -167,6 +167,7 @@ void MondisServer::parseConfFile(string &confFile) {
 }
 
 int MondisServer::runAsDaemon() {
+    //TODO
     return 0;
 }
 
@@ -202,20 +203,30 @@ ExecutionResult MondisServer::execute(string &commandStr) {
     if (res.type == OK) {
         if (aof) {
             aofFileOut << commandStr;
+            if (aofSyncStrategy == 1) {
+                clock_t cur = clock();
+                if (cur - preSync >= 1000) {
+                    aofFileOut.flush();
+                    preSync = cur;
+                }
+            } else if (aofSyncStrategy == 2) {
+                aofFileOut.flush();
+            }
         }
     }
-    logFileOut << res.toString();
+    Log log(commandStr, res);
+    logFileOut << log.toString();
 
     return res;
 }
 
-void MondisServer::appendOnly(Command &command) {
-    aofFileOut<<command.toString();
-}
-
 int MondisServer::save(string &jsonFile) {
-    ofstream out(jsonFile);
+    ofstream out(jsonFile + "2");
     out << curKeySpace->getJson();
+    out.flush();
+    remove(jsonFile.c_str());
+    out.close();
+    rename((jsonFile + "2").c_str(), jsonFile.c_str());
 }
 
 void MondisServer::applyConf() {
@@ -243,7 +254,7 @@ void MondisServer::applyConf() {
         } else if (kv.first == "databaseID") {
             util::toInteger(kv.second, curDbIndex);
         } else if (kv.first == "aofSyncStrategy") {
-            aofSyncStrategy = kv.second;
+            aofSyncStrategy = atoi(kv.second.c_str());
         } else if (kv.first == "json") {
             if (kv.second == "true") {
                 json = true;
@@ -262,11 +273,16 @@ void MondisServer::applyConf() {
             aofFile = kv.second;
         } else if (kv.first == "jsonFile") {
             jsonFile = kv.second;
+        } else if (kv.first == "recovery") {
+            recoveryStrategy = kv.second;
+        } else if (kv.first == "recoveryFile") {
+            recoveryFile = kv.second;
         }
     }
 }
 
 void MondisServer::init() {
+    isLoading = true;
     Executor::init();
     Executor::bindServer(this);
     executor = Executor::getExecutor();
@@ -284,6 +300,23 @@ void MondisServer::init() {
     if (json) {
         jsonFileOut.open(jsonFile, ios::app);
     }
+    isLoading = false;
+    isRecovering = true;
+    if (recoveryStrategy == "json") {
+        JSONParser temp(recoveryFile);
+        temp.parse(curKeySpace);
+    } else if (recoveryStrategy == "aof") {
+        recoveryFileIn.open(recoveryFile);
+        string command;
+        while (getline(recoveryFileIn, command)) {
+            execute(command);
+        }
+    }
+    isRecovering = false;
+    if (daemonize) {
+        runAsDaemon();
+    }
+
 }
 
 ExecutionResult Executor::execute(Command *command) {

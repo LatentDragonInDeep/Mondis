@@ -18,10 +18,10 @@
 class Log{
 private:
     string currentTime;
-    Command& command;
+    string &command;
     ExecutionResult& res;
 public:
-    Log(Command& command,ExecutionResult& res):command(command),res(res) {
+    Log(string &command, ExecutionResult &res) : command(command), res(res) {
         time_t t = time(0);
         char ch[64];
         strftime(ch, sizeof(ch), "%Y-%m-%d %H-%M-%S", localtime(&t));
@@ -31,7 +31,7 @@ public:
         string res;
         res+=currentTime;
         res+='\t';
-        res+=command.toString();
+        res += command;
         res+='\t';
         res += this->res.getTypeStr();
         res += '\t';
@@ -54,7 +54,7 @@ private:
     int port = 6379;
     int databaseNum = 16;
     bool aof = true;
-    string aofSyncStrategy = "osDefault";
+    int aofSyncStrategy = 1;
     bool json = true;
     int jsonDuration = 10;
     string slaveof = "127.0.0.1";
@@ -68,12 +68,16 @@ private:
     ofstream logFileOut;
     ofstream aofFileOut;
     ofstream jsonFileOut;
+    ifstream recoveryFileIn;
     unordered_map<string,string> conf;
     Executor* executor;
     CommandInterpreter* interpreter;
     string username = "root";
     string password = "admin";
+    clock_t preSync = clock();
 
+    string recoveryFile;
+    string recoveryStrategy;
     string aofFile;
     string jsonFile;
     bool isLoading;
@@ -90,7 +94,6 @@ public:
     int startEventLoop();
     void applyConf();
     int appendLog(Log& log);
-    void appendOnly(Command& command);
     void parseConfFile(string& confFile);
     ExecutionResult execute(string& commandStr);
     ExecutionResult execute(Command *command);

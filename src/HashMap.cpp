@@ -35,11 +35,13 @@ bool HashMap::put(Key *key, MondisObject *value)
         content.listLen++;
         _size++;
         modified();
-        if(content.listLen>treeThreshold) {
+        if (((double) _size) / capacity > loadFactor) {
+            rehash();
+            return true;
+        } else if (content.listLen > treeThreshold) {
             toTree(index);
-            content.isList = false;
+            return true;
         }
-        return true;
     }
     _size -= content.tree->size();
     Entry* newEntry = new Entry;

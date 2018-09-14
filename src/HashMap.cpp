@@ -155,9 +155,8 @@ void HashMap::rehash ()
     for (int i = 0; i < capacity>>1;++i)
     {
         if(arrayFrom[i].isList) {
-            for (Entry *cur = arrayFrom[i].head; cur != nullptr;)
+            for (Entry *cur = arrayFrom[i].head->next; cur != arrayFrom[i].tail;)
             {
-                Entry* next = cur->next;
                 int index = cur->key->hashCode()&(capacity-1);
                 add(index,cur);
             }

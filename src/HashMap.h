@@ -143,19 +143,13 @@ class KeyValue :public MondisData{
 public:
     Key* key = nullptr;
     MondisObject* value = nullptr;
-    bool isValueNull = false;
 
-    KeyValue(Key *k, MondisObject *v) : key(k), value(v) {
-        if (v == nullptr) {
-            isValueNull = true;
-        }
-    }
+    KeyValue(Key *k, MondisObject *v) : key(k), value(v) {}
     KeyValue(){};
     KeyValue(KeyValue&& other) = default;
     KeyValue(KeyValue& other):key(other.key),value(other.value) {
         other.key = nullptr;
         other.value = nullptr;
-        isValueNull = other.isValueNull;
     }
     bool compare(KeyValue& other) {
         return key->compare(*other.key);
@@ -172,7 +166,7 @@ public:
     void toJson() {
         json = "";
         json += key->getJson();
-        if (!isValueNull) {
+        if (value == nullptr) {
             json += ":";
             json += value->getJson();
         }
@@ -198,7 +192,6 @@ public:
     MondisObject* object = nullptr;
     Entry* pre = nullptr;
     Entry* next = nullptr;
-    bool isValueNull = false;
     bool compare(Entry& other) {
         return key->compare(*other.key);
     }
@@ -206,15 +199,11 @@ public:
     bool equals(Entry& other) {
         return key->equals(*other.key);
     }
-    Entry(Key* key,MondisObject* data):key(key),object(data) {
-        if (data == nullptr) {
-            isValueNull = true;
-        }
-    };
+
+    Entry(Key *key, MondisObject *data) : key(key), object(data) {};
     Entry(KeyValue* kv):key(kv->key),object(kv->value){
         kv->key= nullptr;
         kv->value = nullptr;
-        kv->isValueNull = isValueNull;
     };
     Entry(){};
     ~Entry (){
@@ -225,7 +214,7 @@ public:
     void toJson() {
         json = "";
         json += key->getJson();
-        if(!isValueNull) {
+        if (object == nullptr) {
             json += " : ";
             json += object->getJson();
         }

@@ -197,14 +197,25 @@ void HashMap::add (int index, Entry *entry)
 }
 
 void HashMap::toJson() {
-    json = "";
-    json += "{\n";
-    auto iter = iterator();
-    while (iter.next()) {
-        json += iter->getJson();
-        json += ",\n";
+    if (isValueNull) {
+        json = "";
+        json += "[\n";
+        auto iter = iterator();
+        while (iter.next()) {
+            json += iter->getJson();
+            json += ",\n";
+        }
+        json += ']';
+    } else {
+        json = "";
+        json += "{\n";
+        auto iter = iterator();
+        while (iter.next()) {
+            json += iter->getJson();
+            json += ",\n";
+        }
+        json += '}';
     }
-    json += '}';
 }
 
 HashMap::MapIterator HashMap::iterator() {

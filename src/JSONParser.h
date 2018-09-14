@@ -98,6 +98,10 @@ public:
 
     private:
         void skip() {
+            if (curIndex >= source.size()) {
+                isEnd = true;
+                return;
+            }
             while (source[curIndex] == ' ' || source[curIndex] == '\n' || source[curIndex] == '\r' ||
                    source[curIndex] == '\t') {
                 curIndex++;
@@ -151,6 +155,7 @@ public:
                             res.type = STRING;
                             std::string raw(source, start + 1, end - start - 1);
                             util::eraseBackSlash(raw);
+                            curIndex++;
                             res.content = raw;
                             return res;
                         }

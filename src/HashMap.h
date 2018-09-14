@@ -143,13 +143,19 @@ class KeyValue :public MondisData{
 public:
     Key* key = nullptr;
     MondisObject* value = nullptr;
+    bool isValueNull = false;
 
-    KeyValue(Key *k, MondisObject *v) : key(k), value(v) {}
+    KeyValue(Key *k, MondisObject *v) : key(k), value(v) {
+        if (v == nullptr) {
+            isValueNull = true;
+        }
+    }
     KeyValue(){};
     KeyValue(KeyValue&& other) = default;
     KeyValue(KeyValue& other):key(other.key),value(other.value) {
         other.key = nullptr;
         other.value = nullptr;
+        isValueNull = other.isValueNull;
     }
     bool compare(KeyValue& other) {
         return key->compare(*other.key);
@@ -166,8 +172,10 @@ public:
     void toJson() {
         json = "";
         json += key->getJson();
-        json += ":";
-        json += value->getJson();
+        if (!isValueNull) {
+            json += ":";
+            json += value->getJson();
+        }
     }
 
     KeyValue &operator=(KeyValue &other) {
@@ -199,11 +207,14 @@ public:
         return key->equals(*other.key);
     }
     Entry(Key* key,MondisObject* data):key(key),object(data) {
-
+        if (data == nullptr) {
+            isValueNull = true;
+        }
     };
     Entry(KeyValue* kv):key(kv->key),object(kv->value){
         kv->key= nullptr;
         kv->value = nullptr;
+        kv->isValueNull = isValueNull;
     };
     Entry(){};
     ~Entry (){
@@ -388,24 +399,25 @@ private:
         AVLTree::AVLIterator avlIterator;
         bool isTree = false;
         HashMap *map;
-
+        Content *pc = nullptr;
+        bool isInit = true;
         bool lookForNext() {
             while (true) {
-                if (slotIndex > map->capacity) {
+                if (slotIndex >= map->capacity) {
                     return false;
                 }
-                Content current = array[slotIndex];
+                Content &current = array[slotIndex];
                 if(current.isList) {
-                    if (current.head == nullptr) {
+                    if (current.head->next == current.tail) {
                         slotIndex++;
                         continue;
                     }
-                    cur = current.head;
+                    pc = &current;
+                    cur = current.head->next;
                     isTree = false;
                     break;
                 }
                 avlIterator = current.tree->iterator();
-                avlIterator.next();
                 isTree = true;
                 break;
             }
@@ -413,15 +425,18 @@ private:
         };
     public:
         MapIterator(HashMap *map) : array(map->arrayFrom), map(map) {
-            lookForNext();
+            isInit = lookForNext();
         };
         bool next() {
+            if (isInit) {
+                isInit = false;
+                return true;
+            }
             if(isTree) {
                 if(!avlIterator.next()) {
                     return lookForNext();
                 }
-            }
-            else if(cur->next == nullptr) {
+            } else if (cur->next == pc->tail) {
                 return lookForNext();
             }
             cur = cur->next;

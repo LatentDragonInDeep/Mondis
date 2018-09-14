@@ -23,9 +23,7 @@ bool HashMap::put(Key *key, MondisObject *value)
                 return true;
             }
         }
-        Entry* newEntry = new Entry;
-        newEntry->object = value;
-        newEntry->key = key;
+        Entry *newEntry = new Entry(key, value);
         cur = content.head;
         Entry *next = cur->next;
         cur->next = newEntry;
@@ -37,11 +35,10 @@ bool HashMap::put(Key *key, MondisObject *value)
         modified();
         if (((double) _size) / capacity > loadFactor) {
             rehash();
-            return true;
         } else if (content.listLen > treeThreshold) {
             toTree(index);
-            return true;
         }
+        return true;
     }
     _size -= content.tree->size();
     Entry* newEntry = new Entry;

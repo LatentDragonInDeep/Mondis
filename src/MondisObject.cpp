@@ -226,7 +226,7 @@ MondisObject *MondisObject::getNullObject() {
     return nullObj;
 }
 
-string MondisObject::typeStrs[] = {"RAW_STRING", "RAW_INT", "RAW_BIN", "LIST", "BIND", "ZSET", "HASH", "EMPTY"};
+string MondisObject::typeStrs[] = {"RAW_STRING", "RAW_INT", "RAW_BIN", "LIST", "SET", "ZSET", "HASH", "EMPTY"};
 MondisObject *MondisObject::nullObj = new MondisObject;
 
 bool MondisObject::modified() {

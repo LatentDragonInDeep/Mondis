@@ -98,6 +98,7 @@ MondisObject *JSONParser::parseObject(LexicalParser &lp) {
         if (!to) {
             res->type = RAW_STRING;
             res->objectData = (void *) new string(next.content);
+            delete data;
             return res;
         }
         res->type = RAW_INT;
@@ -135,10 +136,10 @@ MondisObject *JSONParser::parseJSONArray(LexicalParser &lp, bool isNeedNext) {
         matchToken(lp,LEFT_SQAURE_BRACKET);
     }
     MondisObject* res = new MondisObject;
-    MondisObject* first = parseJSONObject(lp, false, false);
+    MondisObject *first = parseObject(lp);
     if (first != nullptr) {
         if (first->type == RAW_STRING) {
-            if (first->getJson() == "LIST") {
+            if (first->getJson() == "\"LIST\"") {
                 list:
                 res->type = LIST;
                 MondisList *data = new MondisList;
@@ -154,7 +155,7 @@ MondisObject *JSONParser::parseJSONArray(LexicalParser &lp, bool isNeedNext) {
                 }
                 delete first;
                 return res;
-            } else if (first->getJson() == "SET") {
+            } else if (first->getJson() == "\"SET\"") {
                 res->type = SET;
                 HashMap *data = new HashMap(true, true);
                 res->objectData = data;
@@ -175,7 +176,7 @@ MondisObject *JSONParser::parseJSONArray(LexicalParser &lp, bool isNeedNext) {
                 delete first;
                 return res;
             }
-        } else if (first->getJson() == "ZSET") {
+        } else if (first->getJson() == "\"ZSET\"") {
             res->type = ZSET;
             SplayTree *data = new SplayTree;
             res->objectData = data;

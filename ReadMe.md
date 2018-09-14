@@ -81,8 +81,12 @@ locate命令即定位命令，用来定位要操作的数据对象。数据对�
 set命令即添加一条键值对。第一个参数是键，第二个是值。如果键值对已存在，则值将会被覆盖。第二个参数应当是标准的
 json字符串，它将会被自动解析成合适的数据结构。例如，""this is a test""将会被解析成一个RAW_STRING，内容是
 this is a test。注意这里出现了两对引号，这样做的原因是外面的一对引号表明这是一个string参数，内部的一对引号是
-json字符串表示法的引号。"{}"将会被解析成没有键值对的hash。"[]"将会被解析成没有元素的list,"["LIST"]"同样是list,
-"["SET"]"则是空的set,"["ZSET"]"则是空的zset。"[{}]"则会被解析成有一个hash元素的list。
+json字符串表示法的引号。""12345""将会被解析成RAW_INT编码的12345。如果想要使用RAW_BIN编码，可以在
+二进制字符串的最开始加上LatentDragon这十二个字符。例如，""LatentDragonxxx""将会被解析成RAW_BIN编码的
+xxxx,开头的LatentDragon将被忽略。注意所有以LatentDragon开头的字符串都将被解析成RAW_BIN，也就是说我们无法
+保存普通的以LatentDragon开头的RAW_STRING。这个缺陷无伤大雅，而且会在后续版本中修复。"{}"将会被解析成没有键值对的hash。
+"[]"将会被解析成没有元素的list,"["LIST"]"同样是list,"["SET"]"则是空的set,"["ZSET"]"则是空的zset。
+"[{}]"则会被解析成有一个hash元素的list。
 ### del &lt;key&gt;
 删除对应的key。
 ### get &lt;key&gt;
@@ -104,7 +108,8 @@ mondis不提供bgsave。
 以username和password登录
 ### exit
 退出登录并退出Mondis server。
-### slaveof &lt;ip:port&gt;
+### size
+返回键空间内键的数量
 
 ## string命令
 string命令分为两大类，有些只能在RAW_INT上执行，有些可以在RAW_STRING上执行。下面分别介绍

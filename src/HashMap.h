@@ -214,7 +214,7 @@ public:
     void toJson() {
         json = "";
         json += key->getJson();
-        if (object == nullptr) {
+        if (object != nullptr) {
             json += " : ";
             json += object->getJson();
         }
@@ -391,6 +391,7 @@ private:
         Content *pc = nullptr;
         bool isInit = true;
         bool lookForNext() {
+            slotIndex++;
             while (true) {
                 if (slotIndex >= map->capacity) {
                     return false;
@@ -425,7 +426,7 @@ private:
                 if(!avlIterator.next()) {
                     return lookForNext();
                 }
-            } else if (cur->next == pc->tail) {
+            } else if (pc == nullptr || cur->next == pc->tail) {
                 return lookForNext();
             }
             cur = cur->next;
@@ -445,9 +446,9 @@ public:
     HashMap();
     HashMap(unsigned int capacity, float loadFactor);
 
-    HashMap(float loadFactor, unsigned int capacity, bool isIntset, bool isValueNull);
+    HashMap(unsigned int capacity, float loadFactor, bool isIntset, bool isValueNull);
 
-    HashMap(const bool isIntset);
+    HashMap(const bool isIntset, const bool isValueNull);
 
     ~HashMap();
 

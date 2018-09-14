@@ -114,6 +114,11 @@ ExecutionResult MondisServer::execute(Command *command) {
             OK_AND_RETURN
 
         }
+        case SIZE: {
+            CHECK_PARAM_NUM(0);
+            res.res = to_string(curKeySpace->size());
+            OK_AND_RETURN
+        }
     }
     INVALID_AND_RETURN
 }
@@ -270,7 +275,7 @@ void MondisServer::init() {
     CommandInterpreter::init();
     interpreter = new CommandInterpreter;
     for (int i = 0; i < databaseNum; ++i) {
-        dbs.push_back(new HashMap(0.75, 16, false, false));
+        dbs.push_back(new HashMap(16, 0.75f, false, false));
     }
     curKeySpace = dbs[curDbIndex];
     if (aof) {

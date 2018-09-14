@@ -222,8 +222,6 @@ HashMap::MapIterator HashMap::iterator() {
     return HashMap::MapIterator(this);
 }
 
-HashMap::HashMap(const bool isIntset) : HashMap(1024, 0.75f, isIntset, true) {}
-
 MondisObject *HashMap::locate(Command *command) {
     if (command->params.size() != 1) {
         return nullptr;
@@ -253,7 +251,7 @@ ExecutionResult HashMap::execute(Command *command) {
         case EXISTS: {
             CHECK_PARAM_NUM(1)
             KEY(0)
-            res.res = to_string(containsKey(key));
+            res.res = util::to_string(containsKey(key));
             OK_AND_RETURN
         }
         case SIZE: {
@@ -266,29 +264,25 @@ ExecutionResult HashMap::execute(Command *command) {
 }
 
 void HashMap::toStringSet() {
-    if(!isIntset) {
+    if (!isIntset) {
         return;
     }
     arrayTo = new Content[capacity];
-    for (int i = 0; i < capacity;++i)
-    {
-        if(arrayFrom[i].isList) {
-            for (Entry *cur = arrayFrom[i].head; cur != nullptr;)
-            {
-                Entry* next = cur->next;
-                Key* k = cur->key;
+    for (int i = 0; i < capacity; ++i) {
+        if (arrayFrom[i].isList) {
+            for (Entry *cur = arrayFrom[i].head->next; cur != arrayFrom[i].tail;) {
+                Key *k = cur->key;
                 k->toString();
-                int index = k->hashCode()&(capacity-1);
-                add(index,cur);
+                int index = k->hashCode() & (capacity - 1);
+                add(index, cur);
             }
-        }
-        else{
+        } else {
             auto treeIterator = arrayFrom[i].tree->iterator();
             while (treeIterator.next()) {
-                Key* k = treeIterator->data->key;
+                Key *k = treeIterator->data->key;
                 k->toString();
-                int index = k->hashCode()&(capacity-1);
-                add(index,new Entry(treeIterator->data));
+                int index = k->hashCode() & (capacity - 1);
+                add(index, new Entry(treeIterator->data));
                 delete arrayFrom[i].tree;
             }
         }
@@ -310,7 +304,7 @@ unsigned HashMap::size() {
     return _size;
 }
 
-HashMap::HashMap(float loadFactor, unsigned int capa, bool isIntset, bool isValueNull) :
+HashMap::HashMap(unsigned int capa, float loadFactor, bool isIntset, bool isValueNull) :
         loadFactor(loadFactor), capacity(capa), isIntset(isIntset), isValueNull(isValueNull) {
     arrayFrom = new Content[capacity];
 }
@@ -319,5 +313,9 @@ void HashMap::clear() {
     for (int i = 0; i < capacity; ++i) {
         arrayFrom[i].clear();
     }
+}
+
+HashMap::HashMap(const bool isIntset, const bool isValueNull) : HashMap(16, 0.75f, isIntset, isValueNull) {
+
 }
 

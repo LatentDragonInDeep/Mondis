@@ -33,7 +33,12 @@ public:
         res+='\t';
         res+=command.toString();
         res+='\t';
-        res+=this->res.toString();
+        res += this->res.getTypeStr();
+        res += '\t';
+        if (this->res.type != OK) {
+            res += this->res.res;
+            res += '\t';
+        }
 
         return res;
     }

@@ -127,64 +127,11 @@ enum CommandType {
     TO_STRING,
     CHECK_POS,
     CHANGE_SCORE,
-
-    //key space command
-//    KEYSPACE_SET,//set
-//    KEYSPACE_DEL,//del
-//    KEYSPACE_DUMP,//dump
-//    KEYSPACE_EXISTS,//exists
-//    KEYSPACE_RENAME,//rename
-//    KEYSPACE_TYPE,//type
-//    KEYSPACE_MOVE,//move
-
-    //list command
-//    LIST_PUSHFRONT,//pushfront
-//    LIST_PUSHBACK,//pushback
-//    LIST_POPFRONT,//popfront
-//    LIST_POPBACK,//popback
-//    LIST_SET,
-//    LIST_GET,
-//    LIST_GETRANGE,//getrange
-
-    //BIND
-//    SET_ADD,//add
-//    SET_REMOVE,//remove
-//    SET_EXISTS,
-//    SET_SIZE,
-
-    //ZSET
-//    ZSET_INSERT,
-//    ZSET_REMOVE_BY_RANK,
-//    ZSET_REMOVE_BY_SCORE,
-//    ZSET_REMOVE_RANGE_BY_RANK,
-//    ZSET_REMOVE_RANGE_BY_SCORE,
-//    ZSET_EXISTS,
-//    ZSET_SIZE,
-//    ZSET_COUNT_RANGE_BY_SCORE,
-//    ZSET_GET_BY_RANK,
-//    ZSET_GET_BY_SCORE,
-//    ZSET_GETRANGE_BY_RANK,
-//    ZSET_GETRANGE_BY_SCORE,
-
-    //hash
-//    HASH_GET,
-//    HASH_SET,
-//    HASH_DEL,
-//    HASH_EXISTS,
-//    HASH_SIZE,
-
-    //locate
     LOCATE,
-
-    //persistence
     SAVE,
-
-    //control
     EXIT,
     LOGIN,
     SELECT,
-
-
     VACANT,
     ERROR,
 };
@@ -208,6 +155,10 @@ public:
         res+=" ";
         res+=this->res;
         return res;
+    }
+
+    std::string getTypeStr() {
+        return typeToStr[type];
     }
 };
 

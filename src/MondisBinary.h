@@ -21,11 +21,11 @@ private:
     char* heapBuffer;
     const unsigned capacity;//char数组的容量
     unsigned position;//下一次读的起始位置
-    unsigned m_mark;//标记
 public:
-    MondisBinary(int mark, int pos, int cap,
+    MondisBinary(int pos, int cap,
                  char hb[]);
-    MondisBinary(int mark,int pos,int cap);
+
+    MondisBinary(int pos, int cap);
 
     ~MondisBinary();
 
@@ -47,14 +47,10 @@ public:
 
     bool forward(unsigned off);
 
-    void mark();
-
-    void reset();
-
     template <typename T>
     string readType() {
         if(position+ sizeof(T)>=capacity) {
-            throw new std::invalid_argument("read out of range");
+            return "";
         }
         string res(heapBuffer + position, sizeof(T));
         position+=sizeof(T);

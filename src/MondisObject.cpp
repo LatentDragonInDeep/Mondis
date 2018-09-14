@@ -191,7 +191,7 @@ ExecutionResult MondisObject::execute(Command *command) {
 }
 
 string MondisObject::getJson() {
-    if (hasSerialized) {
+    if ((type == RAW_STRING || type == RAW_INT) && hasSerialized) {
         return json;
     }
     json = "";

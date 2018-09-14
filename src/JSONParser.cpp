@@ -82,11 +82,12 @@ MondisObject *JSONParser::parseObject(LexicalParser &lp) {
     }
     else if(next.type == STRING) {
         MondisObject *res = new MondisObject;
-        if (next.content.size() > 11) {
-            if (next.content.substr(0, 11) == "LatentDragon") {
+        if (next.content.size() > 12) {
+            if (next.content.substr(0, 12) == "LatentDragon") {
                 res->type = RAW_BIN;
-                MondisBinary *binary = MondisBinary::allocate(next.content.size() - 11);
-                binary->write(next.content.size() - 11, next.content.data());
+                MondisBinary *binary = MondisBinary::allocate(next.content.size() - 12);
+                binary->write(next.content.size() - 12, next.content.data() + 12);
+                binary->setPosition(0);
                 res->objectData = (void*)binary;
                 return res;
             }

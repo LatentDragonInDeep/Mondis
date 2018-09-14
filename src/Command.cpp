@@ -103,6 +103,8 @@ void CommandInterpreter::init() {
     PUT(READ_INT)
     PUT(READ_LONG)
     PUT(READ_LONG_LONG)
+    PUT(READ)
+    PUT(WRITE)
     PUT(BACK)
     PUT(FORWARD)
     PUT(SELECT)
@@ -110,6 +112,7 @@ void CommandInterpreter::init() {
     PUT(TO_STRING)
     PUT(CHECK_POS)
     PUT(CHANGE_SCORE)
+    PUT(SET_POS)
 }
 
 void CommandInterpreter::LexicalParser::skip() {
@@ -241,7 +244,7 @@ void Command::init() {
     MAP(READ_LONG_LONG)
     MAP(BACK)
     MAP(FORWARD)
-    MAP(SET_POSITION)
+    MAP(SET_POS)
     MAP(READ)
     MAP(WRITE)
     MAP(LOCATE)

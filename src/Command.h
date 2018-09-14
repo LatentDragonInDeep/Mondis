@@ -17,6 +17,7 @@
 #define INSERT(TYPE) serverCommand.insert(CommandType::TYPE);
 
 #define CHECK_PARAM_NUM(x) if(command->params.size()!=x) {\
+                             res.type = SYNTAX_ERROR;\
                              res.res = "arguments num error";\
                              return res;\
                              }
@@ -59,6 +60,7 @@
 
 #define CHECK_PARAM_TYPE(INDEX, TYPE) if((*command)[INDEX].type!=Command::ParamType::TYPE) {\
                                         res.res = "Invalid param";\
+                                        res.type = SYNTAX_ERROR;\
                                         return res;\
                                         }
 
@@ -119,7 +121,7 @@ enum CommandType {
     READ_LONG_LONG,
     BACK,
     FORWARD,
-    SET_POSITION,
+    SET_POS,
     READ,
     WRITE,
     TO_STRING,

@@ -56,6 +56,13 @@ public:
             }
             cur = s.top();
             s.pop();
+            if (cur == tree->head) {
+                cur = s.top();
+                s.pop();
+            }
+            if (cur == tree->tail) {
+                return false;
+            }
             dfs(cur->right);
             return true;
         }
@@ -91,7 +98,7 @@ public:
     MondisObject *locate(Command *command);
 
 private:
-    void splay(SplayTreeNode* cur);
+    void splay(SplayTreeNode *cur, SplayTreeNode *target);
     void sizeUpdate(SplayTreeNode* cur, int delta);
     unsigned getSize(SplayTreeNode* root);
     void leftRotate(SplayTreeNode* cur);

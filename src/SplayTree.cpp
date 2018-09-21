@@ -13,6 +13,8 @@ void SplayTree::toJson() {
     json += "{";
     json += "\n";
     while (iterator.next()) {
+        json += "\"" + to_string(iterator->score) + "\"";
+        json += ",";
         json += iterator->data->getJson();
         json += ",\n";
     }
@@ -43,30 +45,30 @@ bool SplayTree::insert(int score, MondisObject *obj) {
         if(cur == nullptr) {
             cur = new SplayTreeNode(score,obj);
             cur->parent = parent;
-            splay(cur);
-            sizeUpdate(cur,1);
-            if(parent!= nullptr) {
-                if(leftOrRight) {
+            if (parent != nullptr) {
+                if (leftOrRight) {
                     parent->left = cur;
-                } else{
+                } else {
                     parent->right = cur;
                 }
             }
+            sizeUpdate(cur,1);
+            splay(cur, nullptr);
             return true;
         }
         if(cur->score == score) {
             delete cur->data;
             cur->data = obj;
-            splay(cur);
+            splay(cur, nullptr);
             return false;
         } else if(cur->score>score) {
             parent = cur;
-            cur = cur->right;
-            leftOrRight = false;
-        } else{
-            parent = cur;
             cur = cur->left;
             leftOrRight = true;
+        } else{
+            parent = cur;
+            cur = cur->right;
+            leftOrRight = false;
         }
     }
 }
@@ -103,14 +105,23 @@ SplayTreeNode *SplayTree::getNodeByRank(SplayTreeNode *root, int rank) {
     if(root == nullptr) {
         return nullptr;
     }
+    if (root == head) {
+        root = root->right;
+    }
+    if (root == tail) {
+        root = root->left;
+    }
     if(root == this->root&&rank == 0) {
         return head;
     }
     if(root == this->root&&rank == root->treeSize+1) {
         return tail;
     }
+    if (rank > root->treeSize) {
+        return nullptr;
+    }
     unsigned leftSize = getSize(root->left);
-    if(rank<leftSize) {
+    if (rank <= leftSize) {
         return getNodeByRank(root->left,rank);
     }
     if(rank == leftSize+1) {
@@ -120,10 +131,10 @@ SplayTreeNode *SplayTree::getNodeByRank(SplayTreeNode *root, int rank) {
 }
 
 SplayTreeNode *SplayTree::getNodeByScore(int score) {
-    if(root == this->root&&score == numeric_limits<int>::min()) {
+    if (score == numeric_limits<int>::min()) {
         return head;
     }
-    if(root == this->root&&score == numeric_limits<int>::max()) {
+    if (score == numeric_limits<int>::max()) {
         return tail;
     }
     SplayTreeNode* cur = root;
@@ -132,12 +143,11 @@ SplayTreeNode *SplayTree::getNodeByScore(int score) {
             return nullptr;
         }
         if(cur->score == score) {
-            splay(cur);
             return cur;
         } else if(cur->score>score) {
-            cur = cur->right;
-        } else{
             cur = cur->left;
+        } else{
+            cur = cur->right;
         }
     }
 }
@@ -152,13 +162,16 @@ unsigned SplayTree::count(int startScore, int endScore) {
     }
     SplayTreeNode* from = getLowerBound(startScore);
     SplayTreeNode* to = getUpperBound(endScore);
-    splay(from);
-    splay(to);
+    splay(from, nullptr);
+    splay(to, from);
     return getSize(root->right->left);
 }
 
 unsigned SplayTree::size() {
-    return getSize(root);
+    if (root == nullptr) {
+        return 0;
+    }
+    return root->treeSize;
 }
 
 void SplayTree::sizeUpdate(SplayTreeNode *cur,int delta) {
@@ -248,10 +261,21 @@ void SplayTree::rightLeftRotate(SplayTreeNode *root) {
     leftRotate(root);
 }
 
-void SplayTree::splay(SplayTreeNode *cur) {
+void SplayTree::splay(SplayTreeNode *cur, SplayTreeNode *target) {
     SplayTreeNode* parent = cur->parent;
-    while (parent!= nullptr) {
+    while (parent != target) {
+        if (parent == nullptr) {
+            break;
+        }
         SplayTreeNode* grandParent = parent->parent;
+        if (grandParent == target) {
+            if (cur == parent->left) {
+                rightRotate(parent);
+            } else {
+                leftRotate(parent);
+            }
+            break;
+        }
         if(cur == parent->left) {
             if(grandParent == nullptr) {
                 rightRotate(parent);
@@ -273,7 +297,9 @@ void SplayTree::splay(SplayTreeNode *cur) {
         }
         parent = cur->parent;
     }
-    root = cur;
+    if (target == nullptr) {
+        root = cur;
+    }
 }
 
 bool SplayTree::removeByScore(int score) {
@@ -387,26 +413,34 @@ SplayTreeNode *SplayTree::getPredecessor(SplayTreeNode *root) {
 }
 
 void SplayTree::removeRangeByRank(int start, int end) {
-    if(start == end||start+1 == end) {
+    if (start == end) {
+        return;
+    } else if (start + 1 == end) {
+        SplayTreeNode *from = getNodeByRank(root, start);
+        remove(from);
         return;
     }
     modified();
-    SplayTreeNode* from = getNodeByRank(root,start);
-    SplayTreeNode *to = getNodeByRank(root, end + 1);
-    splay(from);
-    splay(to);
+    SplayTreeNode *from = getNodeByRank(root, start - 1);
+    SplayTreeNode *to = getNodeByRank(root, end);
+    splay(from, nullptr);
+    splay(to, from);
     sizeUpdate(root->right,-getSize(root->right->left));
     deleteTree(root->right->left);
 }
 
 void SplayTree::getRangeByRank(int start, int end, vector<MondisObject*> *res) {
-    if(start == end||start+1 == end) {
+    if (start == end) {
+        return;
+    } else if (start + 1 == end) {
+        SplayTreeNode *from = getNodeByRank(root, start);
+        res->push_back(from->data);
         return;
     }
-    SplayTreeNode* from = getNodeByRank(root,start);
-    SplayTreeNode *to = getNodeByRank(root, end + 1);
-    splay(from);
-    splay(to);
+    SplayTreeNode *from = getNodeByRank(root, start - 1);
+    SplayTreeNode *to = getNodeByRank(root, end);
+    splay(from, nullptr);
+    splay(to, from);
     inOrderTraversal(root->right->left,res);
 }
 
@@ -429,8 +463,12 @@ void SplayTree::removeRangeByScore(int startScore, int endScore) {
     if(from == tail||to == head) {
         return;
     }
-    splay(from);
-    splay(to);
+    if (from == to) {
+        remove(from);
+        return;;
+    }
+    splay(from, nullptr);
+    splay(to, nullptr);
     sizeUpdate(root->right,-getSize(root->right->left));
     deleteTree(root->right->left);
 }
@@ -439,13 +477,17 @@ void SplayTree::getRangeByScore(int startScore, int endScore, vector<MondisObjec
     if(startScore == endScore) {
         return;
     }
-    SplayTreeNode* from = getLowerBound(startScore);
+    SplayTreeNode *from = getLowerBound(startScore - 1);
     SplayTreeNode* to = getUpperBound(endScore);
     if(from == tail||to == head) {
         return;
     }
-    splay(from);
-    splay(to);
+    if (from == to) {
+        res->push_back(from->data);
+        return;;
+    }
+    splay(from, nullptr);
+    splay(to, from);
     inOrderTraversal(root->right->left,res);
 
 }
@@ -505,12 +547,11 @@ ExecutionResult SplayTree::execute(Command *command) {
             CHECK_PARAM_TYPE(0, PLAIN)
             CHECK_AND_DEFINE_INT_LEGAL(0, rank)
             if (rank < 1) {
-                res.res = "can not remove under rank 1";
+                res.res = "rank out of range";
                 return res;
             }
             if (rank > size()) {
-                res.res = "can not remove over rank ";
-                res.res += size();
+                res.res = "rank out of range";
                 return res;
             }
             removeByRank(rank);
@@ -524,34 +565,53 @@ ExecutionResult SplayTree::execute(Command *command) {
             OK_AND_RETURN
         }
         case REMOVE_RANGE_BY_RANK: {
-            CHECK_PARAM_NUM(2)
-            CHECK_PARAM_TYPE(0, PLAIN)
-            CHECK_PARAM_TYPE(1, PLAIN)
-            CHECK_START_AND_DEFINE(0)
-            CHECK_END_AND_DEFINE(1, size())
-            removeRangeByRank(start, end);
-            OK_AND_RETURN
+            if (command->params.size() == 1) {
+                CHECK_PARAM_TYPE(0, PLAIN)
+                CHECK_START_AND_DEFINE(0)
+                removeRangeByRank(start, size() + 1);
+                OK_AND_RETURN
+            } else if (command->params.size() == 2) {
+                CHECK_PARAM_TYPE(0, PLAIN)
+                CHECK_PARAM_TYPE(1, PLAIN)
+                CHECK_START_AND_DEFINE(0)
+                CHECK_END_AND_DEFINE(1, size())
+                removeRangeByRank(start, end);
+                OK_AND_RETURN
+            } else {
+                res.type = SYNTAX_ERROR;
+                res.res = "arguments num error";
+                return res;
+            }
         }
         case REMOVE_RANGE_BY_SCORE: {
-            CHECK_PARAM_NUM(2)
-            CHECK_PARAM_TYPE(0, PLAIN)
-            CHECK_PARAM_TYPE(1, PLAIN)
-            CHECK_AND_DEFINE_INT_LEGAL(0, start)
-            CHECK_AND_DEFINE_INT_LEGAL(1, end)
-            removeRangeByScore(start, end);
-            OK_AND_RETURN
+            if (command->params.size() == 1) {
+                CHECK_PARAM_TYPE(0, PLAIN)
+                CHECK_START_AND_DEFINE(0)
+                removeRangeByScore(start, numeric_limits<int>::max());
+                OK_AND_RETURN
+            } else if (command->params.size() == 2) {
+                CHECK_PARAM_TYPE(0, PLAIN)
+                CHECK_PARAM_TYPE(1, PLAIN)
+                CHECK_START_AND_DEFINE(0)
+                CHECK_END_AND_DEFINE(1, size())
+                removeRangeByScore(start, end);
+                OK_AND_RETURN
+            } else {
+                res.type = SYNTAX_ERROR;
+                res.res = "arguments num error";
+                return res;
+            }
         }
         case GET_BY_RANK: {
             CHECK_PARAM_NUM(1)
             CHECK_PARAM_TYPE(0, PLAIN)
             CHECK_AND_DEFINE_INT_LEGAL(0, rank)
             if (rank < 1) {
-                res.res = "can not remove under rank 1";
+                res.res = "rank out of range";
                 return res;
             }
             if (rank > size()) {
-                res.res = "can not remove over rank ";
-                res.res += size();
+                res.res = "rank out of range";
                 return res;
             }
             res.res = getByRank(rank)->getJson();
@@ -563,43 +623,77 @@ ExecutionResult SplayTree::execute(Command *command) {
             CHECK_AND_DEFINE_INT_LEGAL(0, score)
             MondisObject *data = getByScore(score);
             if(data== nullptr) {
-                res.res = "null object";
+                res.res = string("there is no object whose score is ") + to_string(score);
                 return res;
             }
             res.res = data->getJson();
             OK_AND_RETURN
         }
         case GET_RANGE_BY_RANK: {
-            CHECK_PARAM_NUM(2)
-            CHECK_PARAM_TYPE(0, PLAIN)
-            CHECK_PARAM_TYPE(1, PLAIN)
-            CHECK_START_AND_DEFINE(0)
-            CHECK_END_AND_DEFINE(1, size())
-            vector<MondisObject *> v;
-            getRangeByRank(start, end, &v);
-            res.res += "[\n";
-            for (MondisObject *every:v) {
-                res.res += every->getJson();
-                res.res += "\n";
+            if (command->params.size() == 1) {
+                CHECK_PARAM_TYPE(0, PLAIN)
+                CHECK_START_AND_DEFINE(0)
+                vector<MondisObject *> v;
+                getRangeByRank(start, size() + 1, &v);
+                res.res += "[\n";
+                for (MondisObject *every:v) {
+                    res.res += every->getJson();
+                    res.res += ",\n";
+                }
+                res.res += "]\n";
+                OK_AND_RETURN
+            } else if (command->params.size() == 2) {
+                CHECK_PARAM_TYPE(0, PLAIN)
+                CHECK_PARAM_TYPE(1, PLAIN)
+                CHECK_START_AND_DEFINE(0)
+                CHECK_END_AND_DEFINE(1, size())
+                vector<MondisObject *> v;
+                getRangeByRank(start, end, &v);
+                res.res += "[\n";
+                for (MondisObject *every:v) {
+                    res.res += every->getJson();
+                    res.res += ",\n";
+                }
+                res.res += "]\n";
+                OK_AND_RETURN
+            } else {
+                res.type = SYNTAX_ERROR;
+                res.res = "arguments num error";
+                return res;
             }
-            res.res += "]\n";
-            OK_AND_RETURN
         }
         case GET_RANGE_BY_SCORE:{
-            CHECK_PARAM_NUM(2)
-            CHECK_PARAM_TYPE(0, PLAIN)
-            CHECK_PARAM_TYPE(1, PLAIN)
-            CHECK_AND_DEFINE_INT_LEGAL(0, start)
-            CHECK_AND_DEFINE_INT_LEGAL(1, end)
-            vector<MondisObject *> v;
-            getRangeByScore(start, end, &v);
-            res.res += "[\n";
-            for (MondisObject *every:v) {
-                res.res += every->getJson();
-                res.res += "\n";
+            if (command->params.size() == 1) {
+                CHECK_PARAM_TYPE(0, PLAIN)
+                CHECK_START_AND_DEFINE(0)
+                vector<MondisObject *> v;
+                getRangeByScore(start, numeric_limits<int>::max(), &v);
+                res.res += "[\n";
+                for (MondisObject *every:v) {
+                    res.res += every->getJson();
+                    res.res += ",\n";
+                }
+                res.res += "]\n";
+                OK_AND_RETURN
+            } else if (command->params.size() == 2) {
+                CHECK_PARAM_TYPE(0, PLAIN)
+                CHECK_PARAM_TYPE(1, PLAIN)
+                CHECK_START_AND_DEFINE(0)
+                CHECK_END_AND_DEFINE(1, size())
+                vector<MondisObject *> v;
+                getRangeByScore(start, end, &v);
+                res.res += "[\n";
+                for (MondisObject *every:v) {
+                    res.res += every->getJson();
+                    res.res += ",\n";
+                }
+                res.res += "]\n";
+                OK_AND_RETURN
+            } else {
+                res.type = SYNTAX_ERROR;
+                res.res = "arguments num error";
+                return res;
             }
-            res.res += "]\n";
-            OK_AND_RETURN
         }
         case EXISTS: {
             CHECK_PARAM_NUM(1)

@@ -154,6 +154,7 @@ MondisObject *JSONParser::parseJSONArray(LexicalParser &lp, bool isNeedNext) {
                     }
                 }
                 delete first;
+                matchToken(lp, RIGHT_SQUARE_BRACKET);
                 return res;
             } else if (first->getJson() == "\"SET\"") {
                 res->type = SET;
@@ -174,30 +175,32 @@ MondisObject *JSONParser::parseJSONArray(LexicalParser &lp, bool isNeedNext) {
                     }
                 }
                 delete first;
+                matchToken(lp, RIGHT_SQUARE_BRACKET);
+                return res;
+            } else if (first->getJson() == "\"ZSET\"") {
+                res->type = ZSET;
+                SplayTree *data = new SplayTree;
+                res->objectData = data;
+                MondisObject *cur = nullptr;
+                MondisObject *next = nullptr;
+                while (true) {
+                    cur = parseObject(lp);
+                    next = parseObject(lp);
+                    if (cur == nullptr) {
+                        break;
+                    }
+                    if (cur->type != RAW_INT) {
+                        throw "unexpected element";
+                    }
+                    string curScore = cur->getJson();
+                    int score = *reinterpret_cast<int *>(curScore.data());
+                    delete cur;
+                    data->insert(score, next);
+                }
+                delete first;
+                matchToken(lp, RIGHT_SQUARE_BRACKET);
                 return res;
             }
-        } else if (first->getJson() == "\"ZSET\"") {
-            res->type = ZSET;
-            SplayTree *data = new SplayTree;
-            res->objectData = data;
-            MondisObject *cur = nullptr;
-            MondisObject *next = nullptr;
-            while (true) {
-                cur = parseObject(lp);
-                next = parseObject(lp);
-                if (cur == nullptr) {
-                    break;
-                }
-                if (cur->type != RAW_INT) {
-                    throw "unexpected element";
-                }
-                string curScore = cur->getJson();
-                int score = *reinterpret_cast<int *>(curScore.data());
-                delete cur;
-                data->insert(score, next);
-            }
-            delete first;
-            return res;
         } else {
             goto list;
         }

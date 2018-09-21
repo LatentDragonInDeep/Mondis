@@ -133,6 +133,7 @@ public:
         };
         Token nextToken() {
             preIndex = curIndex;
+            hasBacked = false;
             Token res;
             skip();
             if(isEnd) {

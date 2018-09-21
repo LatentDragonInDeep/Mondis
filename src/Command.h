@@ -72,6 +72,9 @@
                                             }
 #define PARAM(INDEX) (*command)[INDEX].content
 
+#define LOGIC_ERROR_AND_RETURN res.type = LOGIC_ERROR;\
+                                return res;
+
 namespace util {
     bool toInteger(std::string &data, int &res);
 

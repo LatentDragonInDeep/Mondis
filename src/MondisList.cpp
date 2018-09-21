@@ -16,6 +16,9 @@ MondisList::MondisList ()
 
 int MondisList::pushBack (MondisObject *object)
 {
+    if (nextSize == 0 && preSize > 0) {
+        trim();
+    }
     auto * newNode = new MondisListNode;
     newNode->data = object;
     MondisListNode * pre = tail->pre;
@@ -35,7 +38,7 @@ MondisObject *MondisList::popBack ()
         trim();
     }
     if(nextSize == 0) {
-        return MondisObject::getNullObject();
+        return nullptr;
     }
     nextSize--;
     MondisListNode* last = tail->pre;
@@ -43,8 +46,11 @@ MondisObject *MondisList::popBack ()
     tail->pre = last->pre;
 
     MondisObject* obj = last->data;
+    last->data == nullptr;
     delete last;
     modified();
+    indexToNode.erase(nodeToIndex[last]);
+    nodeToIndex.erase(last);
 
     return obj;
 }
@@ -62,13 +68,15 @@ void MondisList::trim ()
     int index = 1;
     for (MondisListNode* node = first;node!= tail;node = node->next)
     {
+        indexToNode.erase(index);
         indexToNode[index] = node;
+        nodeToIndex.erase(node);
         nodeToIndex[node] = index;
         index++;
     }
 
     preSize = 0;
-    nextSize = index--;
+    nextSize = index - 1;
 }
 
 int MondisList::pushFront (MondisObject *object)
@@ -77,13 +85,15 @@ int MondisList::pushFront (MondisObject *object)
     newNode->data = object;
     if(headModifyNum>0)
     {
-        headModifyNum --;
         MondisListNode *next = mid->next;
         mid->next = newNode;
         newNode->pre = mid;
         newNode->next = next;
         next->pre = newNode;
-        nextSize ++;
+        nextSize++;
+        indexToNode[headModifyNum] = newNode;
+        nodeToIndex[newNode] = headModifyNum;
+        headModifyNum--;
     }
     else{
         MondisListNode* next = head->next;
@@ -99,7 +109,7 @@ int MondisList::pushFront (MondisObject *object)
 
 }
 
-MondisObject *MondisList::popFront ()
+MondisObject *MondisList::popFront()
 {
     if(preSize>0) {
         preSize--;
@@ -109,10 +119,11 @@ MondisObject *MondisList::popFront ()
         temp->pre = head;
         MondisObject* obj = res->data;
         delete res;
+        indexToNode.erase(nodeToIndex[res]);
+        nodeToIndex.erase(res);
         modified();
         return obj;
-    }
-    else{
+    } else if (nextSize > 0) {
         nextSize--;
         MondisListNode* res = mid->next;
         MondisListNode* temp = res->next;
@@ -121,9 +132,12 @@ MondisObject *MondisList::popFront ()
         MondisObject* obj = res->data;
         headModifyNum++;
         delete res;
+        indexToNode.erase(nodeToIndex[res]);
+        nodeToIndex.erase(res);
         modified();
         return obj;
     }
+    return nullptr;
 }
 
 MondisObject *MondisList::get (int index)
@@ -145,7 +159,7 @@ int MondisList::getRange (int from, int to, vector<MondisObject *> *res)
 
 MondisListNode *MondisList::locate (int index)
 {
-    if(index<preSize) {
+    if (index <= preSize) {
         return indexToNode[-preSize+index-1];
     }
     return indexToNode[index-preSize+headModifyNum];
@@ -179,6 +193,7 @@ void MondisList::toJson() {
     ListIterator iterator = this->iterator();
     while (iterator.next()) {
         json += iterator->data->getJson();
+        json += ",";
         json += "\n";
     }
     json += "]\n";
@@ -213,7 +228,7 @@ ExecutionResult MondisList::execute(Command *command) {
             CHECK_PARAM_TYPE(1, STRING)
             if (index < 0 || index > size()) {
                 res.res = "index out of range";
-                return res;
+                LOGIC_ERROR_AND_RETURN
             }
             set(index, MondisServer::getJSONParser()->parseObject((*command)[1].content));
             OK_AND_RETURN
@@ -222,49 +237,64 @@ ExecutionResult MondisList::execute(Command *command) {
             CHECK_PARAM_NUM(1)
             CHECK_PARAM_TYPE(0, PLAIN)
             CHECK_AND_DEFINE_INT_LEGAL(0, index)
-            if (index < 0 || index > size()) {
+            if (index < 1 || index > size()) {
                 res.res = "index out of range";
-                return res;
+                LOGIC_ERROR_AND_RETURN
             }
             res.res = get(index)->getJson();
             OK_AND_RETURN
         }
-        case PUSH_FRONT:
+        case PUSH_FRONT: {
             CHECK_PARAM_NUM(1)
-            CHECK_PARAM_TYPE(0,STRING)
+            CHECK_PARAM_TYPE(0, STRING)
             pushFront(MondisServer::getJSONParser()->parseObject((*command)[0].content));
             OK_AND_RETURN
-        case PUSH_BACK:
+        }
+        case PUSH_BACK: {
             CHECK_PARAM_NUM(1)
-            CHECK_PARAM_TYPE(0,STRING)
+            CHECK_PARAM_TYPE(0, STRING)
             pushBack(MondisServer::getJSONParser()->parseObject((*command)[0].content));
             OK_AND_RETURN
-        case POP_FRONT:
+        }
+        case POP_FRONT: {
             CHECK_PARAM_NUM(0)
-            CHECK_PARAM_TYPE(0,STRING)
-            res.res = popFront()->getJson();
+            MondisObject *data = popFront();
+            if (data == nullptr) {
+                res.res = "list is empty";
+                LOGIC_ERROR_AND_RETURN
+            }
+            res.res = data->getJson();
+            delete data;
             OK_AND_RETURN
-        case POP_BACK:
+        }
+        case POP_BACK: {
             CHECK_PARAM_NUM(0)
-            CHECK_PARAM_TYPE(0,STRING)
-            res.res = popBack()->getJson();
+            MondisObject *data = popBack();
+            if (data == nullptr) {
+                res.res = "list is empty";
+                LOGIC_ERROR_AND_RETURN
+            }
+            res.res = data->getJson();
+            delete data;
             OK_AND_RETURN
-        case GET_RANGE:
+        }
+        case GET_RANGE: {
             CHECK_PARAM_NUM(2)
-            CHECK_PARAM_TYPE(0,PLAIN)
-            CHECK_PARAM_TYPE(1,PLAIN)
+            CHECK_PARAM_TYPE(0, PLAIN)
+            CHECK_PARAM_TYPE(1, PLAIN)
             CHECK_INT_START_LEGAL(0)
             CHECK_START
             CHECK_INT_END_LEGAL(1)
             CHECK_END(size())
-            std::vector<MondisObject*> data;
+            std::vector<MondisObject *> data;
             getRange(start, end, &data);
-            res.res+="{\n";
+            res.res += "{\n";
             for (auto obj:data) {
                 res.res += obj->getJson();
             }
-            res.res+="}\n";
+            res.res += "}\n";
             OK_AND_RETURN
+        }
     }
     INVALID_AND_RETURN
 }

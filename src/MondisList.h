@@ -36,17 +36,24 @@ private:
 public:
     class ListIterator {
     private:
+        MondisList *list;
         MondisListNode* cur;
     public:
-        ListIterator(MondisList* list) {
+        ListIterator(MondisList *list) : list(list) {
             cur = list->head;
         }
         bool next() {
-            if(cur->next!= nullptr) {
+            cur = cur->next;
+            if (cur == list->mid) {
                 cur = cur->next;
+                if (cur == list->tail) {
+                    return false;
+                }
                 return true;
+            } else if (cur == list->tail) {
+                return false;
             }
-            return false;
+            return true;
         };
 
         MondisListNode* operator->() {

@@ -56,12 +56,24 @@ public:
             }
             cur = s.top();
             s.pop();
-            if (cur == tree->head) {
-                cur = s.top();
-                s.pop();
-            }
-            if (cur == tree->tail) {
-                return false;
+            while (true) {
+                if (cur == tree->head) {
+                    dfs(cur->right);
+                    if (s.empty()) {
+                        return false;
+                    }
+                    cur = s.top();
+                    s.pop();
+                    continue;
+                } else if (cur == tree->tail) {
+                    if (s.empty()) {
+                        return false;
+                    }
+                    cur = s.top();
+                    s.pop();
+                    break;
+                }
+                break;
             }
             dfs(cur->right);
             return true;

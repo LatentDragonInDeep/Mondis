@@ -113,6 +113,7 @@ void CommandInterpreter::init() {
     PUT(CHECK_POS)
     PUT(CHANGE_SCORE)
     PUT(SET_POS)
+    PUT(COUNT)
 }
 
 void CommandInterpreter::LexicalParser::skip() {

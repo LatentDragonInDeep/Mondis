@@ -10,15 +10,13 @@
 void SplayTree::toJson() {
     json = "";
     SplayIterator iterator = this->iterator();
-    json += "{";
+    json += "[";
     json += "\n";
     while (iterator.next()) {
-        json += "\"" + to_string(iterator->score) + "\"";
-        json += ",";
         json += iterator->data->getJson();
         json += ",\n";
     }
-    json += "}\n";
+    json += "]\n";
 }
 
 
@@ -105,17 +103,17 @@ SplayTreeNode *SplayTree::getNodeByRank(SplayTreeNode *root, int rank) {
     if(root == nullptr) {
         return nullptr;
     }
+    if (root == this->root && rank == 0) {
+        return head;
+    }
+    if (root == this->root && rank == root->treeSize + 1) {
+        return tail;
+    }
     if (root == head) {
         root = root->right;
     }
     if (root == tail) {
         root = root->left;
-    }
-    if(root == this->root&&rank == 0) {
-        return head;
-    }
-    if(root == this->root&&rank == root->treeSize+1) {
-        return tail;
     }
     if (rank > root->treeSize) {
         return nullptr;
@@ -153,15 +151,18 @@ SplayTreeNode *SplayTree::getNodeByScore(int score) {
 }
 
 bool SplayTree::contains(int score) {
-    return getByScore(score) == nullptr;
+    return getByScore(score) != nullptr;
 }
 
 unsigned SplayTree::count(int startScore, int endScore) {
     if(startScore == endScore) {
+        if (contains(startScore)) {
+            return 1;
+        }
         return 0;
     }
-    SplayTreeNode* from = getLowerBound(startScore);
-    SplayTreeNode* to = getUpperBound(endScore);
+    SplayTreeNode *from = getUpperBound(startScore - 1);
+    SplayTreeNode *to = getLowerBound(endScore - 1);
     splay(from, nullptr);
     splay(to, from);
     return getSize(root->right->left);
@@ -347,6 +348,9 @@ bool SplayTree::remove(SplayTreeNode *target) {
     }
     modified();
     if(target->left == nullptr&&target->right == nullptr) {
+        if (target == root) {
+            root == nullptr;
+        }
         sizeUpdate(target,-1);
         delete target;
         return true;
@@ -359,6 +363,9 @@ bool SplayTree::remove(SplayTreeNode *target) {
             delete target;
             parent->right = right;
             right->parent = parent;
+        } else {
+            root = target->right;
+            delete target;
         }
         return true;
     }
@@ -370,25 +377,31 @@ bool SplayTree::remove(SplayTreeNode *target) {
             delete target;
             parent->left = left;
             left->parent = parent;
+        } else {
+            root = target->left;
+            delete target;
         }
         return true;
     } else{
         SplayTreeNode* successor = getSuccessor(target);
         if(successor == tail) {
             SplayTreeNode* predecessor = getPredecessor(target);
-            if(predecessor = head) {
+            if (predecessor == head) {
                 root = head;
                 head->right = tail;
                 tail->parent = head;
+                delete target;
                 return true;
             }
             delete target->data;
             target->data = predecessor->data;
+            predecessor->data = nullptr;
             remove(predecessor);
             return true;
         }
         delete target->data;
         target->data = successor->data;
+        successor->data = nullptr;
         remove(successor);
         return true;
     }
@@ -415,10 +428,6 @@ SplayTreeNode *SplayTree::getPredecessor(SplayTreeNode *root) {
 void SplayTree::removeRangeByRank(int start, int end) {
     if (start == end) {
         return;
-    } else if (start + 1 == end) {
-        SplayTreeNode *from = getNodeByRank(root, start);
-        remove(from);
-        return;
     }
     modified();
     SplayTreeNode *from = getNodeByRank(root, start - 1);
@@ -427,6 +436,7 @@ void SplayTree::removeRangeByRank(int start, int end) {
     splay(to, from);
     sizeUpdate(root->right,-getSize(root->right->left));
     deleteTree(root->right->left);
+    root->right->left = nullptr;
 }
 
 void SplayTree::getRangeByRank(int start, int end, vector<MondisObject*> *res) {
@@ -458,8 +468,8 @@ void SplayTree::removeRangeByScore(int startScore, int endScore) {
         return;
     }
     modified();
-    SplayTreeNode* from = getLowerBound(startScore);
-    SplayTreeNode* to = getUpperBound(endScore);
+    SplayTreeNode *from = getUpperBound(startScore - 1);
+    SplayTreeNode *to = getLowerBound(endScore - 1);
     if(from == tail||to == head) {
         return;
     }
@@ -467,18 +477,22 @@ void SplayTree::removeRangeByScore(int startScore, int endScore) {
         remove(from);
         return;;
     }
+    if (from->score < to->score) {
+        return;
+    }
     splay(from, nullptr);
-    splay(to, nullptr);
+    splay(to, from);
     sizeUpdate(root->right,-getSize(root->right->left));
     deleteTree(root->right->left);
+    root->right->left = nullptr;
 }
 
 void SplayTree::getRangeByScore(int startScore, int endScore, vector<MondisObject *> *res) {
     if(startScore == endScore) {
         return;
     }
-    SplayTreeNode *from = getLowerBound(startScore - 1);
-    SplayTreeNode* to = getUpperBound(endScore);
+    SplayTreeNode *from = getUpperBound(startScore - 1);
+    SplayTreeNode *to = getLowerBound(endScore - 1);
     if(from == tail||to == head) {
         return;
     }
@@ -492,12 +506,13 @@ void SplayTree::getRangeByScore(int startScore, int endScore, vector<MondisObjec
 
 }
 
+//大于score的最小元素
 SplayTreeNode *SplayTree::getLowerBound(int score) {
     SplayTreeNode* cur = root;
     while (true) {
         if(cur->score == score) {
-            return getSuccessor(root);
-        } else if(cur->score>score) {
+            return getSuccessor(cur);
+        } else if(cur->score > score) {
             if(cur->left == nullptr) {
                 return cur;
             }
@@ -511,12 +526,13 @@ SplayTreeNode *SplayTree::getLowerBound(int score) {
     }
 }
 
+//不大于score的最大元素
 SplayTreeNode *SplayTree::getUpperBound(int score) {
     SplayTreeNode* cur = root;
     while (true) {
         if(cur->score == score) {
-            return getPredecessor(root);
-        } else if(cur->score<score) {
+            return cur;
+        } else if(cur->score < score) {
             if(cur->right == nullptr) {
                 return cur;
             }
@@ -586,14 +602,14 @@ ExecutionResult SplayTree::execute(Command *command) {
         case REMOVE_RANGE_BY_SCORE: {
             if (command->params.size() == 1) {
                 CHECK_PARAM_TYPE(0, PLAIN)
-                CHECK_START_AND_DEFINE(0)
+                CHECK_AND_DEFINE_INT_LEGAL(0, start)
                 removeRangeByScore(start, numeric_limits<int>::max());
                 OK_AND_RETURN
             } else if (command->params.size() == 2) {
                 CHECK_PARAM_TYPE(0, PLAIN)
                 CHECK_PARAM_TYPE(1, PLAIN)
-                CHECK_START_AND_DEFINE(0)
-                CHECK_END_AND_DEFINE(1, size())
+                CHECK_AND_DEFINE_INT_LEGAL(0, start)
+                CHECK_AND_DEFINE_INT_LEGAL(1, end)
                 removeRangeByScore(start, end);
                 OK_AND_RETURN
             } else {
@@ -699,7 +715,7 @@ ExecutionResult SplayTree::execute(Command *command) {
             CHECK_PARAM_NUM(1)
             CHECK_PARAM_TYPE(0, PLAIN)
             CHECK_AND_DEFINE_INT_LEGAL(0, score)
-            res.res = to_string(contains(score));
+            res.res = util::to_string(contains(score));
             OK_AND_RETURN
         }
         case SIZE: {
@@ -724,12 +740,12 @@ ExecutionResult SplayTree::execute(Command *command) {
             CHECK_AND_DEFINE_INT_LEGAL(1, newScore)
             SplayTreeNode *oldNode = getNodeByScore(oldScore);
             if (oldNode == nullptr) {
-                res.res == "element whose score is" + PARAM(0) + "does not exists";
+                res.res = string("element whose score is ") + PARAM(0) + " does not exists";
                 return res;
             }
             SplayTreeNode *newNode = getNodeByScore(newScore);
             if (newNode != nullptr) {
-                res.res == "element whose score is" + PARAM(1) + "has existed";
+                res.res = string("element whose score is ") + PARAM(1) + " has existed";
                 return res;
             }
             MondisObject *data = oldNode->data;

@@ -564,11 +564,11 @@ ExecutionResult SplayTree::execute(Command *command) {
             CHECK_AND_DEFINE_INT_LEGAL(0, rank)
             if (rank < 1) {
                 res.res = "rank out of range";
-                return res;
+                LOGIC_ERROR_AND_RETURN
             }
             if (rank > size()) {
                 res.res = "rank out of range";
-                return res;
+                LOGIC_ERROR_AND_RETURN
             }
             removeByRank(rank);
             OK_AND_RETURN
@@ -624,11 +624,11 @@ ExecutionResult SplayTree::execute(Command *command) {
             CHECK_AND_DEFINE_INT_LEGAL(0, rank)
             if (rank < 1) {
                 res.res = "rank out of range";
-                return res;
+                LOGIC_ERROR_AND_RETURN
             }
             if (rank > size()) {
                 res.res = "rank out of range";
-                return res;
+                LOGIC_ERROR_AND_RETURN
             }
             res.res = getByRank(rank)->getJson();
             OK_AND_RETURN
@@ -640,7 +640,7 @@ ExecutionResult SplayTree::execute(Command *command) {
             MondisObject *data = getByScore(score);
             if(data== nullptr) {
                 res.res = string("there is no object whose score is ") + to_string(score);
-                return res;
+                LOGIC_ERROR_AND_RETURN
             }
             res.res = data->getJson();
             OK_AND_RETURN
@@ -741,12 +741,12 @@ ExecutionResult SplayTree::execute(Command *command) {
             SplayTreeNode *oldNode = getNodeByScore(oldScore);
             if (oldNode == nullptr) {
                 res.res = string("element whose score is ") + PARAM(0) + " does not exists";
-                return res;
+                LOGIC_ERROR_AND_RETURN
             }
             SplayTreeNode *newNode = getNodeByScore(newScore);
             if (newNode != nullptr) {
                 res.res = string("element whose score is ") + PARAM(1) + " has existed";
-                return res;
+                LOGIC_ERROR_AND_RETURN
             }
             MondisObject *data = oldNode->data;
             oldNode->data = nullptr;

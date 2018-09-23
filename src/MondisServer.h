@@ -34,11 +34,11 @@ public:
         res += command;
         res+='\t';
         res += this->res.getTypeStr();
-        res += '\t';
         if (this->res.type != OK) {
-            res += this->res.res;
             res += '\t';
+            res += this->res.res;
         }
+        res += '\n';
 
         return res;
     }

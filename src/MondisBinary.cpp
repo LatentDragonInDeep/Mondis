@@ -8,7 +8,7 @@
                         string r = readType<TYPE>();\
                          if(r.size() == 0) {\
                          res.res = "read out of range!";\
-                         return res;\
+                         LOGIC_ERROR_AND_RETURN\
                          }\
                          res.res = r;\
                            OK_AND_RETURN
@@ -121,7 +121,7 @@ ExecutionResult MondisBinary::execute(Command *command) {
             CHECK_PARAM_LENGTH(1, 1)
             if (pos < 0 || pos >=capacity) {
                 res.res = "read or write out of range";
-                return res;
+                LOGIC_ERROR_AND_RETURN
             }
             heapBuffer[pos] = (*command)[1].content[0];
             modified();
@@ -133,7 +133,7 @@ ExecutionResult MondisBinary::execute(Command *command) {
             CHECK_AND_DEFINE_INT_LEGAL(0, pos)
             if (pos < 0 || pos >=capacity) {
                 res.res = "read or write out of range";
-                return res;
+                LOGIC_ERROR_AND_RETURN
             }
             res.res += heapBuffer[pos];
             OK_AND_RETURN
@@ -147,11 +147,11 @@ ExecutionResult MondisBinary::execute(Command *command) {
             CHECK_AND_DEFINE_INT_LEGAL(1, end)
             if (start < 0 || end > capacity || start >= end) {
                 res.res = "read or write out of range";
-                return res;
+                LOGIC_ERROR_AND_RETURN
             }
             if (PARAM(2).size() < end - start) {
                 res.res = "data length too shrot!";
-                return res;
+                LOGIC_ERROR_AND_RETURN
             }
             memcpy(heapBuffer + start, (*command)[2].content.data(), end - start);
             modified();
@@ -163,7 +163,7 @@ ExecutionResult MondisBinary::execute(Command *command) {
                 CHECK_AND_DEFINE_INT_LEGAL(0, start)
                 if (start < 0) {
                     res.res = "read or write out of range";
-                    return res;
+                    LOGIC_ERROR_AND_RETURN
                 }
                 res.res = string(heapBuffer + start, capacity - start);
                 OK_AND_RETURN
@@ -175,7 +175,7 @@ ExecutionResult MondisBinary::execute(Command *command) {
             CHECK_AND_DEFINE_INT_LEGAL(1, end)
             if (start < 0 || end > capacity || start > end) {
                 res.res = "read or write out of range";
-                return res;
+                LOGIC_ERROR_AND_RETURN
             }
             res.res = string(heapBuffer + start, end - start);
             OK_AND_RETURN

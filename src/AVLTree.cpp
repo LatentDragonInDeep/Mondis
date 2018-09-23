@@ -319,9 +319,11 @@ ExecutionResult AVLTree::execute(Command *command) {
             CHECK_PARAM_TYPE(0, PLAIN)
             KEY(0)
             auto *obj = getValue(key);
-            if (obj != nullptr) {
-                res.res = obj->getJson();
+            if (obj == nullptr) {
+                res.res = "the key " + PARAM(0) + " does not exists";
+                INVALID_AND_RETURN;
             }
+            res.res = obj->getJson();
             OK_AND_RETURN;
         }
         case DEL: {

@@ -10,6 +10,9 @@
 #include <vector>
 #include <unordered_map>
 
+#define LOGIC_ERROR_AND_RETURN res.type = LOGIC_ERROR;\
+                                return res;
+
 #define PUT(TYPE) map[#TYPE] = CommandType::TYPE;
 
 #define MAP(TYPE) typeToStr[TYPE] = #TYPE;
@@ -19,7 +22,7 @@
 #define CHECK_PARAM_NUM(x) if(command->params.size()!=x) {\
                              res.type = SYNTAX_ERROR;\
                              res.res = "arguments num error";\
-                             return res;\
+                             LOGIC_ERROR_AND_RETURN\
                              }
 
 #define OK_AND_RETURN res.type = OK;\
@@ -30,7 +33,7 @@
 
 #define CHECK_INT_LEGAL(DATA, NAME) if(!util::toInteger(DATA,NAME)) {\
                                     res.res = "argument can not be transformed to int";\
-                                    return res;\
+                                    LOGIC_ERROR_AND_RETURN\
                                     }
 
 #define CHECK_INT_START_LEGAL(INDEX) int start;\
@@ -44,12 +47,12 @@
 
 #define CHECK_START if(start<0) {\
                      res.res = "start under zero!";\
-                     return res;\
+                     LOGIC_ERROR_AND_RETURN\
                      }
 
 #define CHECK_END(size) if(end>(int)size) {\
                      res.res = "end over flow!";\
-                     return res;\
+                     LOGIC_ERROR_AND_RETURN\
                      }
 
 #define CHECK_START_AND_DEFINE(INDEX) CHECK_INT_START_LEGAL(INDEX)\
@@ -68,12 +71,9 @@
 
 #define CHECK_PARAM_LENGTH(INDEX, LENGTH) if((*command)[INDEX].content.size()!=LENGTH) { \
                                             res.res = "argument length error";\
-                                            return res;\
+                                            LOGIC_ERROR_AND_RETURN\
                                             }
 #define PARAM(INDEX) (*command)[INDEX].content
-
-#define LOGIC_ERROR_AND_RETURN res.type = LOGIC_ERROR;\
-                                return res;
 
 namespace util {
     bool toInteger(std::string &data, int &res);

@@ -30,7 +30,7 @@ ExecutionResult MondisServer::execute(Command *command) {
             MondisObject *data = curKeySpace->get(key);
             if (data == nullptr) {
                 res.res = "the key does not exists";
-                OK_AND_RETURN
+                LOGIC_ERROR_AND_RETURN
             }
             res.res = data->getJson();
             OK_AND_RETURN
@@ -56,7 +56,7 @@ ExecutionResult MondisServer::execute(Command *command) {
             MondisObject *data = curKeySpace->get(key);
             if (data == nullptr) {
                 res.res = "the key does not exists";
-                OK_AND_RETURN
+                LOGIC_ERROR_AND_RETURN
             }
             res.res = data->getTypeStr();
             OK_AND_RETURN;
@@ -91,7 +91,7 @@ ExecutionResult MondisServer::execute(Command *command) {
             CHECK_AND_DEFINE_INT_LEGAL(0, index);
             if (index < 0 || index >= dbs.size()) {
                 res.res = "Invalid database id";
-                return res;
+                LOGIC_ERROR_AND_RETURN
             }
             curDbIndex = index;
             curKeySpace = dbs[curDbIndex];
@@ -106,7 +106,7 @@ ExecutionResult MondisServer::execute(Command *command) {
             MondisObject *data = curKeySpace->get(*key1);
             if (data == nullptr) {
                 res.res = "the object whose key is" + PARAM(0) + "does not exists";
-                return res;
+                LOGIC_ERROR_AND_RETURN
             }
             curKeySpace->put(key1, nullptr);
             curKeySpace->remove(*key1);
@@ -158,6 +158,9 @@ void MondisServer::parseConfFile(string &confFile) {
         while (!configFile.eof())
         {
             getline(configFile, strLine);
+            if (strLine[0] == '#' || strLine == "") {
+                continue;
+            }
             size_t pos = strLine.find('=');
             string key = strLine.substr(0, pos);
             string value = strLine.substr(pos+1);
@@ -176,6 +179,7 @@ int MondisServer::appendLog(Log &log) {
 }
 
 int MondisServer::start(string &confFile) {
+    configfile = confFile;
     parseConfFile(confFile);
     applyConf();
     init();
@@ -202,7 +206,7 @@ ExecutionResult MondisServer::execute(string &commandStr) {
     ExecutionResult res = executor->execute(interpreter->getCommand(commandStr));
     if (res.type == OK) {
         if (aof) {
-            aofFileOut << commandStr;
+            aofFileOut << commandStr + "\n";
             if (aofSyncStrategy == 1) {
                 clock_t cur = clock();
                 if (cur - preSync >= 1000) {
@@ -216,6 +220,7 @@ ExecutionResult MondisServer::execute(string &commandStr) {
     }
     Log log(commandStr, res);
     logFileOut << log.toString();
+    logFileOut.flush();
 
     return res;
 }
@@ -316,6 +321,7 @@ void MondisServer::init() {
     if (daemonize) {
         runAsDaemon();
     }
+    logFileOut.open(logFile, ios::app);
 
 }
 

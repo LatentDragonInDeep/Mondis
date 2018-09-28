@@ -10,7 +10,6 @@
 MondisClient::MondisClient(SOCKET sock) : sock(sock) {
 
 }
-
 #elif defined(linux)
 MondisClient::MondisClient(int fd) : fd(fd), id(nextId) {
     nextId++;
@@ -18,3 +17,11 @@ MondisClient::MondisClient(int fd) : fd(fd), id(nextId) {
 }
 
 #endif
+
+string MondisClient::readCommand() {
+    return std::__cxx11::string();
+}
+
+void MondisClient::sendResult(const string &res) {
+
+}

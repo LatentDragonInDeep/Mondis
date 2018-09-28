@@ -456,6 +456,7 @@ void MondisServer::init() {
     }
     logFileOut.open(logFile, ios::app);
     std::thread t(&MondisServer::acceptClient, this);
+    //TODO
 }
 
 void MondisServer::acceptClient() {
@@ -478,6 +479,7 @@ void MondisServer::acceptClient() {
         socketToClient[&client->sock] = client;
     }
 #elif defined(linux)
+    //TODO
     int socket_fd;
     int connect_fd;
     struct sockaddr_in servaddr;
@@ -523,6 +525,7 @@ void MondisServer::selectAndHandle() {
         }
     }
 #elif defined(linux)
+    //TODO
 #endif
 }
 

@@ -8,7 +8,8 @@
 #ifdef WIN32
 
 MondisClient::MondisClient(SOCKET sock) : sock(sock) {
-
+    nextId++;
+    ctime = time(nullptr);
 }
 #elif defined(linux)
 MondisClient::MondisClient(int fd) : fd(fd), id(nextId) {

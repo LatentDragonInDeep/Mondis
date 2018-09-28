@@ -13,9 +13,10 @@
 #include "Command.h"
 
 class MondisClient {
-private:
+public:
     uint64_t id;            /* Client incremental unique ID. */
-    int fd;                 /* Client socket. */
+    int fd;/* Client socket. */
+    int curDbIndex = 0;
     HashMap *keySpace = nullptr;            /* Pointer to currently SELECTed DB. */
     string name;             /* As set by CLIENT SETNAME. */
     queue<string> queryBuffer;         /* Buffer we use to accumulate client queries. */
@@ -51,28 +52,17 @@ private:
     long long psync_initial_offset; /* FULLRESYNC reply offset other slaves
                                        copying this slave output buffer
                                        should use. */
-    char replid[CONFIG_RUN_ID_SIZE + 1]; /* Master replication ID (if master). */
-    int slave_listening_port; /* As configured with: SLAVECONF listening-port */
-    char slave_ip[NET_IP_STR_LEN]; /* Optionally given by REPLCONF ip-address */
-    int slave_capa;         /* Slave capabilities: SLAVE_CAPA_* bitwise OR. */
-    multiState mstate;      /* MULTI/EXEC state */
-    int btype;              /* Type of blocking op if CLIENT_BLOCKED. */
-    blockingState bpop;     /* blocking state */
-    long long woff;         /* Last write global replication offset. */
-    HashMap *watched_keys;     /* Keys WATCHED for MULTI/EXEC CAS */
-    sds peerid;             /* Cached peer ID. */
-    listNode *client_list_node; /* list node in client list */
-
-    /* Response buffer */
-    int bufpos;
-    char buf[PROTO_REPLY_CHUNK_BYTES];
 
     string ip;
     string port;
-
+public:
+    bool hasLogin = false;
+private:
     static int nextId;
 public:
     MondisClient(int fd);
+    string readCommand();
+    void sendResult(const string& res);
 };
 
 

@@ -11,6 +11,7 @@
 #include <time.h>
 #include <fstream>
 #include <vector>
+#include <unordered_map>
 
 #include "HashMap.h"
 #include "MondisClient.h"
@@ -61,7 +62,7 @@ private:
     int jsonDuration = 10;
     string slaveof = "127.0.0.1";
     string workDir;
-    string logFile = "D:\\MondisWork\\log.txt";
+    string logFile;
     HashMap* curKeySpace;
     vector<HashMap *> dbs;
     int curDbIndex = 0;
@@ -85,8 +86,7 @@ private:
     bool isLoading;
     bool isRecovering;
 
-    vector<MondisClient *> clients;
-
+    unordered_map<int,MondisClient*> fdToClient;
 
     bool hasLogin = true;
 public:
@@ -100,8 +100,9 @@ public:
     void applyConf();
     int appendLog(Log& log);
     void parseConfFile(string& confFile);
-    ExecutionResult execute(string& commandStr);
-    ExecutionResult execute(Command *command);
+    ExecutionResult execute(string &commandStr, MondisClient *client);
+    ExecutionResult execute(Command *command, MondisClient *client);
+    void handle(MondisClient* client);
     ExecutionResult locateExecute(Command *command);
     static JSONParser* getJSONParser();
 

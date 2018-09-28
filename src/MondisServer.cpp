@@ -15,7 +15,7 @@ unordered_set<CommandType> Executor::serverCommand;
 
 JSONParser MondisServer::parser;
 
-ExecutionResult MondisServer::execute(Command *command) {
+ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
     ExecutionResult res;
     switch (command->type) {
         case BIND: {
@@ -23,14 +23,23 @@ ExecutionResult MondisServer::execute(Command *command) {
             CHECK_PARAM_TYPE(0, PLAIN)
             CHECK_PARAM_TYPE(1, STRING)
             Key *key = new Key((*command)[0].content);
-            curKeySpace->put(key, parser.parseObject((*command)[1].content));
+            if(client== nullptr) {
+                curKeySpace->put(key, parser.parseObject((*command)[1].content));
+            } else {
+                client->keySpace->put(key, parser.parseObject((*command)[1].content));
+            }
             OK_AND_RETURN
         }
         case GET: {
             CHECK_PARAM_NUM(1)
             CHECK_PARAM_TYPE(0, PLAIN)
             KEY(0)
-            MondisObject *data = curKeySpace->get(key);
+            MondisObject* data;
+            if(client== nullptr) {
+                data = curKeySpace->get(key);
+            } else{
+                data = client->keySpace->get(key);
+            }
             if (data == nullptr) {
                 res.res = "the key does not exists";
                 LOGIC_ERROR_AND_RETURN
@@ -42,13 +51,23 @@ ExecutionResult MondisServer::execute(Command *command) {
             CHECK_PARAM_NUM(1)
             CHECK_PARAM_TYPE(0, PLAIN)
             KEY(0)
-            curKeySpace->remove(key);
+            if(client == nullptr) {
+                curKeySpace->remove(key);
+            } else {
+                client->keySpace->remove(key);
+            }
             OK_AND_RETURN
         }
         case EXISTS: {
             CHECK_PARAM_NUM(1)
             CHECK_PARAM_TYPE(0, PLAIN)
             KEY(0)
+            bool r;
+            if(client == nullptr) {
+                r = curKeySpace->containsKey(key);
+            } else {
+                r = client->keySpace->containsKey(key);
+            }
             res.res = util::to_string(curKeySpace->containsKey(key));
             OK_AND_RETURN
         }
@@ -56,7 +75,12 @@ ExecutionResult MondisServer::execute(Command *command) {
             CHECK_PARAM_NUM(1)
             CHECK_PARAM_TYPE(0, PLAIN)
             KEY(0)
-            MondisObject *data = curKeySpace->get(key);
+            MondisObject* data;
+            if(client == nullptr) {
+                data = curKeySpace->get(key);
+            } else {
+                data = client->keySpace->get(key);
+            }
             if (data == nullptr) {
                 res.res = "the key does not exists";
                 LOGIC_ERROR_AND_RETURN
@@ -66,7 +90,12 @@ ExecutionResult MondisServer::execute(Command *command) {
         }
         case EXIT: {
             CHECK_PARAM_NUM(0)
-            system("exit");
+            if(client == nullptr) {
+                system("exit");
+            } else {
+                fdToClient.erase(fdToClient.find(client->fd));
+                delete client;
+            }
         }
         case SAVE: {
             CHECK_PARAM_NUM(1)
@@ -81,12 +110,21 @@ ExecutionResult MondisServer::execute(Command *command) {
             CHECK_PARAM_TYPE(1, PLAIN)
             string userName = (*command)[0].content;
             string pwd = (*command)[1].content;
-            if (userName == username && pwd == password) {
-                hasLogin = true;
-                OK_AND_RETURN
+            if(client == nullptr) {
+                if (userName == username && pwd == password) {
+                    hasLogin = true;
+                    OK_AND_RETURN
+                }
+                res.res = "username or password error";
+                return res;
+            } else {
+                if (userName == username && pwd == password) {
+                    client->hasLogin = true;
+                    OK_AND_RETURN
+                }
+                res.res = "username or password error";
+                return res;
             }
-            res.res = "username or password error";
-            return res;
         }
         case SELECT: {
             CHECK_PARAM_NUM(1)
@@ -96,9 +134,15 @@ ExecutionResult MondisServer::execute(Command *command) {
                 res.res = "Invalid database id";
                 LOGIC_ERROR_AND_RETURN
             }
-            curDbIndex = index;
-            curKeySpace = dbs[curDbIndex];
-            OK_AND_RETURN
+            if(client == nullptr) {
+                curDbIndex = index;
+                curKeySpace = dbs[curDbIndex];
+                OK_AND_RETURN
+            } else {
+                client->curDbIndex = index;
+                client->keySpace = dbs[index];
+                OK_AND_RETURN
+            }
         }
         case RENAME: {
             CHECK_PARAM_NUM(2)
@@ -119,7 +163,21 @@ ExecutionResult MondisServer::execute(Command *command) {
         }
         case SIZE: {
             CHECK_PARAM_NUM(0);
-            res.res = to_string(curKeySpace->size());
+            if(client == nullptr) {
+                res.res = to_string(curKeySpace->size());
+            } else {
+                res.res = to_string(client->keySpace->size());
+            }
+            OK_AND_RETURN
+        }
+        case SET_NAME: {
+            CHECK_PARAM_NUM(1);
+            CHECK_PARAM_TYPE(0,PLAIN)
+            if(client == nullptr) {
+                res.res = "no known client!";
+                LOGIC_ERROR_AND_RETURN;
+            }
+            client->name = PARAM(0);
             OK_AND_RETURN
         }
     }
@@ -194,19 +252,19 @@ int MondisServer::startEventLoop() {
         cout << username + "@Mondis>";
         string nextCommand;
         getline(std::cin, nextCommand);
-        ExecutionResult res = execute(nextCommand);
+        ExecutionResult res = execute(nextCommand, nullptr);
         cout << res.toString();
         cout << endl;
     }
 }
 
-ExecutionResult MondisServer::execute(string &commandStr) {
+ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) {
     if (!hasLogin) {
         ExecutionResult e;
         e.res = "you haven't login,please login";
         return e;
     }
-    ExecutionResult res = executor->execute(interpreter->getCommand(commandStr));
+    ExecutionResult res = executor->execute(interpreter->getCommand(commandStr),client);
     if (res.type == OK) {
         if (aof) {
             aofFileOut << commandStr + "\n";
@@ -317,7 +375,7 @@ void MondisServer::init() {
         recoveryFileIn.open(recoveryFile);
         string command;
         while (getline(recoveryFileIn, command)) {
-            execute(command);
+            execute(command, nullptr);
         }
     }
     isRecovering = false;
@@ -338,14 +396,20 @@ void MondisServer::acceptClient() {
     while (true) {
         connect_fd = accept(socket_fd, (struct sockaddr*)NULL, NULL));
         MondisClient* client = new MondisClient(connect_fd);
-        clients.push_back(client);
+        fdToClient[connect_fd] = client;
     }
+}
+
+void MondisServer::handle(MondisClient *client) {
+    string commandStr = client->readCommand();
+    ExecutionResult res = execute(commandStr, nullptr);
+    client->sendResult(res.toString());
 }
 
 ExecutionResult Executor::execute(Command *command) {
     if(serverCommand.find(command->type)!=serverCommand.end()) {
         if (command->next == nullptr || command->next->type == VACANT) {
-            ExecutionResult res = server->execute(command);
+            ExecutionResult res = server->execute(command, nullptr);
             destroyCommand(command);
             return res;
         }

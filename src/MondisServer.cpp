@@ -13,8 +13,13 @@
 
 #elif defined(linux)
 #include <sys/socket.h>
-#include <netinet/in.h>
+#include <netinet/
+#include <stdlib>
+#include <stdio>
 #endif
+
+#include <boost/algorithm/string.hpp>
+
 #include "Command.h"
 #include "MondisServer.h"
 
@@ -101,7 +106,9 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
                 system("exit");
             } else {
 #ifdef WIN32
-
+                socketToClient.erase(socketToClient.find(&client->sock));
+                delete client;
+                FD_CLR(client->sock, &fds);
 #elif defined(linux)
                 fdToClient.erase(fdToClient.find(client->fd));
                 delete client;
@@ -172,7 +179,7 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             OK_AND_RETURN
 
         }
-        case SIZE: {
+        case M_SIZE: {
             CHECK_PARAM_NUM(0);
             if (client == nullptr) {
                 res.res = to_string(curKeySpace->size());
@@ -242,8 +249,48 @@ void MondisServer::parseConfFile(string &confFile) {
 }
 
 int MondisServer::runAsDaemon() {
-    //TODO
+#ifdef WIN32
     return 0;
+#elif defined(linux)
+    pid_t pid;
+    int fd, i, nfiles;
+    struct rlimit rl;
+    pid = fork();
+    if(pid < 0)
+        ERROR_EXIT("First fork failed!");
+
+     if(pid > 0)
+         exit(EXIT_SUCCESS);// father exit
+
+     if(setsid() == -1)
+         ERROR_EXIT("setsid failed!");
+
+     pid = fork();
+     if(pid < 0)
+         ERROR_EXIT("Second fork failed!");
+
+     if(pid > 0)// father exit
+         exit(EXIT_SUCCESS);
+#ifdef RLIMIT_NOFILE
+     /* 关闭从父进程继承来的文件描述符 */
+     if (getrlimit(RLIMIT_NOFILE, &rl) == -1)
+         ERROR_EXIT("getrlimit failed!");
+     nfiles = rl.rlim_cur = rl.rlim_max;
+     setrlimit(RLIMIT_NOFILE, &rl);
+     for(i=3; i<nfiles; i++)
+         close(i);
+#endif
+     /* 重定向标准的3个文件描述符 */
+     if(fd = open("/dev/null", O_RDWR) < 0)
+         ERROR_EXIT("open /dev/null failed!");
+     for(i=0; i<3; i++)
+         dup2(fd, i);
+     if(fd > 2) close(fd);
+     /* 改变工作目录和文件掩码常量 */
+     chdir("/");
+     umask(0);
+     return 0;
+#endif
 }
 
 int MondisServer::appendLog(Log &log) {
@@ -252,14 +299,15 @@ int MondisServer::appendLog(Log &log) {
 
 int MondisServer::start(string &confFile) {
     configfile = confFile;
-    parseConfFile(confFile);
-    applyConf();
+    if (configfile != "") {
+        parseConfFile(confFile);
+        applyConf();
+    }
     init();
     startEventLoop();
 }
 
 int MondisServer::startEventLoop() {
-#ifdef WIN32
     while (true) {
         cout << username + "@Mondis>";
         string nextCommand;
@@ -299,12 +347,24 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
 }
 
 int MondisServer::save(string &jsonFile) {
+#ifdef WIN32
     ofstream out(jsonFile + "2");
     out << curKeySpace->getJson();
     out.flush();
     remove(jsonFile.c_str());
     out.close();
     rename((jsonFile + "2").c_str(), jsonFile.c_str());
+#elif defined(linux)
+    int pid = fork();
+    if(pid == 0) {
+    ofstream out(jsonFile + "2");
+    out << curKeySpace->getJson();
+    out.flush();
+    remove(jsonFile.c_str());
+    out.close();
+    rename((jsonFile + "2").c_str(), jsonFile.c_str());
+    }
+#endif
 }
 
 void MondisServer::applyConf() {
@@ -413,7 +473,9 @@ void MondisServer::acceptClient() {
     while (true) {
         sockaddr_in remoteAddr;
         SOCKET clientSock = accept(servSock, (SOCKADDR *) &remoteAddr, sizeof(remoteAddr));
-        sockets.push_back(clientSock);
+        FD_SET(clientSock, &fds);
+        MondisClient *client = new MondisClient(clientSock);
+        socketToClient[&client->sock] = client;
     }
 #elif defined(linux)
     int socket_fd;
@@ -437,7 +499,37 @@ void MondisServer::handleCommand(MondisClient *client) {
 }
 
 void MondisServer::selectAndHandle() {
+#ifdef WIN32
+    while (true) {
+        int ret = select(0, &fds, nullptr, nullptr, nullptr);
+        if (ret == 0) {
+            continue;
+        }
+        for (auto &pair:socketToClient) {
+            if (FD_ISSET(*pair.first, &fds)) {
+                string commandSTr;
+                char buffer[4096];
+                int ret;
+                while ((ret = recv(*pair.first, buffer, sizeof(buffer), 0)) != 0) {
+                    commandSTr += string(buffer, ret);
+                }
+                vector<string> fields;
+                boost::split(fields, commandSTr, boost::is_any_of("\r\n\r\n\r\n"));
+                for (string &command:fields) {
+                    ExecutionResult res = execute(command, pair.second);
+                    pair.second->sendResult(res.toString());
+                }
+            }
+        }
+    }
+#elif defined(linux)
+#endif
+}
 
+MondisServer::MondisServer() {
+#ifdef WIN32
+    FD_ZERO(&fds);
+#endif
 }
 
 ExecutionResult Executor::execute(Command *command) {

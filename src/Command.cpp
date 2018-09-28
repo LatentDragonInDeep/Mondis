@@ -83,7 +83,7 @@ void CommandInterpreter::init() {
     PUT(POP_BACK)
     PUT(ADD)
     PUT(REMOVE)
-    PUT(SIZE)
+    map["size"] = M_SIZE;
     PUT(REMOVE_BY_RANK)
     PUT(REMOVE_BY_SCORE)
     PUT(REMOVE_RANGE_BY_RANK)
@@ -228,7 +228,7 @@ void Command::init() {
     MAP(POP_BACK)
     MAP(ADD)
     MAP(REMOVE)
-    MAP(SIZE)
+    MAP(M_SIZE)
     MAP(REMOVE_BY_RANK)
     MAP(REMOVE_BY_SCORE)
     MAP(REMOVE_RANGE_BY_RANK)

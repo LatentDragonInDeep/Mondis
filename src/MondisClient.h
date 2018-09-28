@@ -9,13 +9,27 @@
 #include <stdint-gcc.h>
 #include <queue>
 
+#ifdef WIN32
+
+#include <winsock2.h>
+#include <inaddr.h>
+
+#elif defined(linux)
+#include <sys/socket.h>
+#include <netinet/in.h>
+#endif
+
 #include "HashMap.h"
 #include "Command.h"
 
 class MondisClient {
 public:
     uint64_t id;            /* Client incremental unique ID. */
+#ifdef WIN32
+    SOCKET sock;
+#elif defined(linux)
     int fd;/* Client socket. */
+#endif
     int curDbIndex = 0;
     HashMap *keySpace = nullptr;            /* Pointer to currently SELECTed DB. */
     string name;             /* As set by CLIENT SETNAME. */
@@ -60,8 +74,14 @@ public:
 private:
     static int nextId;
 public:
+#ifdef WIN32
+
+    MondisClient(SOCKET sock);
+
+#elif defined(linux)
     MondisClient(int fd);
 
+#endif
     string readCommand();
 
     void sendResult(const string &res);

@@ -104,7 +104,7 @@ enum CommandType {
     POP_BACK,
     ADD,
     REMOVE,
-    SIZE,
+    M_SIZE,
     COUNT,
     REMOVE_BY_RANK,
     REMOVE_BY_SCORE,

@@ -92,13 +92,15 @@ private:
     bool isLoading;
     bool isRecovering;
 #ifdef WIN32
-    vector<SOCKET> sockets;
+    fd_set fds;
+    unordered_map<SOCKET *, MondisClient *> socketToClient;
 #elif defined(linux)
     unordered_map<int,MondisClient*> fdToClient;
 #endif
 
     bool hasLogin = true;
 public:
+    MondisServer();
     int start(string& confFile);
     int runAsDaemon();
 

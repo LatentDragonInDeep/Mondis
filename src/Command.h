@@ -137,6 +137,7 @@ enum CommandType {
     SELECT,
     VACANT,
     ERROR,
+    SET_NAME,
 };
 
 enum ExecutionResultType {

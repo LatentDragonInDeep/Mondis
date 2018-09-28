@@ -4,6 +4,7 @@
 #include <iostream>
 #include <unistd.h>
 #include <sys/types.h>
+#include <thread>
 
 #include "Command.h"
 #include "MondisServer.h"
@@ -322,7 +323,14 @@ void MondisServer::init() {
         runAsDaemon();
     }
     logFileOut.open(logFile, ios::app);
+    std::thread t(&MondisServer::acceptClient, this);
+}
 
+void MondisServer::acceptClient() {
+    int
+    while (true) {
+
+    }
 }
 
 ExecutionResult Executor::execute(Command *command) {

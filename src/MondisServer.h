@@ -10,6 +10,8 @@
 #include <string>
 #include <time.h>
 #include <fstream>
+#include <vector>
+
 #include "HashMap.h"
 #include "MondisClient.h"
 #include "Command.h"
@@ -83,6 +85,9 @@ private:
     bool isLoading;
     bool isRecovering;
 
+    vector<MondisClient *> clients;
+
+
     bool hasLogin = true;
 public:
     int start(string& confFile);
@@ -99,6 +104,8 @@ public:
     ExecutionResult execute(Command *command);
     ExecutionResult locateExecute(Command *command);
     static JSONParser* getJSONParser();
+
+    void acceptClient();
 };
 
 class Executor {

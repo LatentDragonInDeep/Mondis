@@ -18,8 +18,6 @@
 #include <stdio>
 #endif
 
-#include <boost/algorithm/string.hpp>
-
 #include "Command.h"
 #include "MondisServer.h"
 
@@ -455,8 +453,9 @@ void MondisServer::init() {
         runAsDaemon();
     }
     logFileOut.open(logFile, ios::app);
-    std::thread t(&MondisServer::acceptClient, this);
-    //TODO
+    std::thread accept(&MondisServer::acceptClient, this);
+    std::thread eventLopp(&MondisServer::startEventLoop, this);
+    selectAndHandle();
 }
 
 void MondisServer::acceptClient() {
@@ -480,10 +479,12 @@ void MondisServer::acceptClient() {
         socketToClient[&client->sock] = client;
     }
 #elif defined(linux)
-    //TODO
     int socket_fd;
     int connect_fd;
     struct sockaddr_in servaddr;
+    sockAddr.sin_family = PF_INET;
+    sockAddr.sin_addr.S_un.S_addr = inet_addr("127.0.0.1");
+    sockAddr.sin_port = htons(port);
     socket_fd = socket(AF_INET,SOCK_STREAM,0);
     bind(socket_fd,&servaddr, sizeof(servaddr));
     listen(socket_fd,10);
@@ -496,9 +497,11 @@ void MondisServer::acceptClient() {
 }
 
 void MondisServer::handleCommand(MondisClient *client) {
-    string commandStr = client->readCommand();
-    ExecutionResult res = execute(commandStr, nullptr);
-    client->sendResult(res.toString());
+    string commandStr;
+    while ((commandStr = client->readCommand()) != "") {
+        ExecutionResult res = execute(commandStr, nullptr);
+        client->sendResult(res.toString());
+    }
 }
 
 void MondisServer::selectAndHandle() {
@@ -510,18 +513,8 @@ void MondisServer::selectAndHandle() {
         }
         for (auto &pair:socketToClient) {
             if (FD_ISSET(*pair.first, &fds)) {
-                string commandSTr;
-                char buffer[4096];
-                int ret;
-                while ((ret = recv(*pair.first, buffer, sizeof(buffer), 0)) != 0) {
-                    commandSTr += string(buffer, ret);
-                }
-                vector<string> fields;
-                boost::split(fields, commandSTr, boost::is_any_of("\r\n\r\n\r\n"));
-                for (string &command:fields) {
-                    ExecutionResult res = execute(command, pair.second);
-                    pair.second->sendResult(res.toString());
-                }
+                MondisClient *client = pair.second;
+                handleCommand(client);
             }
         }
     }

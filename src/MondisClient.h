@@ -7,7 +7,7 @@
 
 
 #include <stdint-gcc.h>
-#include <queue>
+#include <vector>
 
 #ifdef WIN32
 
@@ -33,11 +33,8 @@ public:
     int curDbIndex = 0;
     HashMap *keySpace = nullptr;            /* Pointer to currently SELECTed DB. */
     string name;             /* As set by CLIENT SETNAME. */
-    queue<string> queryBuffer;         /* Buffer we use to accumulate client queries. */
-    queue<string> pendingQuerybuf;   /* If this client is flagged as master, this buffer
-                               represents the yet not applied portion of the
-                               replication stream that we are receiving from
-                               the master. */
+    vector<string> commandBuffer;         /* Buffer we use to accumulate client queries. */
+    int curCommandIndex = 0;
     size_t querybuf_peak;   /* Recent (100ms or more) peak of querybuf size. */
     Command *curCommand;          /* Arguments of current command. */
     Command *lastcmd;  /* Last command executed. */

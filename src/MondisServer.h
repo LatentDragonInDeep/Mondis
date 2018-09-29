@@ -128,7 +128,7 @@ public:
 class Executor {
 public:
 
-    ExecutionResult execute(Command* command);
+    ExecutionResult execute(Command *command, MondisClient *client);
     static Executor* getExecutor();
     static void destroyCommand(Command* command);
 

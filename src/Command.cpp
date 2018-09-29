@@ -29,19 +29,19 @@ Command *CommandInterpreter::getCommand(std::string &raw) {
         for (int i = 0; i <vt.size(); ++i) {
             if (i == 0) {
                 if(vt[i].type!=PLAIN_PARAM) {
-                    cur->type = ERROR;
+                    cur->type = M_ERROR;
                     return res;
                 }
                 util::toUpperCase(vt[i].content);
                 if(map.find(vt[i].content)==map.end()) {
-                    cur->type = ERROR;
+                    cur->type = M_ERROR;
                     return res;
                 }
                 cur->type = map[vt[i].content];
                 continue;
             }
             else if(i>=5) {
-                cur->type = ERROR;
+                cur->type = M_ERROR;
                 return res;
             }
             Command::Param param;

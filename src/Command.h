@@ -136,7 +136,7 @@ enum CommandType {
     LOGIN,
     SELECT,
     VACANT,
-    ERROR,
+    M_ERROR,
     SET_NAME,
 };
 

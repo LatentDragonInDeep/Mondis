@@ -13,7 +13,7 @@
 
 #elif defined(linux)
 #include <sys/socket.h>
-#include <netinet/
+#include <netinet.h>
 #include <stdlib>
 #include <stdio>
 #endif
@@ -324,7 +324,7 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
         e.res = "you haven't login,please login";
         return e;
     }
-    ExecutionResult res = executor->execute(interpreter->getCommand(commandStr), client);
+    ExecutionResult res = executor->execute(interpreter->getCommand(commandStr), nullptr);
     if (res.type == OK) {
         if (aof) {
             aofFileOut << commandStr + "\n";
@@ -473,7 +473,8 @@ void MondisServer::acceptClient() {
     listen(servSock, 10);
     while (true) {
         sockaddr_in remoteAddr;
-        SOCKET clientSock = accept(servSock, (SOCKADDR *) &remoteAddr, sizeof(remoteAddr));
+        int len = sizeof(remoteAddr);
+        SOCKET clientSock = accept(servSock, (SOCKADDR *) &remoteAddr, &len);
         FD_SET(clientSock, &fds);
         MondisClient *client = new MondisClient(clientSock);
         socketToClient[&client->sock] = client;
@@ -535,10 +536,10 @@ MondisServer::MondisServer() {
 #endif
 }
 
-ExecutionResult Executor::execute(Command *command) {
+ExecutionResult Executor::execute(Command *command, MondisClient *client) {
     if(serverCommand.find(command->type)!=serverCommand.end()) {
         if (command->next == nullptr || command->next->type == VACANT) {
-            ExecutionResult res = server->execute(command, nullptr);
+            ExecutionResult res = server->execute(command, client);
             destroyCommand(command);
             return res;
         }

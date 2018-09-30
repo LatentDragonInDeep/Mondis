@@ -98,13 +98,14 @@ private:
     string jsonFile;
     bool isLoading = false;
     bool isRecovering = false;
+    bool isReplicating = false;
     bool isSlave = false;
     bool isMaster = false;
     bool isLeader = false;
     unordered_set<MondisClient *> slaves;
     unordered_set<MondisClient *> peers;
 
-    unsigned replicaOffset = 0;
+    unsigned long long replicaOffset = 0;
     queue<string> *replicaCommandBuffer;
 
 #ifdef WIN32
@@ -168,6 +169,10 @@ public:
     void acceptClient();
 
     void sendToMaster(const string &res);
+
+    void replicaToSlave(MondisClient *client, unsigned dbIndex, unsigned long long slaveReplicaOffset);
+
+    void commandPropagate();
 };
 
 class Executor {

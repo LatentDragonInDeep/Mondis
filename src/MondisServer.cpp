@@ -228,17 +228,37 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
                 closesocket(sclient);
                 LOGIC_ERROR_AND_RETURN
             }
-            sendToMaster(string("SYNC ") + to_string(replicaOffset));
+#elif defined(linux)
+            sockfd = socket(AF_INET, SOCK_STREAM, 0);
+            sockaddr_in serAddr;
+            serAddr.sin_family = AF_INET;
+            serAddr.sin_port = htons(atoi(port.c_str()));
+            serAddr.sin_addr.S_un.S_addr = inet_addr(ip.c_str());
+            if(connect(sockfd, (struct sockaddr*)&servaddr, sizeof(servaddr))<0) {
+                res.res = "can not connect to master" + PARAM(0);
+                closesocket(sclient);
+                LOGIC_ERROR_AND_RETURN
+            }
+#endif
+            sendToMaster(string("SYNC ") + to_string(replicaOffset) + " " + to_string(curDbIndex));
             //TODO 复制和命令传播
             if (client != nullptr) {
                 OK_AND_RETURN;
             }
-#elif defined(linux)
-            //TODO linux下
-#endif
         }
         case SYNC: {
-            //TODO
+            CHECK_PARAM_NUM(2)
+            CHECK_PARAM_TYPE(0, PLAIN)
+            CHECK_PARAM_TYPE(1, PLAIN)
+            CHECK_AND_DEFINE_INT_LEGAL(0, dbIndex);
+            CHECK_AND_DEFINE_INT_LEGAL(1, offset);
+            client->type = SLAVE;
+            std::thread t(&MondisServer::replicaToSlave, this, client, dbIndex, offset);
+            OK_AND_RETURN
+        }
+        case SYNC_FINISHED: {
+            CHECK_PARAM_NUM(0)
+            cout << "sync has finished";
         }
     }
     INVALID_AND_RETURN
@@ -340,8 +360,10 @@ int MondisServer::appendLog(Log &log) {
 }
 
 int MondisServer::start(string &confFile) {
+    cout << "Mondis 1.0" << endl;
     configfile = confFile;
     if (configfile != "") {
+        cout << "is apply configuration..." << endl;
         parseConfFile(confFile);
         applyConf();
     }
@@ -350,6 +372,7 @@ int MondisServer::start(string &confFile) {
 }
 
 int MondisServer::startEventLoop() {
+    cout << "start event loop,now you can input command" << endl;
     while (true) {
         cout << username + "@Mondis>";
         string nextCommand;
@@ -463,6 +486,7 @@ void MondisServer::applyConf() {
 }
 
 void MondisServer::init() {
+    cout << "is Initializing..." << endl;
     isLoading = true;
     Executor::init();
     Executor::bindServer(this);
@@ -481,8 +505,8 @@ void MondisServer::init() {
     if (json) {
         jsonFileOut.open(jsonFile, ios::app);
     }
-    isLoading = false;
     isRecovering = true;
+    cout << "is Recovering..." << endl;
     if (recoveryStrategy == "json") {
         JSONParser temp(recoveryFile);
         temp.parse(curKeySpace);
@@ -499,10 +523,13 @@ void MondisServer::init() {
     }
     logFileOut.open(logFile, ios::app);
     if (slaveof != "") {
+        isReplicating = true;
+        cout << "is Replicating from master..." << endl;
         string sync = "SLAVE_OF ";
         sync += slaveof;
         execute(sync, nullptr);
     }
+    isReplicating = false;
     std::thread accept(&MondisServer::acceptClient, this);
     std::thread eventLopp(&MondisServer::startEventLoop, this);
     selectAndHandle();
@@ -564,7 +591,6 @@ void MondisServer::acceptClient() {
 }
 
 void MondisServer::handleCommand(MondisClient *client) {
-    //TODO 改为异步实现
     string commandStr;
     while ((commandStr = client->readCommand()) != "") {
         ExecutionResult res = execute(commandStr, nullptr);
@@ -619,6 +645,14 @@ MondisServer::~MondisServer() {
     delete replicaCommandBuffer;
 }
 
+void MondisServer::replicaToSlave(MondisClient *client, unsigned dbIndex, unsigned long long slaveReplicaOffset) {
+//TODO
+}
+
+void MondisServer::commandPropagate() {
+//TODO
+}
+
 ExecutionResult Executor::execute(Command *command, MondisClient *client) {
     if(serverCommand.find(command->type)!=serverCommand.end()) {
         if (command->next == nullptr || command->next->type == VACANT) {
@@ -666,6 +700,7 @@ void Executor::init() {
     INSERT(SLAVE_OF)
     INSERT(SYNC)
     INSERT(SET_NAME)
+    INSERT(SYNC_FINISHED)
 }
 
 void Executor::destroyCommand(Command *command) {

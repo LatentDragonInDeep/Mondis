@@ -117,6 +117,7 @@ void CommandInterpreter::init() {
     PUT(SET_NAME)
     PUT(SLAVE_OF)
     PUT(SYNC)
+    PUT(SYNC_FINISHED)
 }
 
 void CommandInterpreter::LexicalParser::skip() {

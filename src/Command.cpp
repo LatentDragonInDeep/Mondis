@@ -256,4 +256,5 @@ void Command::init() {
     MAP(SAVE)
     MAP(EXIT)
     MAP(LOGIN)
+    MAP(DISCONNECT)
 }

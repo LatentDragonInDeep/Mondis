@@ -119,7 +119,7 @@ private:
         const char *data = res.data();
         int hasWrite = 0;
         while (hasWrite < res.size()) {
-            ret = sendToMaster(sock, data + hasWrite, res.size() - hasWrite);
+            ret = ::send(sock, data + hasWrite, res.size() - hasWrite, 0);
             hasWrite += ret;
         }
     };
@@ -172,7 +172,9 @@ public:
 
     void replicaToSlave(MondisClient *client, unsigned dbIndex, unsigned long long slaveReplicaOffset);
 
-    void commandPropagate();
+    void singleCommandPropagate(const string &command);
+
+    void replicaCommandPropagate(vector<string> &commands, MondisClient *client);
 };
 
 class Executor {

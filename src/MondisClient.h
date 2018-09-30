@@ -86,6 +86,8 @@ public:
     MondisClient(int fd);
 
 #endif
+
+    ~MondisClient();
     string readCommand();
 
     void sendResult(const string &res);

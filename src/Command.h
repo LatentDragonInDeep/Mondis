@@ -141,6 +141,7 @@ enum CommandType {
     SLAVE_OF,
     SYNC,
     SYNC_FINISHED,//通知从服务器同步完成
+    DISCONNECT,
 };
 
 enum ExecutionResultType {

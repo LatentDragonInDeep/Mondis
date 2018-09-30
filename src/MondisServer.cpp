@@ -207,6 +207,9 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             OK_AND_RETURN
         }
         case SLAVE_OF: {
+            if (isSlave) {
+                sendToMaster(string("DISCONNECT"));
+            }
             CHECK_PARAM_NUM(1);
             CHECK_PARAM_TYPE(0, PLAIN)
             isSlave = true;
@@ -218,16 +221,17 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             WORD sockVersion = MAKEWORD(2, 2);
             WSADATA data;
             WSAStartup(sockVersion, &data);
-            SOCKET sclient = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+            SOCKET masterSock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
             sockaddr_in serAddr;
             serAddr.sin_family = AF_INET;
             serAddr.sin_port = htons(atoi(port.c_str()));
             serAddr.sin_addr.S_un.S_addr = inet_addr(ip.c_str());
-            if (connect(sclient, (sockaddr *) &serAddr, sizeof(serAddr)) == SOCKET_ERROR) {
+            if (connect(masterSock, (sockaddr *) &serAddr, sizeof(serAddr)) == SOCKET_ERROR) {
                 res.res = "can not connect to master" + PARAM(0);
-                closesocket(sclient);
+                closesocket(masterSock);
                 LOGIC_ERROR_AND_RETURN
             }
+            this->masterSock = masterSock;
 #elif defined(linux)
             sockfd = socket(AF_INET, SOCK_STREAM, 0);
             sockaddr_in serAddr;
@@ -241,7 +245,8 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             }
 #endif
             sendToMaster(string("SYNC ") + to_string(replicaOffset) + " " + to_string(curDbIndex));
-            //TODO 复制和命令传播
+            string json;
+            //TODO 接受json和命令传播
             if (client != nullptr) {
                 OK_AND_RETURN;
             }
@@ -259,6 +264,14 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
         case SYNC_FINISHED: {
             CHECK_PARAM_NUM(0)
             cout << "sync has finished";
+        }
+        case DISCONNECT: {
+#ifdef WIN32
+            socketToClient.erase(socketToClient.find(&client->sock));
+#elif defined(linux)
+            fdToClient.erase(fdToClient.find(client->fd));
+#endif
+            delete client;
         }
     }
     INVALID_AND_RETURN
@@ -554,7 +567,7 @@ void MondisServer::acceptClient() {
         if (socketToClient.size() > MAX_SOCK_NUM) {
             ExecutionResult res;
             res.type = LOGIC_ERROR;
-            res.res = "can not build connection because has up to max sockets number!"
+            res.res = "can not build connection because has up to max sockets number!";
             send(clientSock, res.toString());
         }
         FD_SET(clientSock, &fds);
@@ -630,7 +643,7 @@ MondisServer::MondisServer() {
     epollFd = epoll_create(1024);
     events = new epoll_events[1024];
 #endif
-    replicaCommandBuffer = new queue<string>(MAX_COMMAND_BUFFER_SIZE);
+    replicaCommandBuffer = new queue<string>;
 }
 
 void MondisServer::sendToMaster(const string &res) {
@@ -649,7 +662,11 @@ void MondisServer::replicaToSlave(MondisClient *client, unsigned dbIndex, unsign
 //TODO
 }
 
-void MondisServer::commandPropagate() {
+void MondisServer::singleCommandPropagate(const string &command) {
+//TODO
+}
+
+void MondisServer::replicaCommandPropagate(vector<string> &commands, MondisClient *client) {
 //TODO
 }
 
@@ -701,6 +718,7 @@ void Executor::init() {
     INSERT(SYNC)
     INSERT(SET_NAME)
     INSERT(SYNC_FINISHED)
+    INSERT(DISCONNECT)
 }
 
 void Executor::destroyCommand(Command *command) {

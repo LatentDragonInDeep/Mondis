@@ -45,11 +45,11 @@ string MondisClient::readCommand() {
 void MondisClient::sendResult(const string &res) {
     char buffer[4096];
     int ret;
-    char *data = res.data();
+    const char *data = res.data();
     int hasWrite = 0;
 #ifdef WIN32
     while (hasWrite < res.size()) {
-        ret = send(sock, data + hasWrite, res.size() - hasWrite);
+        ret = send(sock, data + hasWrite, res.size() - hasWrite, 0);
         hasWrite += ret;
     }
 #elif defined(linux)
@@ -57,5 +57,13 @@ void MondisClient::sendResult(const string &res) {
         ret = write(fd,data+hasWrite,res.size()-hasWrite);
         hasWrite+=ret;
     }
+#endif
+}
+
+MondisClient::~MondisClient() {
+#ifdef WIN32
+    closesocket(sock);
+#elif defined(linux)
+    close(fd);
 #endif
 }

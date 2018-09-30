@@ -10,16 +10,23 @@
 
 #include <winsock2.h>
 #include <inaddr.h>
+#include <stdio.h>
 
 #elif defined(linux)
 #include <sys/socket.h>
 #include <netinet.h>
 #include <stdlib>
 #include <stdio>
+#include <sys/epoll.h>
 #endif
 
 #include "Command.h"
 #include "MondisServer.h"
+
+#define SLAVE_CHECK if(isSlave) {\
+res.res = "current server is a slave,can not execute this command";\
+LOGIC_ERROR_AND_RETURN\
+}
 
 unordered_set<CommandType> Executor::serverCommand;
 
@@ -29,6 +36,7 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
     ExecutionResult res;
     switch (command->type) {
         case BIND: {
+            SLAVE_CHECK
             CHECK_PARAM_NUM(2);
             CHECK_PARAM_TYPE(0, PLAIN)
             CHECK_PARAM_TYPE(1, STRING)
@@ -58,6 +66,7 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             OK_AND_RETURN
         }
         case DEL: {
+            SLAVE_CHECK
             CHECK_PARAM_NUM(1)
             CHECK_PARAM_TYPE(0, PLAIN)
             KEY(0)
@@ -161,6 +170,7 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             }
         }
         case RENAME: {
+            SLAVE_CHECK
             CHECK_PARAM_NUM(2)
             CHECK_PARAM_TYPE(0, PLAIN)
             CHECK_PARAM_TYPE(1, PLAIN)
@@ -195,6 +205,40 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             }
             client->name = PARAM(0);
             OK_AND_RETURN
+        }
+        case SLAVE_OF: {
+            CHECK_PARAM_NUM(1);
+            CHECK_PARAM_TYPE(0, PLAIN)
+            isSlave = true;
+            slaveof = PARAM(0);
+            int divide = PARAM(0).find_first_of(":");
+            string ip = PARAM(0).substr(0, divide);
+            string port = PARAM(0).substr(divide + 1);
+#ifdef WIN32
+            WORD sockVersion = MAKEWORD(2, 2);
+            WSADATA data;
+            WSAStartup(sockVersion, &data);
+            SOCKET sclient = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+            sockaddr_in serAddr;
+            serAddr.sin_family = AF_INET;
+            serAddr.sin_port = htons(atoi(port.c_str()));
+            serAddr.sin_addr.S_un.S_addr = inet_addr(ip.c_str());
+            if (connect(sclient, (sockaddr *) &serAddr, sizeof(serAddr)) == SOCKET_ERROR) {
+                res.res = "can not connect to master" + PARAM(0);
+                closesocket(sclient);
+                LOGIC_ERROR_AND_RETURN
+            }
+            sendToMaster(string("SYNC ") + to_string(replicaOffset));
+            //TODO 复制和命令传播
+            if (client != nullptr) {
+                OK_AND_RETURN;
+            }
+#elif defined(linux)
+            //TODO linux下
+#endif
+        }
+        case SYNC: {
+            //TODO
         }
     }
     INVALID_AND_RETURN
@@ -316,6 +360,7 @@ int MondisServer::startEventLoop() {
     }
 }
 
+//client表示执行命令的客户端，如果为nullptr则为Mondisserver自身
 ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) {
     if (!hasLogin) {
         ExecutionResult e;
@@ -453,6 +498,11 @@ void MondisServer::init() {
         runAsDaemon();
     }
     logFileOut.open(logFile, ios::app);
+    if (slaveof != "") {
+        string sync = "SLAVE_OF ";
+        sync += slaveof;
+        execute(sync, nullptr);
+    }
     std::thread accept(&MondisServer::acceptClient, this);
     std::thread eventLopp(&MondisServer::startEventLoop, this);
     selectAndHandle();
@@ -474,6 +524,12 @@ void MondisServer::acceptClient() {
         sockaddr_in remoteAddr;
         int len = sizeof(remoteAddr);
         SOCKET clientSock = accept(servSock, (SOCKADDR *) &remoteAddr, &len);
+        if (socketToClient.size() > MAX_SOCK_NUM) {
+            ExecutionResult res;
+            res.type = LOGIC_ERROR;
+            res.res = "can not build connection because has up to max sockets number!"
+            send(clientSock, res.toString());
+        }
         FD_SET(clientSock, &fds);
         MondisClient *client = new MondisClient(clientSock);
         socketToClient[&client->sock] = client;
@@ -486,17 +542,29 @@ void MondisServer::acceptClient() {
     sockAddr.sin_addr.S_un.S_addr = inet_addr("127.0.0.1");
     sockAddr.sin_port = htons(port);
     socket_fd = socket(AF_INET,SOCK_STREAM,0);
+    setnoblocking(socket_fd);
     bind(socket_fd,&servaddr, sizeof(servaddr));
     listen(socket_fd,10);
     while (true) {
-        connect_fd = accept(socket_fd, (struct sockaddr*)NULL, NULL));
+        connect_fd = accept(socket_fd, (struct sockaddr*)NULL, NULL);
+        if(fdToClient.size()>MAX_SOCK_NUM) {
+            ExecutionResult res;
+            res.type = LOGIC_ERROR;
+            res.res = "can not build connection because has up to max sockets number!"
+            send(connect_fd,res.toString());
+        }
+        setnoblocking(connect_fd);
         MondisClient* client = new MondisClient(connect_fd);
         fdToClient[connect_fd] = client;
+        epoll_event event;
+        event.events = EPOLLIN|EPOLLET;
+        epoll_ctl(efd, EPOLL_CTL_ADD, connect_fd, &event);
     }
 #endif
 }
 
 void MondisServer::handleCommand(MondisClient *client) {
+    //TODO 改为异步实现
     string commandStr;
     while ((commandStr = client->readCommand()) != "") {
         ExecutionResult res = execute(commandStr, nullptr);
@@ -519,14 +587,36 @@ void MondisServer::selectAndHandle() {
         }
     }
 #elif defined(linux)
-    //TODO
+    while (true) {
+        int nfds = epoll_wait(epollFd, events, MAX_SOCK_NUM, -1);
+        for(int i=0;i<nfds;i++) {
+            MondisClient* client = fdToClient[events[i].data.fd];
+            handleCommand(client);
+        }
+    }
 #endif
 }
 
 MondisServer::MondisServer() {
 #ifdef WIN32
     FD_ZERO(&fds);
+#elif defined(linux)
+    epollFd = epoll_create(1024);
+    events = new epoll_events[1024];
 #endif
+    replicaCommandBuffer = new queue<string>(MAX_COMMAND_BUFFER_SIZE);
+}
+
+void MondisServer::sendToMaster(const string &res) {
+#ifdef WIN32
+    send(masterSock, res);
+#elif defined(linux)
+    send(masterFd,res);
+#endif
+}
+
+MondisServer::~MondisServer() {
+    delete replicaCommandBuffer;
 }
 
 ExecutionResult Executor::execute(Command *command, MondisClient *client) {
@@ -573,6 +663,9 @@ void Executor::init() {
     INSERT(EXIT)
     INSERT(SELECT)
     INSERT(DEL)
+    INSERT(SLAVE_OF)
+    INSERT(SYNC)
+    INSERT(SET_NAME)
 }
 
 void Executor::destroyCommand(Command *command) {

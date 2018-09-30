@@ -138,6 +138,8 @@ enum CommandType {
     VACANT,
     M_ERROR,
     SET_NAME,
+    SLAVE_OF,
+    SYNC,
 };
 
 enum ExecutionResultType {

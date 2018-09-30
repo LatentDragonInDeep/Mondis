@@ -22,6 +22,12 @@
 #include "HashMap.h"
 #include "Command.h"
 
+enum ClientType {
+    MASTER,
+    SLAVE,
+    CLIENT,
+    PEER,
+};
 class MondisClient {
 public:
     uint64_t id;            /* Client incremental unique ID. */
@@ -30,6 +36,7 @@ public:
 #elif defined(linux)
     int fd;/* Client socket. */
 #endif
+    ClientType type = CLIENT;
     int curDbIndex = 0;
     HashMap *keySpace = nullptr;            /* Pointer to currently SELECTed DB. */
     string name;             /* As set by CLIENT SETNAME. */
@@ -41,7 +48,7 @@ public:
     int reqtype;            /* Request protocol type: PROTO_REQ_* */
     int multibulklen;       /* Number of multi bulk arguments left to read. */
     long bulklen;           /* Length of bulk argument in multi bulk request. */
-    vector<ExecutionResult> *reply;            /* List of reply objects to send to the client. */
+    vector<ExecutionResult> *reply;            /* List of reply objects to sendToMaster to the client. */
     unsigned long long reply_bytes; /* Tot bytes of objects in reply list. */
     size_t sentlen;         /* Amount of bytes already sent in the current
                                buffer or object being sent. */

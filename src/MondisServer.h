@@ -12,11 +12,16 @@
 #include <fstream>
 #include <vector>
 #include <unordered_map>
+#include <queue>
 
 #ifdef WIN32
 
 #include <winsock2.h>
+#include <inaddr.h>
+#include <stdio.h>
 
+#elif defined(linux)
+#include <sys/epoll.h>
 #endif
 
 #include "HashMap.h"
@@ -57,6 +62,8 @@ public:
 class Executor;
 class MondisServer {
 private:
+    const int MAX_SOCK_NUM = 1024;
+    const int MAX_COMMAND_BUFFER_SIZE = 1024 * 1024;
     pid_t pid;
     std::string configfile;
     std::string executable;
@@ -89,18 +96,54 @@ private:
     string recoveryStrategy;
     string aofFile;
     string jsonFile;
-    bool isLoading;
-    bool isRecovering;
+    bool isLoading = false;
+    bool isRecovering = false;
+    bool isSlave = false;
+    bool isMaster = false;
+    bool isLeader = false;
+    unordered_set<MondisClient *> slaves;
+    unordered_set<MondisClient *> peers;
+
+    unsigned replicaOffset = 0;
+    queue<string> *replicaCommandBuffer;
+
 #ifdef WIN32
     fd_set fds;
     unordered_map<SOCKET *, MondisClient *> socketToClient;
+    SOCKET masterSock;
+
+    void send(SOCKET &sock, const string &res) {
+        char buffer[4096];
+        int ret;
+        const char *data = res.data();
+        int hasWrite = 0;
+        while (hasWrite < res.size()) {
+            ret = sendToMaster(sock, data + hasWrite, res.size() - hasWrite);
+            hasWrite += ret;
+        }
+    };
 #elif defined(linux)
+    int epollFd;
+    epoll_event* events;
+    int masterFd;
     unordered_map<int,MondisClient*> fdToClient;
+    void send(int fd, const string& data) {
+        char buffer[4096];
+        int ret;
+        char *data = res.data();
+        int hasWrite = 0;
+        while (hasWrite<res.size()) {
+            ret = write(fd,data+hasWrite,res.size()-hasWrite);
+            hasWrite+=ret;
+        }
+    };
 #endif
 
     bool hasLogin = true;
 public:
     MondisServer();
+
+    ~MondisServer();
     int start(string& confFile);
     int runAsDaemon();
 
@@ -123,6 +166,8 @@ public:
     static JSONParser* getJSONParser();
 
     void acceptClient();
+
+    void sendToMaster(const string &res);
 };
 
 class Executor {

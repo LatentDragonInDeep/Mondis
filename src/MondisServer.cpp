@@ -707,7 +707,7 @@ void MondisServer::replicaToSlave(MondisClient *client, unsigned dbIndex, unsign
 }
 
 void MondisServer::singleCommandPropagate(const string &command) {
-//TODO 线程池优化
+//TODO singlethreadpoll线程池优化
 }
 
 void MondisServer::replicaCommandPropagate(vector<string> &commands, MondisClient *client) {

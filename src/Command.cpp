@@ -257,4 +257,6 @@ void Command::init() {
     MAP(EXIT)
     MAP(LOGIN)
     MAP(DISCONNECT)
+    MAP(PING)
+    MAP(PONG)
 }

@@ -23,10 +23,7 @@
 #include "Command.h"
 #include "MondisServer.h"
 
-#define SLAVE_CHECK if(isSlave) {\
-res.res = "current server is a slave,can not execute this command";\
-LOGIC_ERROR_AND_RETURN\
-}
+#define ADD(TYPE) modifyCommands.insert(TYPE);
 
 unordered_set<CommandType> Executor::serverCommand;
 
@@ -36,7 +33,6 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
     ExecutionResult res;
     switch (command->type) {
         case BIND: {
-            SLAVE_CHECK
             CHECK_PARAM_NUM(2);
             CHECK_PARAM_TYPE(0, PLAIN)
             CHECK_PARAM_TYPE(1, STRING)
@@ -66,7 +62,6 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             OK_AND_RETURN
         }
         case DEL: {
-            SLAVE_CHECK
             CHECK_PARAM_NUM(1)
             CHECK_PARAM_TYPE(0, PLAIN)
             KEY(0)
@@ -170,7 +165,6 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             }
         }
         case RENAME: {
-            SLAVE_CHECK
             CHECK_PARAM_NUM(2)
             CHECK_PARAM_TYPE(0, PLAIN)
             CHECK_PARAM_TYPE(1, PLAIN)
@@ -210,13 +204,9 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             if (isSlave) {
                 sendToMaster(string("DISCONNECT"));
             }
-            CHECK_PARAM_NUM(1);
+            CHECK_PARAM_NUM(4);
             CHECK_PARAM_TYPE(0, PLAIN)
             isSlave = true;
-            slaveof = PARAM(0);
-            int divide = PARAM(0).find_first_of(":");
-            string ip = PARAM(0).substr(0, divide);
-            string port = PARAM(0).substr(divide + 1);
 #ifdef WIN32
             WORD sockVersion = MAKEWORD(2, 2);
             WSADATA data;
@@ -244,6 +234,14 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
                 LOGIC_ERROR_AND_RETURN
             }
 #endif
+            sendToMaster(string("PING"));
+            string reply = readFromMaster();
+            if (reply != "PONG") {
+                res.res = "the socket to master is unavailable";
+                res.type = INTERNAL_ERROR;
+                return res;
+            }
+            sendToMaster(string("LOGIN ") + PARAM(2) + " " + PARAM(3));
             sendToMaster(string("SYNC ") + to_string(replicaOffset) + " " + to_string(curDbIndex));
             string json;
             //TODO 接受json和命令传播
@@ -257,13 +255,15 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             CHECK_PARAM_TYPE(1, PLAIN)
             CHECK_AND_DEFINE_INT_LEGAL(0, dbIndex);
             CHECK_AND_DEFINE_INT_LEGAL(1, offset);
+            slaves.insert(client);
             client->type = SLAVE;
             std::thread t(&MondisServer::replicaToSlave, this, client, dbIndex, offset);
             OK_AND_RETURN
         }
         case SYNC_FINISHED: {
             CHECK_PARAM_NUM(0)
-            cout << "sync has finished";
+            res.res = "sync has finished";
+            OK_AND_RETURN
         }
         case DISCONNECT: {
 #ifdef WIN32
@@ -272,6 +272,11 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             fdToClient.erase(fdToClient.find(client->fd));
 #endif
             delete client;
+            OK_AND_RETURN
+        }
+        case PING: {
+            client->sendResult("PONG");
+            OK_AND_RETURN
         }
     }
     INVALID_AND_RETURN
@@ -398,12 +403,27 @@ int MondisServer::startEventLoop() {
 
 //client表示执行命令的客户端，如果为nullptr则为Mondisserver自身
 ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) {
+    if (isPropagating) {
+        unique_lock lck(mtx);
+        cv.wait(lck);
+    }
     if (!hasLogin) {
         ExecutionResult e;
         e.res = "you haven't login,please login";
         return e;
     }
-    ExecutionResult res = executor->execute(interpreter->getCommand(commandStr), nullptr);
+    Command *c = interpreter->getCommand(commandStr);
+    Command *last = c;
+    while (last->next != nullptr) {
+        last = last->next;
+    }
+    bool isModifyCommand = modifyCommands.find(last->type) != modifyCommands.end();
+    if (isSlave && isModifyCommand) {
+        ExecutionResult res;
+        res.res = "the current server is a slave,can not execute command which will modify database state";
+        LOGIC_ERROR_AND_RETURN
+    }
+    ExecutionResult res = executor->execute(c, nullptr);
     if (res.type == OK) {
         if (aof) {
             aofFileOut << commandStr + "\n";
@@ -421,6 +441,14 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
     Log log(commandStr, res);
     logFileOut << log.toString();
     logFileOut.flush();
+    if (isModifyCommand) {
+        singleCommandPropagate(commandStr);
+        if (replicaCommandBuffer->size() = MAX_COMMAND_BUFFER_SIZE) {
+            replicaCommandBuffer->pop_front();
+            replicaCommandBuffer->push_back(commandStr);
+        }
+        replicaOffset++;
+    }
 
     return res;
 }
@@ -544,7 +572,7 @@ void MondisServer::init() {
     }
     isReplicating = false;
     std::thread accept(&MondisServer::acceptClient, this);
-    std::thread eventLopp(&MondisServer::startEventLoop, this);
+    std::thread eventLoop(&MondisServer::startEventLoop, this);
     selectAndHandle();
 }
 
@@ -643,7 +671,7 @@ MondisServer::MondisServer() {
     epollFd = epoll_create(1024);
     events = new epoll_events[1024];
 #endif
-    replicaCommandBuffer = new queue<string>;
+    replicaCommandBuffer = new deque<string>;
 }
 
 void MondisServer::sendToMaster(const string &res) {
@@ -659,15 +687,67 @@ MondisServer::~MondisServer() {
 }
 
 void MondisServer::replicaToSlave(MondisClient *client, unsigned dbIndex, unsigned long long slaveReplicaOffset) {
-//TODO
+    if (replicaOffset - slaveReplicaOffset > MAX_COMMAND_BUFFER_SIZE) {
+        const unsigned long long start = replicaOffset;
+        const string &json = dbs[dbIndex]->getJson();
+        client->sendResult(json);
+        isPropagating = true;
+        vector<string> commands(replicaCommandBuffer->begin() + (replicaOffset - start), replicaCommandBuffer->end());
+        replicaCommandPropagate(commands, client);
+        isPropagating = false;
+        cv.notify_all();
+    } else {
+        isPropagating = true;
+        vector<string> commands(replicaCommandBuffer->begin() + (replicaOffset - slaveReplicaOffset),
+                                replicaCommandBuffer->end());
+        replicaCommandPropagate(commands, client);
+        isPropagating = false;
+        cv.notify_all();
+    }
 }
 
 void MondisServer::singleCommandPropagate(const string &command) {
-//TODO
+//TODO 线程池优化
 }
 
 void MondisServer::replicaCommandPropagate(vector<string> &commands, MondisClient *client) {
-//TODO
+    for (auto &c:commands) {
+        client->sendResult(c);
+    }
+}
+
+void MondisServer::initModifyCommands() {
+    ADD(BIND)
+    ADD(DEL)
+    ADD(RENAME)
+    ADD(SET_RANGE)
+    ADD(REMOVE_RANGE)
+    ADD(INCR)
+    ADD(DECR)
+    ADD(INCR_BY)
+    ADD(DECR_BY)
+    ADD(APPEND)
+    ADD(PUSH_FRONT)
+    ADD(PUSH_BACK)
+    ADD(POP_FRONT)
+    ADD(POP_BACK)
+    ADD(ADD)
+    ADD(REMOVE)
+    ADD(REMOVE_BY_RANK)
+    ADD(REMOVE_BY_SCORE)
+    ADD(REMOVE_RANGE_BY_RANK)
+    ADD(REMOVE_RANGE_BY_SCORE)
+    ADD(WRITE)
+    ADD(TO_STRING)
+    ADD(CHANGE_SCORE)
+}
+
+string MondisServer::readFromMaster() {
+#ifdef WIN32
+    return read(masterSock);
+#elif defined(linux)
+    return read(masterFd);
+#endif
 }
 
 ExecutionResult Executor::execute(Command *command, MondisClient *client) {
@@ -739,3 +819,5 @@ void Executor::bindServer(MondisServer *sv) {
 }
 
 Executor *Executor::executor = new Executor;
+
+unordered_set<CommandType> MondisServer::modifyCommands;

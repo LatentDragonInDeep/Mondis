@@ -142,6 +142,8 @@ enum CommandType {
     SYNC,
     SYNC_FINISHED,//通知从服务器同步完成
     DISCONNECT,
+    PING,
+    PONG,
 };
 
 enum ExecutionResultType {

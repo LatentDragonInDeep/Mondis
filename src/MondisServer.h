@@ -13,6 +13,8 @@
 #include <vector>
 #include <unordered_map>
 #include <queue>
+#include <mutex>
+#include <condition_variable>
 
 #ifdef WIN32
 
@@ -106,7 +108,15 @@ private:
     unordered_set<MondisClient *> peers;
 
     unsigned long long replicaOffset = 0;
-    queue<string> *replicaCommandBuffer;
+    deque<string> *replicaCommandBuffer;
+    static unordered_set<CommandType> modifyCommands;
+
+    static void initModifyCommands();
+
+    bool isPropagating = false;
+    condition_variable cv;
+    mutex mtx;
+
 
 #ifdef WIN32
     fd_set fds;
@@ -123,6 +133,16 @@ private:
             hasWrite += ret;
         }
     };
+
+    string read(SOCKET &sock) {
+        string res;
+        char buffer[4096];
+        int ret;
+        while ((ret = recv(sock, buffer, sizeof(buffer), 0)) != 0) {
+            res += string(buffer, ret);
+        }
+        return res;
+    };
 #elif defined(linux)
     int epollFd;
     epoll_event* events;
@@ -137,6 +157,15 @@ private:
             ret = write(fd,data+hasWrite,res.size()-hasWrite);
             hasWrite+=ret;
         }
+    };
+    string read(int fd) {
+        string res;
+        char buffer[4096];
+        int ret;
+        while ((ret = read(fd, buffer, sizeof(buffer))) != 0) {
+            res += string(buffer, ret);
+        }
+        return res;
     };
 #endif
 
@@ -169,6 +198,8 @@ public:
     void acceptClient();
 
     void sendToMaster(const string &res);
+
+    string readFromMaster();
 
     void replicaToSlave(MondisClient *client, unsigned dbIndex, unsigned long long slaveReplicaOffset);
 

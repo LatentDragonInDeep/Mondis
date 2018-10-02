@@ -102,7 +102,7 @@ public:
     public:
         LexicalParser();
 
-        LexicalParser(const std::string &s);
+        LexicalParser(std::string &s);
 
         LexicalParser(std::string &&s);
 
@@ -122,7 +122,7 @@ public:
     Token current;
     JSONParser();
 
-    JSONParser(const std::string &source);
+    JSONParser(std::string &source);
 
     JSONParser(std::string &&s);
 

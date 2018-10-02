@@ -9,7 +9,7 @@
 #include "SplayTree.h"
 
 
-JSONParser::JSONParser(const std::string &source) {
+JSONParser::JSONParser(std::string &source) {
 
     lexicalParser = LexicalParser(source);
 }
@@ -263,7 +263,7 @@ void JSONParser::LexicalParser::skip() {
     }
 }
 
-JSONParser::LexicalParser::LexicalParser(const std::string &s) : source(s) {}
+JSONParser::LexicalParser::LexicalParser(std::string &s) : source(s) {}
 
 JSONParser::LexicalParser::LexicalParser() {}
 

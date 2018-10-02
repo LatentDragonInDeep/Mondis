@@ -4,7 +4,7 @@
 
 #include <ctime>
 #include "MondisClient.h"
-#include <boost/algorithm/string.hpp>
+#include <unistd.h>
 
 #ifdef WIN32
 
@@ -38,7 +38,14 @@ string MondisClient::readCommand() {
 #endif
     commandBuffer.clear();
     curCommandIndex = 0;
-    boost::split(commandBuffer, commandStr, boost::is_any_of("\r\n\r\n\r\n"));
+    int searchStart = 0;
+    int occurrence = 0;
+
+    while ((occurrence=commandStr.find("\r\n\r\n\r\n",searchStart))!=string::npos) {
+        commandBuffer.push_back(commandStr.substr(searchStart,occurrence-searchStart));
+        searchStart = occurrence+6;
+    }
+    commandBuffer.push_back(commandStr.substr(searchStart,commandStr.size()-searchStart));
     return commandBuffer[curCommandIndex];
 }
 

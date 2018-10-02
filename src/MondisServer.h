@@ -25,6 +25,7 @@
 
 #elif defined(linux)
 #include <sys/epoll.h>
+#include <unistd.h>
 #endif
 
 #include "HashMap.h"
@@ -155,10 +156,10 @@ private:
     void send(int fd, const string& data) {
         char buffer[4096];
         int ret;
-        char *data = res.data();
+        const char *toWrite = data.data();
         int hasWrite = 0;
-        while (hasWrite<res.size()) {
-            ret = write(fd,data+hasWrite,res.size()-hasWrite);
+        while (hasWrite<data.size()) {
+            ret = write(fd,toWrite+hasWrite,data.size()-hasWrite);
             hasWrite+=ret;
         }
     };
@@ -166,7 +167,7 @@ private:
         string res;
         char buffer[4096];
         int ret;
-        while ((ret = read(fd, buffer, sizeof(buffer))) != 0) {
+        while ((ret = ::read(fd, buffer, sizeof(buffer))) != 0) {
             res += string(buffer, ret);
         }
         return res;

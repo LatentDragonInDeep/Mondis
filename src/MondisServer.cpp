@@ -14,9 +14,8 @@
 
 #elif defined(linux)
 #include <sys/socket.h>
-#include <netinet.h>
-#include <stdlib>
-#include <stdio>
+#include <stdlib.h>
+#include <stdio.h>
 #include <sys/epoll.h>
 #endif
 
@@ -24,6 +23,9 @@
 #include "MondisServer.h"
 
 #define ADD(TYPE) modifyCommands.insert(TYPE);
+
+#define ERROR_EXIT(MESSAGE) cout<<MESSAGE;\
+                            exit(1);
 
 unordered_set<CommandType> Executor::serverCommand;
 
@@ -223,14 +225,15 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             }
             this->masterSock = masterSock;
 #elif defined(linux)
-            sockfd = socket(AF_INET, SOCK_STREAM, 0);
+            int sockfd = socket(AF_INET, SOCK_STREAM, 0);
             sockaddr_in serAddr;
             serAddr.sin_family = AF_INET;
-            serAddr.sin_port = htons(atoi(port.c_str()));
-            serAddr.sin_addr.S_un.S_addr = inet_addr(ip.c_str());
-            if(connect(sockfd, (struct sockaddr*)&servaddr, sizeof(servaddr))<0) {
+            serAddr.sin_port = htons((u_int16_t)atoi(PARAM(1).c_str()));
+            serAddr.sin_addr.s_addr = htonl(atoi(PARAM(0).c_str()));
+            int clientFd;
+            if((clientFd = connect(sockfd, (struct sockaddr*)&serAddr, sizeof(serAddr)))<0) {
                 res.res = "can not connect to master" + PARAM(0);
-                closesocket(sclient);
+                close(clientFd);
                 LOGIC_ERROR_AND_RETURN
             }
 #endif
@@ -341,23 +344,27 @@ int MondisServer::runAsDaemon() {
 #elif defined(linux)
     pid_t pid;
     int fd, i, nfiles;
-    struct rlimit rl;
     pid = fork();
-    if(pid < 0)
+    if(pid < 0) {
         ERROR_EXIT("First fork failed!");
+    }
 
-     if(pid > 0)
+     if(pid > 0) {
          exit(EXIT_SUCCESS);// father exit
+     }
 
-     if(setsid() == -1)
+     if(setsid() == -1) {
          ERROR_EXIT("setsid failed!");
+     }
 
      pid = fork();
-     if(pid < 0)
+     if(pid < 0) {
          ERROR_EXIT("Second fork failed!");
+     }
 
-     if(pid > 0)// father exit
+     if(pid > 0) {
          exit(EXIT_SUCCESS);
+     }
 #ifdef RLIMIT_NOFILE
      /* 关闭从父进程继承来的文件描述符 */
      if (getrlimit(RLIMIT_NOFILE, &rl) == -1)
@@ -368,11 +375,15 @@ int MondisServer::runAsDaemon() {
          close(i);
 #endif
      /* 重定向标准的3个文件描述符 */
-     if(fd = open("/dev/null", O_RDWR) < 0)
+     if(fd = open("/dev/null", O_RDWR) < 0) {
          ERROR_EXIT("open /dev/null failed!");
-     for(i=0; i<3; i++)
+     }
+     for(i=0; i<3; i++) {
          dup2(fd, i);
-     if(fd > 2) close(fd);
+     }
+     if(fd > 2) {
+         close(fd);
+     }
      /* 改变工作目录和文件掩码常量 */
      chdir("/");
      umask(0);
@@ -615,27 +626,27 @@ void MondisServer::acceptClient() {
     int socket_fd;
     int connect_fd;
     struct sockaddr_in servaddr;
-    sockAddr.sin_family = PF_INET;
-    sockAddr.sin_addr.S_un.S_addr = inet_addr("127.0.0.1");
-    sockAddr.sin_port = htons(port);
+    servaddr.sin_family = PF_INET;
+    servaddr.sin_addr.s_addr = htonl(atoi("127.0.0.1"));
+    servaddr.sin_port = htons(port);
     socket_fd = socket(AF_INET,SOCK_STREAM,0);
-    setnoblocking(socket_fd);
-    bind(socket_fd,&servaddr, sizeof(servaddr));
+    fcntl(socket_fd,F_SETFL,O_NONBLOCK);
+    bind(socket_fd,(sockaddr*)&servaddr, sizeof(servaddr));
     listen(socket_fd,10);
     while (true) {
         connect_fd = accept(socket_fd, (struct sockaddr*)NULL, NULL);
         if(fdToClient.size()>MAX_SOCK_NUM) {
             ExecutionResult res;
             res.type = LOGIC_ERROR;
-            res.res = "can not build connection because has up to max sockets number!"
+            res.res = "can not build connection because has up to max sockets number!";
             send(connect_fd,res.toString());
         }
-        setnoblocking(connect_fd);
+        fcntl(connect_fd,F_SETFL,O_NONBLOCK);
         MondisClient* client = new MondisClient(connect_fd);
         fdToClient[connect_fd] = client;
         epoll_event event;
         event.events = EPOLLIN|EPOLLET;
-        epoll_ctl(efd, EPOLL_CTL_ADD, connect_fd, &event);
+        epoll_ctl(epollFd, EPOLL_CTL_ADD, connect_fd, &event);
     }
 #endif
 }
@@ -678,7 +689,7 @@ MondisServer::MondisServer() {
     FD_ZERO(&fds);
 #elif defined(linux)
     epollFd = epoll_create(1024);
-    events = new epoll_events[1024];
+    events = new epoll_event[1024];
 #endif
     replicaCommandBuffer = new deque<string>;
 }

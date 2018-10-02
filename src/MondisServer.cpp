@@ -214,8 +214,8 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             SOCKET masterSock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
             sockaddr_in serAddr;
             serAddr.sin_family = AF_INET;
-            serAddr.sin_port = htons(atoi(port.c_str()));
-            serAddr.sin_addr.S_un.S_addr = inet_addr(ip.c_str());
+            serAddr.sin_port = htons(atoi(PARAM(0).c_str()));
+            serAddr.sin_addr.S_un.S_addr = inet_addr(PARAM(1).c_str());
             if (connect(masterSock, (sockaddr *) &serAddr, sizeof(serAddr)) == SOCKET_ERROR) {
                 res.res = "can not connect to master" + PARAM(0);
                 closesocket(masterSock);
@@ -442,13 +442,15 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
     logFileOut << log.toString();
     logFileOut.flush();
     if (isModifyCommand) {
-        singleCommandPropagate(commandStr);
-        if (replicaCommandBuffer->size() = MAX_COMMAND_BUFFER_SIZE) {
+        singleCommandPropagate();
+        if (replicaCommandBuffer->size() == MAX_COMMAND_BUFFER_SIZE) {
             replicaCommandBuffer->pop_front();
             replicaCommandBuffer->push_back(commandStr);
         }
         replicaOffset++;
     }
+    curCommand = commandStr;
+    cv2.notify_all();
 
     return res;
 }
@@ -672,6 +674,7 @@ MondisServer::MondisServer() {
     events = new epoll_events[1024];
 #endif
     replicaCommandBuffer = new deque<string>;
+    std::thread propagateIO(&MondisServer::singleCommandPropagate, this);
 }
 
 void MondisServer::sendToMaster(const string &res) {
@@ -706,8 +709,15 @@ void MondisServer::replicaToSlave(MondisClient *client, unsigned dbIndex, unsign
     }
 }
 
-void MondisServer::singleCommandPropagate(const string &command) {
-//TODO singlethreadpoll线程池优化
+void MondisServer::singleCommandPropagate() {
+    std::unique_lock lck(mtx2);
+    cv2.wait(lck);
+    while (true) {
+        for (MondisClient *slave:slaves) {
+            slave->sendResult(curCommand);
+        }
+        cv2.wait(lck);
+    }
 }
 
 void MondisServer::replicaCommandPropagate(vector<string> &commands, MondisClient *client) {

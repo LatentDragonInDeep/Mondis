@@ -15,6 +15,7 @@
 #include <queue>
 #include <mutex>
 #include <condition_variable>
+#include <thread>
 
 #ifdef WIN32
 
@@ -117,6 +118,9 @@ private:
     condition_variable cv;
     mutex mtx;
 
+    string curCommand;
+    condition_variable cv2;
+    mutex mtx2;
 
 #ifdef WIN32
     fd_set fds;
@@ -203,7 +207,7 @@ public:
 
     void replicaToSlave(MondisClient *client, unsigned dbIndex, unsigned long long slaveReplicaOffset);
 
-    void singleCommandPropagate(const string &command);
+    void singleCommandPropagate();
 
     void replicaCommandPropagate(vector<string> &commands, MondisClient *client);
 };

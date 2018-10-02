@@ -575,6 +575,7 @@ void MondisServer::init() {
     isReplicating = false;
     std::thread accept(&MondisServer::acceptClient, this);
     std::thread eventLoop(&MondisServer::startEventLoop, this);
+    std::thread propagateIO(&MondisServer::singleCommandPropagate, this);
     selectAndHandle();
 }
 
@@ -674,7 +675,6 @@ MondisServer::MondisServer() {
     events = new epoll_events[1024];
 #endif
     replicaCommandBuffer = new deque<string>;
-    std::thread propagateIO(&MondisServer::singleCommandPropagate, this);
 }
 
 void MondisServer::sendToMaster(const string &res) {

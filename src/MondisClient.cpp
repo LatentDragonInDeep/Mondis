@@ -67,3 +67,5 @@ MondisClient::~MondisClient() {
     close(fd);
 #endif
 }
+
+int MondisClient::nextId = 1;

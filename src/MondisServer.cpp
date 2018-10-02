@@ -242,9 +242,15 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
                 return res;
             }
             sendToMaster(string("LOGIN ") + PARAM(2) + " " + PARAM(3));
+            string loginRes = readFromMaster();
+            if (loginRes.substr(0, 2) != "OK") {
+                res.res = "username or password error";
+                LOGIC_ERROR_AND_RETURN
+            }
             sendToMaster(string("SYNC ") + to_string(replicaOffset) + " " + to_string(curDbIndex));
-            string json;
-            //TODO 接受json和命令传播
+            const string &json = readFromMaster();
+            JSONParser temp(json);
+            temp.parse(curKeySpace);
             if (client != nullptr) {
                 OK_AND_RETURN;
             }
@@ -262,6 +268,7 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
         }
         case SYNC_FINISHED: {
             CHECK_PARAM_NUM(0)
+            isReplicatingFromMaster = false;
             res.res = "sync has finished";
             OK_AND_RETURN
         }
@@ -551,7 +558,7 @@ void MondisServer::init() {
     isRecovering = true;
     cout << "is Recovering..." << endl;
     if (recoveryStrategy == "json") {
-        JSONParser temp(recoveryFile);
+        JSONParser temp(recoveryFile.c_str());
         temp.parse(curKeySpace);
     } else if (recoveryStrategy == "aof") {
         recoveryFileIn.open(recoveryFile);
@@ -566,13 +573,12 @@ void MondisServer::init() {
     }
     logFileOut.open(logFile, ios::app);
     if (slaveof != "") {
-        isReplicating = true;
+        isReplicatingFromMaster = true;
         cout << "is Replicating from master..." << endl;
         string sync = "SLAVE_OF ";
         sync += slaveof;
         execute(sync, nullptr);
     }
-    isReplicating = false;
     std::thread accept(&MondisServer::acceptClient, this);
     std::thread eventLoop(&MondisServer::startEventLoop, this);
     std::thread propagateIO(&MondisServer::singleCommandPropagate, this);

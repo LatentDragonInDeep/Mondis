@@ -9,9 +9,9 @@
 #include "SplayTree.h"
 
 
-JSONParser::JSONParser(std::string &filePath) {
+JSONParser::JSONParser(const std::string &source) {
 
-    lexicalParser = LexicalParser(filePath.c_str());
+    lexicalParser = LexicalParser(source);
 }
 
 void JSONParser::parse(HashMap *keySpace) {
@@ -221,6 +221,10 @@ void JSONParser::matchToken(JSONParser::LexicalParser &lp, ParserTokenType type)
     }
 }
 
+JSONParser::JSONParser(const char *filePath) {
+    lexicalParser = LexicalParser(filePath);
+}
+
 Token *Token::leftSquareBracket = new Token(LEFT_SQUARE_BRACKET);
 Token *Token::rightSquareBracket = new Token(RIGHT_SQUARE_BRACKET);
 Token *Token::leftAngleBracket = new Token(LEFT_ANGLE_BRACKET);
@@ -255,7 +259,7 @@ void JSONParser::LexicalParser::skip() {
     }
 }
 
-JSONParser::LexicalParser::LexicalParser(std::string &s) : source(s) {}
+JSONParser::LexicalParser::LexicalParser(const std::string &s) : source(s) {}
 
 JSONParser::LexicalParser::LexicalParser() {}
 

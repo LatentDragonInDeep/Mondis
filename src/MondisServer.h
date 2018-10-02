@@ -101,7 +101,7 @@ private:
     string jsonFile;
     bool isLoading = false;
     bool isRecovering = false;
-    bool isReplicating = false;
+    bool isReplicatingFromMaster = false;
     bool isSlave = false;
     bool isMaster = false;
     bool isLeader = false;

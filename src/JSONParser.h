@@ -100,12 +100,15 @@ public:
     private:
         void skip();;
     public:
-        LexicalParser();;
+        LexicalParser();
 
-        LexicalParser(std::string &s);
+        LexicalParser(const std::string &s);
 
         LexicalParser(const char *filePath);;
 
+        LexicalParser(LexicalParser &) = default;
+
+        LexicalParser &operator=(LexicalParser &&) = default;
         Token nextToken();
 
         bool back();
@@ -116,7 +119,10 @@ public:
     };
     Token current;
     JSONParser();
-    JSONParser(std::string& filePath);
+
+    JSONParser(const std::string &source);
+
+    JSONParser(const char *filePath);
     void parse(HashMap* keySpace);
 
     MondisObject *parseObject(std::string &content);

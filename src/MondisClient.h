@@ -7,30 +7,48 @@
 
 
 #include <stdint-gcc.h>
-#include <queue>
+#include <vector>
+
+#ifdef WIN32
+
+#include <winsock2.h>
+#include <inaddr.h>
+
+#elif defined(linux)
+#include <sys/socket.h>
+#include <netinet/in.h>
+#endif
 
 #include "HashMap.h"
 #include "Command.h"
 
+enum ClientType {
+    MASTER,
+    SLAVE,
+    CLIENT,
+    PEER,
+};
 class MondisClient {
 public:
     uint64_t id;            /* Client incremental unique ID. */
+#ifdef WIN32
+    SOCKET sock;
+#elif defined(linux)
     int fd;/* Client socket. */
+#endif
+    ClientType type = CLIENT;
     int curDbIndex = 0;
     HashMap *keySpace = nullptr;            /* Pointer to currently SELECTed DB. */
     string name;             /* As set by CLIENT SETNAME. */
-    queue<string> queryBuffer;         /* Buffer we use to accumulate client queries. */
-    queue<string> pendingQuerybuf;   /* If this client is flagged as master, this buffer
-                               represents the yet not applied portion of the
-                               replication stream that we are receiving from
-                               the master. */
+    vector<string> commandBuffer;         /* Buffer we use to accumulate client queries. */
+    int curCommandIndex = 0;
     size_t querybuf_peak;   /* Recent (100ms or more) peak of querybuf size. */
-    Command *curCommand            /* Arguments of current command. */
+    Command *curCommand;          /* Arguments of current command. */
     Command *lastcmd;  /* Last command executed. */
     int reqtype;            /* Request protocol type: PROTO_REQ_* */
     int multibulklen;       /* Number of multi bulk arguments left to read. */
     long bulklen;           /* Length of bulk argument in multi bulk request. */
-    vector<ExecutionResult> *reply;            /* List of reply objects to send to the client. */
+    vector<ExecutionResult> *reply;            /* List of reply objects to sendToMaster to the client. */
     unsigned long long reply_bytes; /* Tot bytes of objects in reply list. */
     size_t sentlen;         /* Amount of bytes already sent in the current
                                buffer or object being sent. */
@@ -60,9 +78,19 @@ public:
 private:
     static int nextId;
 public:
+#ifdef WIN32
+
+    MondisClient(SOCKET sock);
+
+#elif defined(linux)
     MondisClient(int fd);
+
+#endif
+
+    ~MondisClient();
     string readCommand();
-    void sendResult(const string& res);
+
+    void sendResult(const string &res);
 };
 
 

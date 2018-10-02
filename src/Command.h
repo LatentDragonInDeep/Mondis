@@ -104,7 +104,7 @@ enum CommandType {
     POP_BACK,
     ADD,
     REMOVE,
-    SIZE,
+    M_SIZE,
     COUNT,
     REMOVE_BY_RANK,
     REMOVE_BY_SCORE,
@@ -136,8 +136,14 @@ enum CommandType {
     LOGIN,
     SELECT,
     VACANT,
-    ERROR,
+    M_ERROR,
     SET_NAME,
+    SLAVE_OF,
+    SYNC,
+    SYNC_FINISHED,//通知从服务器同步完成
+    DISCONNECT,
+    PING,
+    PONG,
 };
 
 enum ExecutionResultType {

@@ -29,19 +29,19 @@ Command *CommandInterpreter::getCommand(std::string &raw) {
         for (int i = 0; i <vt.size(); ++i) {
             if (i == 0) {
                 if(vt[i].type!=PLAIN_PARAM) {
-                    cur->type = ERROR;
+                    cur->type = M_ERROR;
                     return res;
                 }
                 util::toUpperCase(vt[i].content);
                 if(map.find(vt[i].content)==map.end()) {
-                    cur->type = ERROR;
+                    cur->type = M_ERROR;
                     return res;
                 }
                 cur->type = map[vt[i].content];
                 continue;
             }
             else if(i>=5) {
-                cur->type = ERROR;
+                cur->type = M_ERROR;
                 return res;
             }
             Command::Param param;
@@ -83,7 +83,7 @@ void CommandInterpreter::init() {
     PUT(POP_BACK)
     PUT(ADD)
     PUT(REMOVE)
-    PUT(SIZE)
+    map["size"] = M_SIZE;
     PUT(REMOVE_BY_RANK)
     PUT(REMOVE_BY_SCORE)
     PUT(REMOVE_RANGE_BY_RANK)
@@ -115,6 +115,9 @@ void CommandInterpreter::init() {
     PUT(SET_POS)
     PUT(COUNT)
     PUT(SET_NAME)
+    PUT(SLAVE_OF)
+    PUT(SYNC)
+    PUT(SYNC_FINISHED)
 }
 
 void CommandInterpreter::LexicalParser::skip() {
@@ -228,7 +231,7 @@ void Command::init() {
     MAP(POP_BACK)
     MAP(ADD)
     MAP(REMOVE)
-    MAP(SIZE)
+    MAP(M_SIZE)
     MAP(REMOVE_BY_RANK)
     MAP(REMOVE_BY_SCORE)
     MAP(REMOVE_RANGE_BY_RANK)
@@ -253,4 +256,7 @@ void Command::init() {
     MAP(SAVE)
     MAP(EXIT)
     MAP(LOGIN)
+    MAP(DISCONNECT)
+    MAP(PING)
+    MAP(PONG)
 }

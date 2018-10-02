@@ -718,7 +718,7 @@ ExecutionResult SplayTree::execute(Command *command) {
             res.res = util::to_string(contains(score));
             OK_AND_RETURN
         }
-        case SIZE: {
+        case M_SIZE: {
             CHECK_PARAM_NUM(0)
             res.res = to_string(size());
             OK_AND_RETURN

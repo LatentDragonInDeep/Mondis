@@ -9,9 +9,9 @@
 #include "SplayTree.h"
 
 
-JSONParser::JSONParser(std::string &filePath) {
+JSONParser::JSONParser(std::string &source) {
 
-    lexicalParser = LexicalParser(filePath.c_str());
+    lexicalParser = LexicalParser(source);
 }
 
 void JSONParser::parse(HashMap *keySpace) {
@@ -77,7 +77,7 @@ MondisObject *JSONParser::parseObject(LexicalParser &lp) {
     Token next = lp.nextToken();
     if(next.type == LEFT_ANGLE_BRACKET) {
         return parseJSONObject(lp, false, false);
-    } else if(next.type == LEFT_SQAURE_BRACKET) {
+    } else if (next.type == LEFT_SQUARE_BRACKET) {
         return parseJSONArray(lp, false);
     }
     else if(next.type == STRING) {
@@ -133,7 +133,7 @@ MondisObject *JSONParser::parseJSONObject(LexicalParser &lp, bool isNeedNext, bo
 
 MondisObject *JSONParser::parseJSONArray(LexicalParser &lp, bool isNeedNext) {
     if(isNeedNext) {
-        matchToken(lp,LEFT_SQAURE_BRACKET);
+        matchToken(lp, LEFT_SQUARE_BRACKET);
     }
     MondisObject* res = new MondisObject;
     MondisObject *first = parseObject(lp);
@@ -214,14 +214,22 @@ MondisObject *JSONParser::parseJSONArray(LexicalParser &lp, bool isNeedNext) {
 
 JSONParser::JSONParser() {}
 
-void JSONParser::matchToken(JSONParser::LexicalParser &lp, TokenType type) {
+void JSONParser::matchToken(JSONParser::LexicalParser &lp, ParserTokenType type) {
     Token next = lp.nextToken();
     if (next.type != type) {
         throw new std::invalid_argument("unexpected token!");
     }
 }
 
-Token *Token::leftSquareBracket = new Token(LEFT_SQAURE_BRACKET);
+JSONParser::JSONParser(const char *filePath) {
+    lexicalParser = LexicalParser(filePath);
+}
+
+JSONParser::JSONParser(std::string &&s) {
+    lexicalParser = LexicalParser(s);
+}
+
+Token *Token::leftSquareBracket = new Token(LEFT_SQUARE_BRACKET);
 Token *Token::rightSquareBracket = new Token(RIGHT_SQUARE_BRACKET);
 Token *Token::leftAngleBracket = new Token(LEFT_ANGLE_BRACKET);
 Token *Token::rightAngleBracket = new Token(RIGHT_ANGLE_BRACKET);
@@ -232,12 +240,107 @@ Token *Token::colon = new Token(COLON);
 std::unordered_map<char, Token *> JSONParser::LexicalParser::directRecognize;
 
 void JSONParser::LexicalParser::init() {
-    directRecognize['['] = Token::getToken(LEFT_SQAURE_BRACKET);
+    directRecognize['['] = Token::getToken(LEFT_SQUARE_BRACKET);
     directRecognize[']'] = Token::getToken(RIGHT_SQUARE_BRACKET);
     directRecognize['{'] = Token::getToken(LEFT_ANGLE_BRACKET);
     directRecognize['}'] = Token::getToken(RIGHT_ANGLE_BRACKET);
     directRecognize[','] = Token::getToken(COMMA);
     directRecognize[':'] = Token::getToken(COLON);
+}
+
+void JSONParser::LexicalParser::skip() {
+    if (curIndex >= source.size()) {
+        isEnd = true;
+        return;
+    }
+    while (source[curIndex] == ' ' || source[curIndex] == '\n' || source[curIndex] == '\r' ||
+           source[curIndex] == '\t') {
+        curIndex++;
+        if (curIndex >= source.size()) {
+            isEnd = true;
+            break;
+        }
+    }
+}
+
+JSONParser::LexicalParser::LexicalParser(std::string &s) : source(s) {}
+
+JSONParser::LexicalParser::LexicalParser() {}
+
+JSONParser::LexicalParser::LexicalParser(const char *filePath) {
+    struct stat info;
+    int fd = open(filePath, O_RDONLY);
+    fstat(fd, &info);
+
+    source.reserve(info.st_size);
+
+    std::ifstream in;
+    in.open(filePath);
+    std::string line;
+    while (std::getline(in, line)) {
+        source += line;
+        source += "\n";
+    }
+    close(fd);
+    in.close();
+}
+
+Token JSONParser::LexicalParser::nextToken() {
+    preIndex = curIndex;
+    hasBacked = false;
+    Token res;
+    skip();
+    if (isEnd) {
+        return res;
+    }
+    int start;
+    int end;
+    if (directRecognize.find(source[curIndex]) != directRecognize.end()) {
+        res = *directRecognize[source[curIndex]];
+        curIndex++;
+        return res;
+    }
+    if (source[curIndex] == '"') {
+        start = curIndex;
+        while (true) {
+            curIndex++;
+            if (source[curIndex] == '"') {
+                if (source[curIndex - 1] != '\\') {
+                    end = curIndex;
+                    res.type = STRING;
+                    std::string raw(source, start + 1, end - start - 1);
+                    util::eraseBackSlash(raw);
+                    curIndex++;
+                    res.content = raw;
+                    return res;
+                }
+            }
+        }
+    }
+
+}
+
+bool JSONParser::LexicalParser::back() {
+    if (hasBacked) {
+        return false;
+    }
+    curIndex = preIndex;
+    hasBacked = true;
+    return true;
+}
+
+void JSONParser::LexicalParser::reset() {
+    source = "";
+    curIndex = 0;
+    isEnd = false;
+}
+
+void JSONParser::LexicalParser::setSource(std::string newSrc) {
+    source = newSrc;
+}
+
+JSONParser::LexicalParser::LexicalParser(std::string &&s) {
+    source = s;
 }
 
 void util::eraseBackSlash(std::string &data) {

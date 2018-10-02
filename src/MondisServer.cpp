@@ -248,7 +248,7 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
                 LOGIC_ERROR_AND_RETURN
             }
             sendToMaster(string("SYNC ") + to_string(replicaOffset) + " " + to_string(curDbIndex));
-            const string &json = readFromMaster();
+            string &&json = readFromMaster();
             JSONParser temp(json);
             temp.parse(curKeySpace);
             if (client != nullptr) {

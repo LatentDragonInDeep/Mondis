@@ -104,6 +104,8 @@ public:
 
         LexicalParser(const std::string &s);
 
+        LexicalParser(std::string &&s);
+
         LexicalParser(const char *filePath);;
 
         LexicalParser(LexicalParser &) = default;
@@ -121,6 +123,8 @@ public:
     JSONParser();
 
     JSONParser(const std::string &source);
+
+    JSONParser(std::string &&s);
 
     JSONParser(const char *filePath);
     void parse(HashMap* keySpace);

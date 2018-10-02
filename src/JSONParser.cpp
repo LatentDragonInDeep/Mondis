@@ -225,6 +225,10 @@ JSONParser::JSONParser(const char *filePath) {
     lexicalParser = LexicalParser(filePath);
 }
 
+JSONParser::JSONParser(std::string &&s) {
+    lexicalParser = LexicalParser(s);
+}
+
 Token *Token::leftSquareBracket = new Token(LEFT_SQUARE_BRACKET);
 Token *Token::rightSquareBracket = new Token(RIGHT_SQUARE_BRACKET);
 Token *Token::leftAngleBracket = new Token(LEFT_ANGLE_BRACKET);
@@ -333,6 +337,10 @@ void JSONParser::LexicalParser::reset() {
 
 void JSONParser::LexicalParser::setSource(std::string newSrc) {
     source = newSrc;
+}
+
+JSONParser::LexicalParser::LexicalParser(std::string &&s) {
+    source = s;
 }
 
 void util::eraseBackSlash(std::string &data) {

@@ -602,7 +602,7 @@ void MondisServer::init() {
     if (slaveOf) {
         isReplicatingFromMaster = true;
         cout << "is Replicating from master..." << endl;
-        string sync = "SLAVE_OF "+;
+        string sync = "SLAVE_OF ";
         sync += masterIP;
         sync += " ";
         sync += masterPort;
@@ -714,7 +714,7 @@ MondisServer::MondisServer() {
     events = new epoll_event[1024];
 #endif
     replicaCommandBuffer = new deque<string>;
-    commandPropagateBuffer = new deque<string>;
+    commandPropagateBuffer = new queue<string>;
 }
 
 void MondisServer::sendToMaster(const string &res) {

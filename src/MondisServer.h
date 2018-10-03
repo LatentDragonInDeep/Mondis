@@ -119,7 +119,7 @@ private:
     condition_variable propagateCV;
     mutex propagateMtx;
 
-    deque<string>* commandPropagateBuffer;
+    queue<string> *commandPropagateBuffer;
     
     string masterUsername;
     string masterPassword;

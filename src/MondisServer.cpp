@@ -422,8 +422,8 @@ int MondisServer::startEventLoop() {
 //client表示执行命令的客户端，如果为nullptr则为Mondisserver自身
 ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) {
     if (isPropagating) {
-        unique_lock lck(mtx);
-        cv.wait(lck);
+        unique_lock lck(propagateMtx);
+        propagateCV.wait(lck);
     }
     if (!hasLogin) {
         ExecutionResult e;
@@ -526,8 +526,6 @@ void MondisServer::applyConf() {
             }
         } else if (kv.first == "jsonDuration") {
             util::toInteger(kv.second, jsonDuration);
-        } else if (kv.first == "slaveOf") {
-            slaveof = kv.second;
         } else if (kv.first == "workDir") {
             workDir = kv.second;
         } else if (kv.first == "logFile") {
@@ -546,6 +544,20 @@ void MondisServer::applyConf() {
             maxCommandPropagateBufferSize = atoi(kv.second.c_str());
         } else if(kv.first == "maxCommandPropagateBufferSize" ) {
             maxCommandPropagateBufferSize=atoi(kv.second.c_str());
+        } else if(kv.first == "masterUsername") {
+            masterUsername = kv.second;
+        } else if(kv.first == "masterPassword") {
+            masterPassword = kv.second;
+        } else if(kv.first == "masterIP" ) {
+            masterIP = kv.second;
+        } else if(kv.first == "masterPort") {
+            masterPort = kv.second;
+        } else if(kv.first == "slaveOf") {
+            if(kv.second == "true") {
+                slaveOf = true;
+            } else if(kv.second == "false"){
+                slaveOf = false;
+            }
         }
     }
 }
@@ -587,11 +599,17 @@ void MondisServer::init() {
         runAsDaemon();
     }
     logFileOut.open(logFile, ios::app);
-    if (slaveof != "") {
+    if (slaveOf) {
         isReplicatingFromMaster = true;
         cout << "is Replicating from master..." << endl;
-        string sync = "SLAVE_OF ";
-        sync += slaveof;
+        string sync = "SLAVE_OF "+;
+        sync += masterIP;
+        sync += " ";
+        sync += masterPort;
+        sync +=" ";
+        sync+= masterUsername;
+        sync+=" ";
+        sync+=masterPassword;
         execute(sync, nullptr);
     }
     std::thread accept(&MondisServer::acceptClient, this);
@@ -721,14 +739,14 @@ void MondisServer::replicaToSlave(MondisClient *client, unsigned dbIndex, unsign
         vector<string> commands(replicaCommandBuffer->begin() + (replicaOffset - start), replicaCommandBuffer->end());
         replicaCommandPropagate(commands, client);
         isPropagating = false;
-        cv.notify_all();
+        propagateCV.notify_all();
     } else {
         isPropagating = true;
         vector<string> commands(replicaCommandBuffer->begin() + (replicaOffset - slaveReplicaOffset),
                                 replicaCommandBuffer->end());
         replicaCommandPropagate(commands, client);
         isPropagating = false;
-        cv.notify_all();
+        propagateCV.notify_all();
     }
 }
 

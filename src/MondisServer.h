@@ -78,7 +78,6 @@ private:
     int aofSyncStrategy = 1;
     bool json = true;
     int jsonDuration = 10;
-    string slaveof = "127.0.0.1";
     string workDir;
     string logFile;
     HashMap* curKeySpace;
@@ -117,12 +116,18 @@ private:
     static void initModifyCommands();
 
     bool isPropagating = false;
-    condition_variable cv;
-    mutex mtx;
+    condition_variable propagateCV;
+    mutex propagateMtx;
 
     deque<string>* commandPropagateBuffer;
-    condition_variable cv2;
-    mutex mtx2;
+    
+    string masterUsername;
+    string masterPassword;
+    string masterIP;
+    string masterPort;
+    
+    bool slaveOf=false;
+    
 
 #ifdef WIN32
     fd_set fds;

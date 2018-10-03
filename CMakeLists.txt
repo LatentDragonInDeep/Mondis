@@ -1,6 +1,4 @@
 cmake_minimum_required(VERSION 3.10)
-set(CMAKE_C_COMPILER "/usr/bin/x86_64-linux-gnu-gcc-8")
-set(CMAKE_CXX_COMPILER "/usr/bin/g++-8")
 project(Mondis)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -13,5 +11,7 @@ set(CMAKE_EXE_LINKER_FLAGS -static)
 
 add_executable(Mondis ${SRC_DIRS})
 IF (WIN32)
-target_link_libraries(Mondis ws2_32)
+    target_link_libraries(Mondis ws2_32)
+ELSEIF(UNIX)
+    target_link_libraries(Mondis pthread)
 ENDIF ()

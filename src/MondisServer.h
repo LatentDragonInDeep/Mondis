@@ -66,8 +66,9 @@ public:
 class Executor;
 class MondisServer {
 private:
-    const int MAX_SOCK_NUM = 1024;
-    const int MAX_COMMAND_BUFFER_SIZE = 1024 * 1024;
+    int maxCilentNum = 1024;
+    int maxCommandReplicaBufferSize = 1024 * 1024;
+    int maxCommandPropagateBufferSize = 0;
     pid_t pid;
     std::string configfile;
     std::string executable;
@@ -119,7 +120,7 @@ private:
     condition_variable cv;
     mutex mtx;
 
-    string curCommand;
+    deque<string>* commandPropagateBuffer;
     condition_variable cv2;
     mutex mtx2;
 
@@ -211,6 +212,13 @@ public:
     void singleCommandPropagate();
 
     void replicaCommandPropagate(vector<string> &commands, MondisClient *client);
+
+    bool putToPropagateBuffer(const string& curCommand);
+
+    string takeFromPropagateBuffer();
+
+    condition_variable notEmpty;
+    mutex notEmptyMtx;
 };
 
 class Executor {

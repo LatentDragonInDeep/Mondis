@@ -460,15 +460,13 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
     logFileOut << log.toString();
     logFileOut.flush();
     if (isModifyCommand) {
-        singleCommandPropagate();
-        if (replicaCommandBuffer->size() == MAX_COMMAND_BUFFER_SIZE) {
+        if (replicaCommandBuffer->size() == maxCommandReplicaBufferSize) {
             replicaCommandBuffer->pop_front();
             replicaCommandBuffer->push_back(commandStr);
         }
         replicaOffset++;
+        while (!putToPropagateBuffer(commandStr));
     }
-    curCommand = commandStr;
-    cv2.notify_all();
 
     return res;
 }
@@ -542,6 +540,12 @@ void MondisServer::applyConf() {
             recoveryStrategy = kv.second;
         } else if (kv.first == "recoveryFile") {
             recoveryFile = kv.second;
+        } else if(kv.first == "maxClientNum") {
+            maxCilentNum=atoi(kv.second.c_str());
+        } else if(kv.first == "maxCommandReplicaBufferSize") {
+            maxCommandPropagateBufferSize = atoi(kv.second.c_str());
+        } else if(kv.first == "maxCommandPropagateBufferSize" ) {
+            maxCommandPropagateBufferSize=atoi(kv.second.c_str());
         }
     }
 }
@@ -612,7 +616,7 @@ void MondisServer::acceptClient() {
         sockaddr_in remoteAddr;
         int len = sizeof(remoteAddr);
         SOCKET clientSock = accept(servSock, (SOCKADDR *) &remoteAddr, &len);
-        if (socketToClient.size() > MAX_SOCK_NUM) {
+        if (socketToClient.size() > maxCilentNum) {
             ExecutionResult res;
             res.type = LOGIC_ERROR;
             res.res = "can not build connection because has up to max sockets number!";
@@ -635,7 +639,7 @@ void MondisServer::acceptClient() {
     listen(socket_fd,10);
     while (true) {
         connect_fd = accept(socket_fd, (struct sockaddr*)NULL, NULL);
-        if(fdToClient.size()>MAX_SOCK_NUM) {
+        if(fdToClient.size()>maxCilentNum) {
             ExecutionResult res;
             res.type = LOGIC_ERROR;
             res.res = "can not build connection because has up to max sockets number!";
@@ -675,7 +679,7 @@ void MondisServer::selectAndHandle() {
     }
 #elif defined(linux)
     while (true) {
-        int nfds = epoll_wait(epollFd, events, MAX_SOCK_NUM, -1);
+        int nfds = epoll_wait(epollFd, events, maxCilentNum, -1);
         for(int i=0;i<nfds;i++) {
             MondisClient* client = fdToClient[events[i].data.fd];
             handleCommand(client);
@@ -692,6 +696,7 @@ MondisServer::MondisServer() {
     events = new epoll_event[1024];
 #endif
     replicaCommandBuffer = new deque<string>;
+    commandPropagateBuffer = new deque<string>;
 }
 
 void MondisServer::sendToMaster(const string &res) {
@@ -704,10 +709,11 @@ void MondisServer::sendToMaster(const string &res) {
 
 MondisServer::~MondisServer() {
     delete replicaCommandBuffer;
+    delete commandPropagateBuffer;
 }
 
 void MondisServer::replicaToSlave(MondisClient *client, unsigned dbIndex, unsigned long long slaveReplicaOffset) {
-    if (replicaOffset - slaveReplicaOffset > MAX_COMMAND_BUFFER_SIZE) {
+    if (replicaOffset - slaveReplicaOffset > maxCommandReplicaBufferSize) {
         const unsigned long long start = replicaOffset;
         const string &json = dbs[dbIndex]->getJson();
         client->sendResult(json);
@@ -727,13 +733,11 @@ void MondisServer::replicaToSlave(MondisClient *client, unsigned dbIndex, unsign
 }
 
 void MondisServer::singleCommandPropagate() {
-    std::unique_lock lck(mtx2);
-    cv2.wait(lck);
     while (true) {
+        const string& cur = takeFromPropagateBuffer();
         for (MondisClient *slave:slaves) {
-            slave->sendResult(curCommand);
+            slave->sendResult(cur);
         }
-        cv2.wait(lck);
     }
 }
 
@@ -775,6 +779,25 @@ string MondisServer::readFromMaster() {
 #elif defined(linux)
     return read(masterFd);
 #endif
+}
+
+string MondisServer::takeFromPropagateBuffer() {
+    if(commandPropagateBuffer->empty()) {
+        unique_lock lck(notEmptyMtx);
+        notEmpty.wait(lck);
+    }
+    string& res = commandPropagateBuffer->front();
+    commandPropagateBuffer->pop();
+    return res;
+}
+
+bool MondisServer::putToPropagateBuffer(const string &curCommand) {
+    if(commandPropagateBuffer->size() == maxCommandPropagateBufferSize) {
+        return false;
+    }
+    commandPropagateBuffer->push(curCommand);
+    notEmpty.notify_all();
+    return true;
 }
 
 ExecutionResult Executor::execute(Command *command, MondisClient *client) {

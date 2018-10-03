@@ -252,6 +252,7 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             }
             sendToMaster(string("SYNC ") + to_string(replicaOffset) + " " + to_string(curDbIndex));
             string &&json = readFromMaster();
+            curKeySpace->clear();
             JSONParser temp(json);
             temp.parse(curKeySpace);
             if (client != nullptr) {

@@ -8,6 +8,7 @@
 
 #include <stdint-gcc.h>
 #include <vector>
+#include <time.h>
 
 #ifdef WIN32
 
@@ -57,6 +58,8 @@ public:
 
     string ip;
     string port;
+
+    clock_t preInteraction = clock();
 public:
     bool hasLogin = false;
 private:

@@ -71,6 +71,12 @@ private:
     int maxCommandPropagateBufferSize = 1024;
     int maxUndoCommandBufferSize = 1024;
     int maxSlaveNum = 1024;
+    int maxSlaveIdleDuration = 10000;
+    int maxMasterIdleDuration = 10000;
+    int maxClientIdleDuration = 10000;
+    int masterSlaveHeartBeatDuration = 1000;
+    int clientHeartBeatDuration = 1000;
+
     pid_t pid;
     std::string configfile;
     std::string executable;
@@ -202,12 +208,12 @@ private:
     };
     void selectAndHandle(int epollFd,epoll_event* events) {
         while (true) {
-        int nfds = epoll_wait(epollFd, events, maxCilentNum, -1);
-        for(int i=0;i<nfds;i++) {
-            MondisClient* client = fdToClient[events[i].data.fd];
-            handleCommand(client);
+            int nfds = epoll_wait(epollFd, events, maxCilentNum, -1);
+            for(int i=0;i<nfds;i++) {
+                MondisClient* client = fdToClient[events[i].data.fd];
+                handleCommand(client);
+            }
         }
-    }
     }
 #endif
 
@@ -270,6 +276,12 @@ public:
 
     int hasExecutedCommandNumInTransaction = 0;
 
+    static void destroyCommand(Command *command);
+
+    void handleHeartBeat();
+
+    void closeClient(MondisClient *c);
+
 };
 
 class Executor {
@@ -277,7 +289,6 @@ public:
 
     ExecutionResult execute(Command *command, MondisClient *client);
     static Executor* getExecutor();
-    static void destroyCommand(Command* command);
 
     static void bindServer(MondisServer *server);
 private:

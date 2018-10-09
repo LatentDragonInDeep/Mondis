@@ -278,25 +278,7 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             OK_AND_RETURN
         }
         case DISCONNECT: {
-#ifdef WIN32
-            if (client->type == CLIENT) {
-                FD_CLR(client->sock, &clientFds);
-                clients.erase(clients.find(client));
-            } else if (client->type == SLAVE) {
-                FD_CLR(client->sock, &slaveFds);
-                slaves.erase(slaves.find(client));
-            }
-            socketToClient.erase(socketToClient.find(&client->sock));
-#elif defined(linux)
-            if(client->type == CLIENT) {
-                //TODO 解除注册
-                clients.erase(clients.find(client));
-            } else if(client->type == SLAVE) {
-                slaves.erase(slaves.find(client));
-            }
-            fdToClient.erase(fdToClient.find(client->fd));
-#endif
-            delete client;
+            closeClient(client);
             OK_AND_RETURN
         }
         case PING: {
@@ -304,7 +286,7 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             OK_AND_RETURN
         }
         case HEART_BEAT: {
-            //TODO 心跳检测
+
         }
         case MULTI: {
             isInTransaction = true;
@@ -557,7 +539,7 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
     Log log(commandStr, res);
     logFileOut << log.toString();
     logFileOut.flush();
-    if (isModifyCommand) {
+    if (isModifyCommand && res.type == OK) {
         if (replicaCommandBuffer->size() == maxCommandReplicaBufferSize) {
             replicaCommandBuffer->pop_front();
             replicaCommandBuffer->push_back(commandStr);
@@ -579,6 +561,7 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
         }
         undoCommands.push_back(getUndoCommand(commandStr));
     }
+    destroyCommand(c);
 
     return res;
 }
@@ -594,12 +577,13 @@ int MondisServer::save(string &jsonFile) {
 #elif defined(linux)
     int pid = fork();
     if(pid == 0) {
-    ofstream out(jsonFile + "2");
-    out << curKeySpace->getJson();
-    out.flush();
-    remove(jsonFile.c_str());
-    out.close();
-    rename((jsonFile + "2").c_str(), jsonFile.c_str());
+        ofstream out(jsonFile + "2");
+        out << curKeySpace->getJson();
+        out.flush();
+        remove(jsonFile.c_str());
+        out.close();
+        rename((jsonFile + "2").c_str(), jsonFile.c_str());
+        exit(0);
     }
 #endif
 }
@@ -674,6 +658,16 @@ void MondisServer::applyConf() {
             maxSlaveNum = atoi(kv.second.c_str());
         } else if (kv.first == "maxUndoCommandBufferSize") {
             maxUndoCommandBufferSize = min(maxCommandReplicaBufferSize, atoi(kv.second.c_str()));
+        } else if (kv.first == "maxSlaveIdleDuration") {
+            maxSlaveIdleDuration = atoi(kv.second.c_str());
+        } else if (kv.first == "maxMasterIdleDuration") {
+            maxMasterIdleDuration = atoi(kv.second.c_str());
+        } else if (kv.first == "maxClientIdleDuration") {
+            maxClientIdleDuration = atoi(kv.second.c_str());
+        } else if (kv.first == "masterSlaveHeartBeatDuration") {
+            masterSlaveHeartBeatDuration = atoi(kv.second.c_str());
+        } else if (kv.first == "clientHeartBeatDuration") {
+            clientHeartBeatDuration = atoi(kv.second.c_str());
         }
     }
 }
@@ -731,6 +725,8 @@ void MondisServer::init() {
     std::thread accept(&MondisServer::acceptSocket, this);
     std::thread eventLoop(&MondisServer::startEventLoop, this);
     std::thread propagateIO(&MondisServer::singleCommandPropagate, this);
+    std::thread heartBeat(&MondisServer::handleHeartBeat, this);
+    //TODO 一个线程发心跳包
 #ifdef WIN32
     selectAndHandle(clientFds);
     std::thread handleSlaves(&MondisServer::selectAndHandle, this, slaveFds);
@@ -981,20 +977,16 @@ ExecutionResult Executor::execute(Command *command, MondisClient *client) {
     if(serverCommand.find(command->type)!=serverCommand.end()) {
         if (command->next == nullptr || command->next->type == VACANT) {
             ExecutionResult res = server->execute(command, client);
-            destroyCommand(command);
             return res;
         }
-        destroyCommand(command);
         ExecutionResult res;
         res.type = LOGIC_ERROR;
         res.res = "invalid pipeline command";
         return res;
     } else if (command->type == LOCATE) {
         ExecutionResult res = server->locateExecute(command);
-        destroyCommand(command);
         return res;
     }
-    destroyCommand(command);
     ExecutionResult res;
     res.type = LOGIC_ERROR;
     res.res = "Invalid command";
@@ -1035,17 +1027,69 @@ void Executor::init() {
     INSERT(UNWATCH)
 }
 
-void Executor::destroyCommand(Command *command) {
-    if(command == nullptr) {
-        return;
-    }
+void MondisServer::destroyCommand(Command *command) {
     Command* cur = command;
     while (cur!= nullptr) {
         Command* temp = cur;
         cur = cur->next;
         delete temp;
     }
+}
 
+void MondisServer::handleHeartBeat() {
+    while (true) {
+        clock_t current = clock();
+#ifdef WIN32
+        for (auto &kv:socketToClient) {
+            MondisClient *c = kv.second;
+            if (c->type == CLIENT) {
+                if (current - c->preInteraction > clientHeartBeatDuration) {
+                    closeClient(c);
+                }
+            } else if (c->type == SLAVE) {
+                if (current - c->preInteraction > masterSlaveHeartBeatDuration) {
+                    closeClient(c);
+                }
+            }
+        }
+#elif defined(linux)
+        for (auto &kv:fdToClient) {
+            MondisClient *c = kv.second;
+            if (c->type == CLIENT) {
+                if (current - c->preInteraction > clientHeartBeatDuration) {
+                    closeClient(c);
+                }
+            } else if (c->type == SLAVE) {
+                if (current - c->preInteraction > masterSlaveHeartBeatDuration) {
+                    closeClient(c);
+                }
+            }
+        }
+#endif
+    }
+}
+
+void MondisServer::closeClient(MondisClient *client) {
+#ifdef WIN32
+    if (client->type == CLIENT) {
+        FD_CLR(client->sock, &clientFds);
+        clients.erase(clients.find(client));
+    } else if (client->type == SLAVE) {
+        FD_CLR(client->sock, &slaveFds);
+        slaves.erase(slaves.find(client));
+    }
+    socketToClient.erase(socketToClient.find(&client->sock));
+#elif defined(linux)
+    if(client->type == CLIENT) {
+        epoll_ctl(clientsEpollFd, EPOLL_CTL_DEL, client->fd, nullptr);
+        clients.erase(clients.find(client));
+    } else if(client->type == SLAVE) {
+        epoll_ctl(slavesEpollFd, EPOLL_CTL_DEL, client->fd, nullptr);
+        slaves.erase(slaves.find(client));
+    }
+    fdToClient.erase(fdToClient.find(client->fd));
+#endif
+    delete client;
 }
 
 void Executor::bindServer(MondisServer *sv) {

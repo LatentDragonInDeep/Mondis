@@ -144,6 +144,13 @@ enum CommandType {
     DISCONNECT,
     PING,
     PONG,
+    HEART_BEAT,
+    UNDO,
+    MULTI,
+    EXEC,
+    DISCARD,
+    WATCH,
+    UNWATCH,
 };
 
 enum ExecutionResultType {

@@ -68,7 +68,9 @@ class MondisServer {
 private:
     int maxCilentNum = 1024;
     int maxCommandReplicaBufferSize = 1024 * 1024;
-    int maxCommandPropagateBufferSize = 0;
+    int maxCommandPropagateBufferSize = 1024;
+    int maxUndoCommandBufferSize = 1024;
+    int maxSlaveNum = 1024;
     pid_t pid;
     std::string configfile;
     std::string executable;
@@ -107,13 +109,15 @@ private:
     bool isMaster = false;
     bool isLeader = false;
     unordered_set<MondisClient *> slaves;
+    unordered_set<MondisClient *> clients;
     unordered_set<MondisClient *> peers;
 
     unsigned long long replicaOffset = 0;
     deque<string> *replicaCommandBuffer;
     static unordered_set<CommandType> modifyCommands;
+    static unordered_set<CommandType> transactionAboutCommands;
 
-    static void initModifyCommands();
+    static void initStaticMember();
 
     bool isPropagating = false;
     condition_variable propagateCV;
@@ -130,7 +134,8 @@ private:
     
 
 #ifdef WIN32
-    fd_set fds;
+    fd_set clientFds;
+    fd_set slaveFds;
     unordered_map<SOCKET *, MondisClient *> socketToClient;
     SOCKET masterSock;
 
@@ -154,9 +159,26 @@ private:
         }
         return res;
     };
+
+    void selectAndHandle(fd_set &fds) {
+        while (true) {
+            int ret = select(0, &fds, nullptr, nullptr, nullptr);
+            if (ret == 0) {
+                continue;
+            }
+            for (auto &pair:socketToClient) {
+                if (FD_ISSET(*pair.first, &clientFds)) {
+                    MondisClient *client = pair.second;
+                    handleCommand(client);
+                }
+            }
+        }
+    }
 #elif defined(linux)
-    int epollFd;
-    epoll_event* events;
+    int clientsEpollFd;
+    int slavesEpollFd;
+    epoll_event* clientEvents;
+    epoll_event* slaveEvents;
     int masterFd;
     unordered_map<int,MondisClient*> fdToClient;
     void send(int fd, const string& data) {
@@ -178,6 +200,15 @@ private:
         }
         return res;
     };
+    void selectAndHandle(int epollFd,epoll_event* events) {
+        while (true) {
+        int nfds = epoll_wait(epollFd, events, maxCilentNum, -1);
+        for(int i=0;i<nfds;i++) {
+            MondisClient* client = fdToClient[events[i].data.fd];
+            handleCommand(client);
+        }
+    }
+    }
 #endif
 
     bool hasLogin = true;
@@ -202,11 +233,10 @@ public:
 
     void handleCommand(MondisClient *client);
 
-    void selectAndHandle();
     ExecutionResult locateExecute(Command *command);
     static JSONParser* getJSONParser();
 
-    void acceptClient();
+    void acceptSocket();
 
     void sendToMaster(const string &res);
 
@@ -222,8 +252,22 @@ public:
 
     string takeFromPropagateBuffer();
 
+    string getUndoCommand(string &command);
+
     condition_variable notEmpty;
     mutex notEmptyMtx;
+
+    unordered_set<string> watchedKeys;
+    unordered_set<string> modifiedKeys;
+    queue<string> *transactionCommands;
+
+    bool isInTransaction = false;
+    bool watchedKeysHasModified = false;
+
+    deque<string> undoCommands;
+
+    int hasExecutedCommandNumInTransaction = 0;
+
 };
 
 class Executor {

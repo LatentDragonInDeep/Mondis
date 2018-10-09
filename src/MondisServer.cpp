@@ -22,7 +22,7 @@
 #include "Command.h"
 #include "MondisServer.h"
 
-#define ADD(TYPE) modifyCommands.insert(TYPE);
+#define ADD(SET, TYPE) SET.insert(TYPE);
 
 #define ERROR_EXIT(MESSAGE) cout<<MESSAGE;\
                             exit(1);
@@ -112,7 +112,7 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
 #ifdef WIN32
                 socketToClient.erase(socketToClient.find(&client->sock));
                 delete client;
-                FD_CLR(client->sock, &fds);
+                FD_CLR(client->sock, &clientFds);
 #elif defined(linux)
                 fdToClient.erase(fdToClient.find(client->fd));
                 delete client;
@@ -237,6 +237,7 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
                 LOGIC_ERROR_AND_RETURN
             }
 #endif
+            sendToMaster(string("IS_SLAVE"));
             sendToMaster(string("PING"));
             string reply = readFromMaster();
             if (reply != "PONG") {
@@ -278,8 +279,21 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
         }
         case DISCONNECT: {
 #ifdef WIN32
+            if (client->type == CLIENT) {
+                FD_CLR(client->sock, &clientFds);
+                clients.erase(clients.find(client));
+            } else if (client->type == SLAVE) {
+                FD_CLR(client->sock, &slaveFds);
+                slaves.erase(slaves.find(client));
+            }
             socketToClient.erase(socketToClient.find(&client->sock));
 #elif defined(linux)
+            if(client->type == CLIENT) {
+                //TODO 解除注册
+                clients.erase(clients.find(client));
+            } else if(client->type == SLAVE) {
+                slaves.erase(slaves.find(client));
+            }
             fdToClient.erase(fdToClient.find(client->fd));
 #endif
             delete client;
@@ -289,8 +303,91 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             client->sendResult("PONG");
             OK_AND_RETURN
         }
+        case HEART_BEAT: {
+            //TODO 心跳检测
+        }
+        case MULTI: {
+            isInTransaction = true;
+            transactionCommands = new queue<string>;
+            OK_AND_RETURN
+        }
+        case EXEC: {
+            if (!isInTransaction) {
+                res.res = "please start a transaction!";
+                LOGIC_ERROR_AND_RETURN
+            }
+            if (watchedKeysHasModified) {
+                res.res = "can not execute the transaction,because the following keys has been modified.\n";
+                for (auto &key:modifiedKeys) {
+                    res.res += key;
+                    res.res += " ";
+                }
+                LOGIC_ERROR_AND_RETURN
+            }
+            while (!transactionCommands->empty()) {
+                string next = transactionCommands->front();
+                transactionCommands->pop();
+                ExecutionResult res = execute(interpreter->getCommand(next), client);
+                if (res.type != OK) {
+                    string undo = "UNDO";
+                    while (hasExecutedCommandNumInTransaction > 0) {
+                        execute(interpreter->getCommand(undo), client);
+                        hasExecutedCommandNumInTransaction--;
+                    }
+                    res.res = "error in executing the command ";
+                    res.res += next;
+                    LOGIC_ERROR_AND_RETURN
+                }
+                hasExecutedCommandNumInTransaction++;
+            }
+            OK_AND_RETURN
+        }
+        case DISCARD: {
+            isInTransaction = false;
+            watchedKeys.clear();
+            modifiedKeys.clear();
+            delete transactionCommands;
+            watchedKeysHasModified = false;
+            hasExecutedCommandNumInTransaction = 0;
+        }
+        case WATCH: {
+            if (!isInTransaction) {
+                res.res = "please start a transaction!";
+                LOGIC_ERROR_AND_RETURN
+            }
+            CHECK_PARAM_NUM(1)
+            CHECK_PARAM_TYPE(0, PLAIN)
+            watchedKeys.insert(PARAM(0));
+            OK_AND_RETURN
+        }
+        case UNWATCH: {
+            if (!isInTransaction) {
+                res.res = "please start a transaction!";
+                LOGIC_ERROR_AND_RETURN
+            }
+            CHECK_PARAM_NUM(1)
+            CHECK_PARAM_TYPE(0, PLAIN)
+            watchedKeys.erase(watchedKeys.find(PARAM(0)));
+            OK_AND_RETURN
+        }
+        case UNDO: {
+            if (undoCommands.empty()) {
+                res.res = "has reached max undo command number!";
+                LOGIC_ERROR_AND_RETURN
+            }
+            string undo = undoCommands.back();
+            undoCommands.pop_back();
+            execute(interpreter->getCommand(undo), client);
+            replicaOffset--;
+            replicaCommandBuffer->pop_back();
+            OK_AND_RETURN;
+        }
     }
     INVALID_AND_RETURN
+}
+
+string MondisServer::getUndoCommand(string &command) {
+    //TODO 获得对应的undo命令
 }
 
 ExecutionResult MondisServer::locateExecute(Command *command) {
@@ -431,6 +528,7 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
         e.res = "you haven't login,please login";
         return e;
     }
+    ExecutionResult res;
     Command *c = interpreter->getCommand(commandStr);
     Command *last = c;
     while (last->next != nullptr) {
@@ -438,11 +536,14 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
     }
     bool isModifyCommand = modifyCommands.find(last->type) != modifyCommands.end();
     if (isSlave && isModifyCommand) {
-        ExecutionResult res;
         res.res = "the current server is a slave,can not execute command which will modify database state";
         LOGIC_ERROR_AND_RETURN
     }
-    ExecutionResult res = executor->execute(c, nullptr);
+    if (isInTransaction && transactionAboutCommands.find(c->type) == transactionCommands.end()) {
+        transactionCommands->push(commandStr);
+        OK_AND_RETURN
+    }
+    res = executor->execute(c, nullptr);
     if (res.type == OK) {
         if (aof) {
             aofFileOut << commandStr + "\n";
@@ -467,6 +568,20 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
         }
         replicaOffset++;
         while (!putToPropagateBuffer(commandStr));
+        switch (c->type) {
+            case DEL:
+            case RENAME:
+            case BIND:
+            case LOCATE: {
+                if (watchedKeys.find(c->[0].content) != watchedKeys.end()) {
+                    watchedKeysHasModified = true;
+                    watchedKeys.erase(watchedKeys.find(c->[0].content));
+                    modifiedKeys.insert(c->[0].content);
+                }
+                break;
+            }
+        }
+        undoCommands.push_back(getUndoCommand(commandStr));
     }
 
     return res;
@@ -559,6 +674,10 @@ void MondisServer::applyConf() {
             } else if(kv.second == "false"){
                 slaveOf = false;
             }
+        } else if (kv.first == "maxSlaveNum") {
+            maxSlaveNum = atoi(kv.second.c_str());
+        } else if (kv.first == "maxUndoCommandBufferSize") {
+            maxUndoCommandBufferSize = min(maxCommandReplicaBufferSize, atoi(kv.second.c_str()));
         }
     }
 }
@@ -613,13 +732,19 @@ void MondisServer::init() {
         sync+=masterPassword;
         execute(sync, nullptr);
     }
-    std::thread accept(&MondisServer::acceptClient, this);
+    std::thread accept(&MondisServer::acceptSocket, this);
     std::thread eventLoop(&MondisServer::startEventLoop, this);
     std::thread propagateIO(&MondisServer::singleCommandPropagate, this);
-    selectAndHandle();
+#ifdef WIN32
+    selectAndHandle(clientFds);
+    std::thread handleSlaves(&MondisServer::selectAndHandle, this, slaveFds);
+#elif defined(linux)
+    selectAndHandle(clientsEpollFd,clientEvents);
+    std::thread handleSlaves(&MondisServer::selectAndHandle,this,slavesEpollFd,slaveEvents);
+#endif
 }
 
-void MondisServer::acceptClient() {
+void MondisServer::acceptSocket() {
 #ifdef WIN32
     WSADATA wsadata;
     WSAStartup(MAKEWORD(2, 2), &wsadata);
@@ -635,14 +760,33 @@ void MondisServer::acceptClient() {
         sockaddr_in remoteAddr;
         int len = sizeof(remoteAddr);
         SOCKET clientSock = accept(servSock, (SOCKADDR *) &remoteAddr, &len);
-        if (socketToClient.size() > maxCilentNum) {
-            ExecutionResult res;
-            res.type = LOGIC_ERROR;
-            res.res = "can not build connection because has up to max sockets number!";
-            send(clientSock, res.toString());
-        }
-        FD_SET(clientSock, &fds);
+        string auth = read(clientSock);
         MondisClient *client = new MondisClient(clientSock);
+        if (auth == "IS_CLIENT") {
+            if (clients.size() > maxCilentNum) {
+                ExecutionResult res;
+                res.type = LOGIC_ERROR;
+                res.res = "can not build connection because has up to max client number!";
+                send(clientSock, res.toString());
+                delete client;
+                continue;
+            }
+            client->type = CLIENT;
+            FD_SET(clientSock, &clientFds);
+            clients.insert(client);
+
+        } else if (auth == "IS_SLAVE") {
+            if (clients.size() > maxCilentNum) {
+                ExecutionResult res;
+                res.type = LOGIC_ERROR;
+                res.res = "can not build connection because has up to max slave number!";
+                send(clientSock, res.toString());
+                continue;
+            }
+            client->type = SLAVE;
+            FD_SET(clientSock, &slaveFds);
+            slaves.insert(client);
+        }
         socketToClient[&client->sock] = client;
     }
 #elif defined(linux)
@@ -658,18 +802,40 @@ void MondisServer::acceptClient() {
     listen(socket_fd,10);
     while (true) {
         connect_fd = accept(socket_fd, (struct sockaddr*)NULL, NULL);
-        if(fdToClient.size()>maxCilentNum) {
-            ExecutionResult res;
-            res.type = LOGIC_ERROR;
-            res.res = "can not build connection because has up to max sockets number!";
-            send(connect_fd,res.toString());
+        string auth = read(clientSock);
+        MondisClient *client = new MondisClient(clientSock);
+        if(auth == "IS_CLIENT") {
+            if (clients.size() > maxCilentNum) {
+                ExecutionResult res;
+                res.type = LOGIC_ERROR;
+                res.res = "can not build connection because has up to max client number!";
+                send(connect_fd, res.toString());
+                delete client;
+                continue;
+            }
+            epoll_event event;
+            event.events = EPOLLIN|EPOLLET;
+            client->type = CLIENT;
+            epoll_ctl(clientsEpollFd, EPOLL_CTL_ADD, connect_fd, &event);
+            clients.insert(client);
+
+        } else if(auth == "IS_SLAVE") {
+            if (clients.size() > maxCilentNum) {
+                ExecutionResult res;
+                res.type = LOGIC_ERROR;
+                res.res = "can not build connection because has up to max slave number!";
+                send(clientSock, res.toString());
+                delete client;
+                continue;
+            }
+            client->type = SLAVE;
+            epoll_event event;
+            event.events = EPOLLIN|EPOLLET;
+            epoll_ctl(slavesEpollFd, EPOLL_CTL_ADD, connect_fd, &event);
+            slaves.insert(client);
         }
         fcntl(connect_fd,F_SETFL,O_NONBLOCK);
-        MondisClient* client = new MondisClient(connect_fd);
         fdToClient[connect_fd] = client;
-        epoll_event event;
-        event.events = EPOLLIN|EPOLLET;
-        epoll_ctl(epollFd, EPOLL_CTL_ADD, connect_fd, &event);
     }
 #endif
 }
@@ -682,37 +848,15 @@ void MondisServer::handleCommand(MondisClient *client) {
     }
 }
 
-void MondisServer::selectAndHandle() {
-#ifdef WIN32
-    while (true) {
-        int ret = select(0, &fds, nullptr, nullptr, nullptr);
-        if (ret == 0) {
-            continue;
-        }
-        for (auto &pair:socketToClient) {
-            if (FD_ISSET(*pair.first, &fds)) {
-                MondisClient *client = pair.second;
-                handleCommand(client);
-            }
-        }
-    }
-#elif defined(linux)
-    while (true) {
-        int nfds = epoll_wait(epollFd, events, maxCilentNum, -1);
-        for(int i=0;i<nfds;i++) {
-            MondisClient* client = fdToClient[events[i].data.fd];
-            handleCommand(client);
-        }
-    }
-#endif
-}
-
 MondisServer::MondisServer() {
 #ifdef WIN32
-    FD_ZERO(&fds);
+    FD_ZERO(&clientFds);
+    FD_ZERO(&slaveFds);
 #elif defined(linux)
-    epollFd = epoll_create(1024);
-    events = new epoll_event[1024];
+    clientsEpollFd = epoll_create(1024);
+    clientEvents = new epoll_event[1024];
+    slavesEpollFd = epoll_create(1024);
+    slaveEvents = new epoll_event[1024];
 #endif
     replicaCommandBuffer = new deque<string>;
     commandPropagateBuffer = new queue<string>;
@@ -727,6 +871,10 @@ void MondisServer::sendToMaster(const string &res) {
 }
 
 MondisServer::~MondisServer() {
+#ifdef linux
+    delete[] clientEvents;
+    delete[] slaveEvents;
+#endif
     delete replicaCommandBuffer;
     delete commandPropagateBuffer;
 }
@@ -766,30 +914,35 @@ void MondisServer::replicaCommandPropagate(vector<string> &commands, MondisClien
     }
 }
 
-void MondisServer::initModifyCommands() {
-    ADD(BIND)
-    ADD(DEL)
-    ADD(RENAME)
-    ADD(SET_RANGE)
-    ADD(REMOVE_RANGE)
-    ADD(INCR)
-    ADD(DECR)
-    ADD(INCR_BY)
-    ADD(DECR_BY)
-    ADD(APPEND)
-    ADD(PUSH_FRONT)
-    ADD(PUSH_BACK)
-    ADD(POP_FRONT)
-    ADD(POP_BACK)
-    ADD(ADD)
-    ADD(REMOVE)
-    ADD(REMOVE_BY_RANK)
-    ADD(REMOVE_BY_SCORE)
-    ADD(REMOVE_RANGE_BY_RANK)
-    ADD(REMOVE_RANGE_BY_SCORE)
-    ADD(WRITE)
-    ADD(TO_STRING)
-    ADD(CHANGE_SCORE)
+void MondisServer::initStaticMember() {
+    ADD(modifyCommands, BIND)
+    ADD(modifyCommands, DEL)
+    ADD(modifyCommands, RENAME)
+    ADD(modifyCommands, SET_RANGE)
+    ADD(modifyCommands, REMOVE_RANGE)
+    ADD(modifyCommands, INCR)
+    ADD(modifyCommands, DECR)
+    ADD(modifyCommands, INCR_BY)
+    ADD(modifyCommands, DECR_BY)
+    ADD(modifyCommands, APPEND)
+    ADD(modifyCommands, PUSH_FRONT)
+    ADD(modifyCommands, PUSH_BACK)
+    ADD(modifyCommands, POP_FRONT)
+    ADD(modifyCommands, POP_BACK)
+    ADD(modifyCommands, ADD)
+    ADD(modifyCommands, REMOVE)
+    ADD(modifyCommands, REMOVE_BY_RANK)
+    ADD(modifyCommands, REMOVE_BY_SCORE)
+    ADD(modifyCommands, REMOVE_RANGE_BY_RANK)
+    ADD(modifyCommands, REMOVE_RANGE_BY_SCORE)
+    ADD(modifyCommands, WRITE)
+    ADD(modifyCommands, TO_STRING)
+    ADD(modifyCommands, CHANGE_SCORE)
+    ADD(modifyCommands, UNDO)
+    ADD(transactionAboutCommands, DISCARD)
+    ADD(transactionAboutCommands, EXEC)
+    ADD(transactionAboutCommands, WATCH)
+    ADD(transactionAboutCommands, UNWATCH)
 }
 
 string MondisServer::readFromMaster() {
@@ -868,6 +1021,13 @@ void Executor::init() {
     INSERT(SET_NAME)
     INSERT(SYNC_FINISHED)
     INSERT(DISCONNECT)
+    INSERT(HEART_BEAT)
+    INSERT(UNDO)
+    INSERT(MULTI)
+    INSERT(EXEC)
+    INSERT(DISCARD)
+    INSERT(WATCH)
+    INSERT(UNWATCH)
 }
 
 void Executor::destroyCommand(Command *command) {
@@ -890,3 +1050,4 @@ void Executor::bindServer(MondisServer *sv) {
 Executor *Executor::executor = new Executor;
 
 unordered_set<CommandType> MondisServer::modifyCommands;
+unordered_set<CommandType> MondisServer::transactionCommands;

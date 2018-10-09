@@ -259,4 +259,11 @@ void Command::init() {
     MAP(DISCONNECT)
     MAP(PING)
     MAP(PONG)
+    MAP(HEART_BEAT)
+    MAP(UNDO)
+    MAP(MULTI)
+    MAP(EXEC)
+    MAP(DISCARD)
+    MAP(WATCH)
+    MAP(UNWATCH)
 }

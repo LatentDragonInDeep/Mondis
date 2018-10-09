@@ -254,6 +254,8 @@ public:
 
     string getUndoCommand(string &command);
 
+    void closeTransaction();
+
     condition_variable notEmpty;
     mutex notEmptyMtx;
 

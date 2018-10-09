@@ -340,15 +340,11 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
                 }
                 hasExecutedCommandNumInTransaction++;
             }
+            closeTransaction();
             OK_AND_RETURN
         }
         case DISCARD: {
-            isInTransaction = false;
-            watchedKeys.clear();
-            modifiedKeys.clear();
-            delete transactionCommands;
-            watchedKeysHasModified = false;
-            hasExecutedCommandNumInTransaction = 0;
+            closeTransaction();
         }
         case WATCH: {
             if (!isInTransaction) {
@@ -539,7 +535,7 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
         res.res = "the current server is a slave,can not execute command which will modify database state";
         LOGIC_ERROR_AND_RETURN
     }
-    if (isInTransaction && transactionAboutCommands.find(c->type) == transactionCommands.end()) {
+    if (isInTransaction && transactionAboutCommands.find(c->type) == transactionAboutCommands.end()) {
         transactionCommands->push(commandStr);
         OK_AND_RETURN
     }
@@ -573,10 +569,10 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
             case RENAME:
             case BIND:
             case LOCATE: {
-                if (watchedKeys.find(c->[0].content) != watchedKeys.end()) {
+                if (watchedKeys.find((*c)[0].content) != watchedKeys.end()) {
                     watchedKeysHasModified = true;
-                    watchedKeys.erase(watchedKeys.find(c->[0].content));
-                    modifiedKeys.insert(c->[0].content);
+                    watchedKeys.erase(watchedKeys.find((*c)[0].content));
+                    modifiedKeys.insert((*c)[0].content);
                 }
                 break;
             }
@@ -972,6 +968,15 @@ bool MondisServer::putToPropagateBuffer(const string &curCommand) {
     return true;
 }
 
+void MondisServer::closeTransaction() {
+    isInTransaction = false;
+    watchedKeys.clear();
+    modifiedKeys.clear();
+    delete transactionCommands;
+    watchedKeysHasModified = false;
+    hasExecutedCommandNumInTransaction = 0;
+}
+
 ExecutionResult Executor::execute(Command *command, MondisClient *client) {
     if(serverCommand.find(command->type)!=serverCommand.end()) {
         if (command->next == nullptr || command->next->type == VACANT) {
@@ -1050,4 +1055,4 @@ void Executor::bindServer(MondisServer *sv) {
 Executor *Executor::executor = new Executor;
 
 unordered_set<CommandType> MondisServer::modifyCommands;
-unordered_set<CommandType> MondisServer::transactionCommands;
+unordered_set<CommandType> MondisServer::transactionAboutCommands;

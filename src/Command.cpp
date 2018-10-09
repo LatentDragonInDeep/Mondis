@@ -40,10 +40,6 @@ Command *CommandInterpreter::getCommand(std::string &raw) {
                 cur->type = map[vt[i].content];
                 continue;
             }
-            else if(i>=5) {
-                cur->type = M_ERROR;
-                return res;
-            }
             Command::Param param;
             switch (vt[i].type) {
                 case PLAIN_PARAM:

@@ -21,6 +21,10 @@ mondis查询类似于redis查询，但是不同的是mondis查询返回的格式
 ## mondis持久化
 mondis支持两种持久化方式，json与aof。json类似于rdb，但是持久化的格式是完全兼容的json，
 这使得持久化文件方便迁移并解析。aof持久化则与redis的aof完全相同，除了命令格式。但是目前mondis还不支持aof重写。
+## 跨平台
+## 事务支持回滚
+## 支持undo(撤销)命令
+## 效率更高
 ## mondis底层实现相对于redis的改进
 ### list
 在mondis里面，list还是用链表实现。不同的是mondis保存了对象指针与索引的双向映射，这样虽然多占用了一些空间，不过可以方便的定位到所需元素。

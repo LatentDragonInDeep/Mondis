@@ -69,11 +69,15 @@
 
 #define KEY(INDEX) Key key((*command)[INDEX].content);
 
+#define TOKEY(COMMAND, INDEX) Key key((*COMMAND)[INDEX].content);
+
 #define CHECK_PARAM_LENGTH(INDEX, LENGTH) if((*command)[INDEX].content.size()!=LENGTH) { \
                                             res.res = "argument length error";\
                                             LOGIC_ERROR_AND_RETURN\
                                             }
 #define PARAM(INDEX) (*command)[INDEX].content
+
+#define RAW_PARAM(COMMAND, INDEX) (*COMMAND)[INDEX]
 
 namespace util {
     bool toInteger(std::string &data, int &res);
@@ -215,6 +219,17 @@ public:
     static std::unordered_map<CommandType,std::string> typeToStr;
 
     static void init();
+
+    void addParam(const std::string &param, ParamType t) {
+        Param p;
+        p.type = t;
+        p.content = param;
+        params.push_back(p);
+    }
+
+    void addParam(Param &p) {
+        params.push_back(p);
+    }
 };
 
 class CommandInterpreter {

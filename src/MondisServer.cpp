@@ -27,6 +27,9 @@
 #define ERROR_EXIT(MESSAGE) cout<<MESSAGE;\
                             exit(1);
 
+#define ADD_AND_RETURN(RES, UNDO) RES->modifies.push_back(UNDO);\
+                                return RES;
+
 unordered_set<CommandType> Executor::serverCommand;
 
 JSONParser MondisServer::parser;
@@ -384,11 +387,28 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
 }
 
 MultiCommand *MondisServer::getUndoCommand(Command *locate, Command *modify, MondisObject *obj) {
+    //TODO
     MultiCommand *res = new MultiCommand;
     res->locateCommand = locate;
     if (obj == nullptr) {
+        Command *undo = new Command;
         switch (modify->type) {
+            case BIND: {
+                TOKEY(modify, 0);
+                MondisObject *original = curKeySpace->get(key);
+                if (original != nullptr) {
+                    undo->type = BIND;
+                    undo->addParam(RAW_PARAM(modify, 0));
+                    undo->addParam(original->getJson(), Command::ParamType::STRING);
+                } else {
+                    undo->type = DEL;
+                    undo->addParam(RAW_PARAM(modify, 0));
+                }
+                ADD_AND_RETURN(res, undo)
+            }
+            case DEL: {
 
+            }
         }
     } else {
 
@@ -523,11 +543,7 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
             last = last->next;
         }
         modify = last->next;
-        obj = chainLocate(c);
-        res = obj->execute(modify);
         isLocate = true;
-    } else {
-        res = executor->execute(modify, nullptr);
     }
     isModifyCommand = modifyCommands.find(modify->type) != modifyCommands.end();
     if (isSlave && isModifyCommand) {
@@ -537,6 +553,21 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
     if (isInTransaction && transactionAboutCommands.find(c->type) == transactionAboutCommands.end()) {
         transactionCommands->push(commandStr);
         OK_AND_RETURN
+    }
+    if (isLocate) {
+        obj = chainLocate(c);
+        res = obj->execute(modify);
+    } else {
+        res = executor->execute(modify, nullptr);
+    }
+    if (isModifyCommand && (isInTransaction || canUndoNotInTransaction)) {
+        MultiCommand *undo = nullptr;
+        if (isLocate) {
+            undo = getUndoCommand(nullptr, modify, nullptr);
+        } else {
+            undo = getUndoCommand(c, modify, obj);
+        }
+        undoCommands.push_back(undo);
     }
     if (res.type == OK) {
         if (aof) {
@@ -576,15 +607,6 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
                     break;
                 }
             }
-        }
-        if (isInTransaction || canUndoNotInTransaction) {
-            MultiCommand *undo = nullptr;
-            if (isLocate) {
-                undo = getUndoCommand(nullptr, modify, nullptr);
-            } else {
-                undo = getUndoCommand(c, modify, obj);
-            }
-            undoCommands.push_back(undo);
         }
     } else {
         destroyCommand(c);

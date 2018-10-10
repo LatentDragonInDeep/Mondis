@@ -77,7 +77,9 @@ public:
     ~MondisClient();
     string readCommand();
 
-    void sendResult(const string &res);
+    void send(const string &res);
+
+    void updateHeartBeatTime();
 };
 
 

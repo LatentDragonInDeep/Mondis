@@ -49,7 +49,7 @@ string MondisClient::readCommand() {
     return commandBuffer[curCommandIndex];
 }
 
-void MondisClient::sendResult(const string &res) {
+void MondisClient::send(const string &res) {
     char buffer[4096];
     int ret;
     const char *data = res.data();
@@ -76,3 +76,7 @@ MondisClient::~MondisClient() {
 }
 
 int MondisClient::nextId = 1;
+
+void MondisClient::updateHeartBeatTime() {
+    preInteraction = clock();
+}

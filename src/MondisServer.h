@@ -71,11 +71,11 @@ private:
     int maxCommandPropagateBufferSize = 1024;
     int maxUndoCommandBufferSize = 1024;
     int maxSlaveNum = 1024;
-    int maxSlaveIdleDuration = 10000;
-    int maxMasterIdleDuration = 10000;
-    int maxClientIdleDuration = 10000;
-    int masterSlaveHeartBeatDuration = 1000;
-    int clientHeartBeatDuration = 1000;
+    int maxSlaveIdle = 10000;
+    int maxMasterIdle = 10000;
+    int maxClientIdle = 10000;
+    int toSlaveHeartBeatDuration = 1000;
+    int toClientHeartBeatDuration = 1000;
 
     pid_t pid;
     std::string configfile;
@@ -137,13 +137,12 @@ private:
     string masterPort;
     
     bool slaveOf=false;
-    
 
+    MondisClient *master = nullptr;
 #ifdef WIN32
     fd_set clientFds;
     fd_set slaveFds;
     unordered_map<SOCKET *, MondisClient *> socketToClient;
-    SOCKET masterSock;
 
     void send(SOCKET &sock, const string &res) {
         char buffer[4096];
@@ -185,7 +184,6 @@ private:
     int slavesEpollFd;
     epoll_event* clientEvents;
     epoll_event* slaveEvents;
-    int masterFd;
     unordered_map<int,MondisClient*> fdToClient;
     void send(int fd, const string& data) {
         char buffer[4096];
@@ -258,7 +256,7 @@ public:
 
     string takeFromPropagateBuffer();
 
-    string getUndoCommand(string &command);
+    Command *getUndoCommand(Command *command);
 
     void closeTransaction();
 
@@ -272,15 +270,21 @@ public:
     bool isInTransaction = false;
     bool watchedKeysHasModified = false;
 
-    deque<string> undoCommands;
+    deque<Command *> undoCommands;
 
     int hasExecutedCommandNumInTransaction = 0;
 
     static void destroyCommand(Command *command);
 
-    void handleHeartBeat();
+    void checkAndHandleIdleClient();
 
     void closeClient(MondisClient *c);
+
+    thread *recvFromMaster = nullptr;
+    thread *sendHeartBeatToSlaves = nullptr;
+    thread *sendHeartBeatToClients = nullptr;
+
+    bool canUndoNotInTransaction = false;
 
 };
 

@@ -223,19 +223,22 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
                 closesocket(masterSock);
                 LOGIC_ERROR_AND_RETURN
             }
-            this->masterSock = masterSock;
+            master = new MondisClient(masterSock);
+            master->type = MASTER;
 #elif defined(linux)
             int sockfd = socket(AF_INET, SOCK_STREAM, 0);
             sockaddr_in serAddr;
             serAddr.sin_family = AF_INET;
             serAddr.sin_port = htons((u_int16_t)atoi(PARAM(1).c_str()));
             serAddr.sin_addr.s_addr = htonl(atoi(PARAM(0).c_str()));
-            int clientFd;
-            if((clientFd = connect(sockfd, (struct sockaddr*)&serAddr, sizeof(serAddr)))<0) {
+            int masterFd;
+            if((masterFd = connect(sockfd, (struct sockaddr*)&serAddr, sizeof(serAddr)))<0) {
                 res.res = "can not connect to master" + PARAM(0);
                 close(clientFd);
                 LOGIC_ERROR_AND_RETURN
             }
+            master = new MondisClient(masterFd);
+            master->type = MASTER;
 #endif
             sendToMaster(string("IS_SLAVE"));
             sendToMaster(string("PING"));
@@ -256,6 +259,13 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             curKeySpace->clear();
             JSONParser temp(json);
             temp.parse(curKeySpace);
+            recvFromMaster = new thread([=]() -> {
+                while (true) {
+                    string next = readFromMaster();
+                    execute(interpreter->getCommand(next), nullptr);
+                    putToPropagateBuffer(next);
+                }
+            });
             if (client != nullptr) {
                 OK_AND_RETURN;
             }
@@ -282,11 +292,17 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             OK_AND_RETURN
         }
         case PING: {
-            client->sendResult("PONG");
+            client->send("PONG");
             OK_AND_RETURN
         }
-        case HEART_BEAT: {
-
+        case HEART_BEAT_TO: {
+            client->updateHeartBeatTime();
+            client->send("HEART_BEAT_REPLY");
+            OK_AND_RETURN
+        }
+        case HEART_BEAT_REPLY: {
+            client->updateHeartBeatTime();
+            OK_AND_RETURN
         }
         case MULTI: {
             isInTransaction = true;
@@ -310,10 +326,12 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
                 string next = transactionCommands->front();
                 transactionCommands->pop();
                 ExecutionResult res = execute(interpreter->getCommand(next), client);
+                putToPropagateBuffer(next);
                 if (res.type != OK) {
                     string undo = "UNDO";
                     while (hasExecutedCommandNumInTransaction > 0) {
                         execute(interpreter->getCommand(undo), client);
+                        putToPropagateBuffer(undo);
                         hasExecutedCommandNumInTransaction--;
                     }
                     res.res = "error in executing the command ";
@@ -353,9 +371,10 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
                 res.res = "has reached max undo command number!";
                 LOGIC_ERROR_AND_RETURN
             }
-            string undo = undoCommands.back();
+            Command *undo = undoCommands.back();
             undoCommands.pop_back();
-            execute(interpreter->getCommand(undo), client);
+            execute(undo, client);
+            destroyCommand(undo);
             replicaOffset--;
             replicaCommandBuffer->pop_back();
             OK_AND_RETURN;
@@ -364,8 +383,9 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
     INVALID_AND_RETURN
 }
 
-string MondisServer::getUndoCommand(string &command) {
+Command *MondisServer::getUndoCommand(Command *command) {
     //TODO 获得对应的undo命令
+
 }
 
 ExecutionResult MondisServer::locateExecute(Command *command) {
@@ -480,7 +500,6 @@ int MondisServer::start(string &confFile) {
         applyConf();
     }
     init();
-    startEventLoop();
 }
 
 int MondisServer::startEventLoop() {
@@ -546,22 +565,29 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
         }
         replicaOffset++;
         while (!putToPropagateBuffer(commandStr));
-        switch (c->type) {
-            case DEL:
-            case RENAME:
-            case BIND:
-            case LOCATE: {
-                if (watchedKeys.find((*c)[0].content) != watchedKeys.end()) {
-                    watchedKeysHasModified = true;
-                    watchedKeys.erase(watchedKeys.find((*c)[0].content));
-                    modifiedKeys.insert((*c)[0].content);
+        if (isInTransaction) {
+            switch (c->type) {
+                case DEL:
+                case RENAME:
+                case BIND:
+                case LOCATE: {
+                    if (watchedKeys.find((*c)[0].content) != watchedKeys.end()) {
+                        watchedKeysHasModified = true;
+                        watchedKeys.erase(watchedKeys.find((*c)[0].content));
+                        modifiedKeys.insert((*c)[0].content);
+                    }
+                    break;
                 }
-                break;
             }
         }
-        undoCommands.push_back(getUndoCommand(commandStr));
+        if (isInTransaction || canUndoNotInTransaction) {
+            undoCommands.push_back(getUndoCommand(c));
+            c = last;
+        }
+        destroyCommand(c);
+    } else {
+        destroyCommand(c);
     }
-    destroyCommand(c);
 
     return res;
 }
@@ -658,16 +684,22 @@ void MondisServer::applyConf() {
             maxSlaveNum = atoi(kv.second.c_str());
         } else if (kv.first == "maxUndoCommandBufferSize") {
             maxUndoCommandBufferSize = min(maxCommandReplicaBufferSize, atoi(kv.second.c_str()));
-        } else if (kv.first == "maxSlaveIdleDuration") {
-            maxSlaveIdleDuration = atoi(kv.second.c_str());
-        } else if (kv.first == "maxMasterIdleDuration") {
-            maxMasterIdleDuration = atoi(kv.second.c_str());
-        } else if (kv.first == "maxClientIdleDuration") {
-            maxClientIdleDuration = atoi(kv.second.c_str());
-        } else if (kv.first == "masterSlaveHeartBeatDuration") {
-            masterSlaveHeartBeatDuration = atoi(kv.second.c_str());
-        } else if (kv.first == "clientHeartBeatDuration") {
-            clientHeartBeatDuration = atoi(kv.second.c_str());
+        } else if (kv.first == "maxSlaveIdle") {
+            maxSlaveIdle = atoi(kv.second.c_str());
+        } else if (kv.first == "maxMasterIdle") {
+            maxMasterIdle = atoi(kv.second.c_str());
+        } else if (kv.first == "maxClientIdle") {
+            maxClientIdle = atoi(kv.second.c_str());
+        } else if (kv.first == "toSlaveHeartBeatDuration") {
+            toSlaveHeartBeatDuration = atoi(kv.second.c_str());
+        } else if (kv.first == "toClientHeartBeatDuration") {
+            toClientHeartBeatDuration = atoi(kv.second.c_str());
+        } else if (kv.first == "canUndoNotInTransaction") {
+            if (kv.second == "true") {
+                canUndoNotInTransaction = true;
+            } else if (kv.second == "false") {
+                canUndoNotInTransaction = false;
+            }
         }
     }
 }
@@ -720,13 +752,34 @@ void MondisServer::init() {
         sync+= masterUsername;
         sync+=" ";
         sync+=masterPassword;
-        execute(sync, nullptr);
+        execute(interpreter->getCommand(sync), nullptr);
     }
+    //接收连接
     std::thread accept(&MondisServer::acceptSocket, this);
+    //控制台事件循环
     std::thread eventLoop(&MondisServer::startEventLoop, this);
+    //命令传播
     std::thread propagateIO(&MondisServer::singleCommandPropagate, this);
-    std::thread heartBeat(&MondisServer::handleHeartBeat, this);
-    //TODO 一个线程发心跳包
+    //检查超时的客户端，从服务器，主服务器并清理
+    std::thread checkAndHandle(&MondisServer::checkAndHandleIdleClient, this);
+    //向客户端发心跳包
+    sendHeartBeatToClients = new std::thread([&]() -> {
+        while (true) {
+            for (auto &client:clients) {
+                client->send("HEART_BEAT_TO");
+            }
+            std::this_thread::sleep_for(chrono::milliseconds(toClientHeartBeatDuration));
+        }
+    });
+    //向从服务器发心跳包
+    sendHeartBeatToSlaves = new std::thread([&]() -> {
+        while (true) {
+            for (auto &slave:slaves) {
+                slave->send("HEART_BEAT_TO");
+            }
+            std::this_thread::sleep_for(chrono::milliseconds(toSlaveHeartBeatDuration));
+        }
+    });
 #ifdef WIN32
     selectAndHandle(clientFds);
     std::thread handleSlaves(&MondisServer::selectAndHandle, this, slaveFds);
@@ -836,7 +889,7 @@ void MondisServer::handleCommand(MondisClient *client) {
     string commandStr;
     while ((commandStr = client->readCommand()) != "") {
         ExecutionResult res = execute(commandStr, nullptr);
-        client->sendResult(res.toString());
+        client->send(res.toString());
     }
 }
 
@@ -856,9 +909,9 @@ MondisServer::MondisServer() {
 
 void MondisServer::sendToMaster(const string &res) {
 #ifdef WIN32
-    send(masterSock, res);
+    send(master->sock, res);
 #elif defined(linux)
-    send(masterFd,res);
+    send(master->fd,res);
 #endif
 }
 
@@ -869,13 +922,16 @@ MondisServer::~MondisServer() {
 #endif
     delete replicaCommandBuffer;
     delete commandPropagateBuffer;
+    delete recvFromMaster;
+    delete sendHeartBeatToClients;
+    delete sendHeartBeatToSlaves;
 }
 
 void MondisServer::replicaToSlave(MondisClient *client, unsigned dbIndex, unsigned long long slaveReplicaOffset) {
     if (replicaOffset - slaveReplicaOffset > maxCommandReplicaBufferSize) {
         const unsigned long long start = replicaOffset;
         const string &json = dbs[dbIndex]->getJson();
-        client->sendResult(json);
+        client->send(json);
         isPropagating = true;
         vector<string> commands(replicaCommandBuffer->begin() + (replicaOffset - start), replicaCommandBuffer->end());
         replicaCommandPropagate(commands, client);
@@ -895,14 +951,14 @@ void MondisServer::singleCommandPropagate() {
     while (true) {
         const string& cur = takeFromPropagateBuffer();
         for (MondisClient *slave:slaves) {
-            slave->sendResult(cur);
+            slave->send(cur);
         }
     }
 }
 
 void MondisServer::replicaCommandPropagate(vector<string> &commands, MondisClient *client) {
     for (auto &c:commands) {
-        client->sendResult(c);
+        client->send(c);
     }
 }
 
@@ -939,9 +995,9 @@ void MondisServer::initStaticMember() {
 
 string MondisServer::readFromMaster() {
 #ifdef WIN32
-    return read(masterSock);
+    return read(master->sock);
 #elif defined(linux)
-    return read(masterFd);
+    return read(master->fd);
 #endif
 }
 
@@ -1018,7 +1074,8 @@ void Executor::init() {
     INSERT(SET_NAME)
     INSERT(SYNC_FINISHED)
     INSERT(DISCONNECT)
-    INSERT(HEART_BEAT)
+    INSERT(HEART_BEAT_TO)
+    INSERT(HEART_BEAT_REPLY)
     INSERT(UNDO)
     INSERT(MULTI)
     INSERT(EXEC)
@@ -1036,18 +1093,18 @@ void MondisServer::destroyCommand(Command *command) {
     }
 }
 
-void MondisServer::handleHeartBeat() {
+void MondisServer::checkAndHandleIdleClient() {
     while (true) {
         clock_t current = clock();
 #ifdef WIN32
         for (auto &kv:socketToClient) {
             MondisClient *c = kv.second;
             if (c->type == CLIENT) {
-                if (current - c->preInteraction > clientHeartBeatDuration) {
+                if (current - c->preInteraction > toClientHeartBeatDuration) {
                     closeClient(c);
                 }
             } else if (c->type == SLAVE) {
-                if (current - c->preInteraction > masterSlaveHeartBeatDuration) {
+                if (current - c->preInteraction > toSlaveHeartBeatDuration) {
                     closeClient(c);
                 }
             }
@@ -1056,16 +1113,22 @@ void MondisServer::handleHeartBeat() {
         for (auto &kv:fdToClient) {
             MondisClient *c = kv.second;
             if (c->type == CLIENT) {
-                if (current - c->preInteraction > clientHeartBeatDuration) {
+                if (current - c->preInteraction > toClientHeartBeatDuration) {
                     closeClient(c);
                 }
             } else if (c->type == SLAVE) {
-                if (current - c->preInteraction > masterSlaveHeartBeatDuration) {
+                if (current - c->preInteraction > toSlaveHeartBeatDuration) {
                     closeClient(c);
                 }
             }
         }
 #endif
+        if (current - master->preInteraction > maxMasterIdle) {
+            delete master;
+            master = nullptr;
+            delete recvFromMaster;
+            recvFromMaster = nullptr;
+        }
     }
 }
 

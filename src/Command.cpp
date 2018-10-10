@@ -114,6 +114,17 @@ void CommandInterpreter::init() {
     PUT(SLAVE_OF)
     PUT(SYNC)
     PUT(SYNC_FINISHED)
+    PUT(DISCONNECT)
+    PUT(PING)
+    PUT(PONG)
+    PUT(HEART_BEAT_TO)
+    PUT(HEART_BEAT_REPLY)
+    PUT(UNDO)
+    PUT(MULTI)
+    PUT(EXEC)
+    PUT(DISCARD)
+    PUT(WATCH)
+    PUT(UNWATCH)
 }
 
 void CommandInterpreter::LexicalParser::skip() {
@@ -255,7 +266,7 @@ void Command::init() {
     MAP(DISCONNECT)
     MAP(PING)
     MAP(PONG)
-    MAP(HEART_BEAT)
+    MAP(HEART_BEAT_TO)
     MAP(UNDO)
     MAP(MULTI)
     MAP(EXEC)

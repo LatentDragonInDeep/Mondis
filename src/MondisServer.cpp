@@ -526,14 +526,17 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
         unique_lock lck(propagateMtx);
         propagateCV.wait(lck);
     }
-    if (!hasLogin) {
-        ExecutionResult e;
-        e.res = "you haven't login,please login";
-        return e;
-    }
     ExecutionResult res;
+    if (!hasLogin) {
+        res.res = "you haven't login,please login";
+        LOGIC_ERROR_AND_RETURN
+    }
     bool isModifyCommand;
     Command *c = interpreter->getCommand(commandStr);
+    if (c->type == M_ERROR) {
+        res.res = "error command";
+        LOGIC_ERROR_AND_RETURN
+    }
     Command *modify = c;
     bool isLocate = false;
     MondisObject *obj = nullptr;

@@ -230,8 +230,6 @@ public:
 
     static void destroyCommand(Command *command);
 
-    ExecutionResult locateExecute(Command *command);
-
 private:
     int runAsDaemon();
 
@@ -263,7 +261,7 @@ private:
 
     string takeFromPropagateBuffer();
 
-    MultiCommand *getUndoCommand(Command *command);
+    MultiCommand *getUndoCommand(Command *locate, Command *modify, MondisObject *obj);
 
     void closeTransaction();
 

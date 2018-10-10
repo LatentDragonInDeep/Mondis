@@ -383,29 +383,16 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
     INVALID_AND_RETURN
 }
 
-MultiCommand *MondisServer::getUndoCommand(Command *command) {
-    //TODO
-}
+MultiCommand *MondisServer::getUndoCommand(Command *locate, Command *modify, MondisObject *obj) {
+    MultiCommand *res = new MultiCommand;
+    res->locateCommand = locate;
+    if (obj == nullptr) {
+        switch (modify->type) {
 
-ExecutionResult MondisServer::locateExecute(Command *command) {
-    ExecutionResult res;
-    MondisObject *curObj = curKeySpace->locate(command);
-    Command *curCommand = command->next;
-    while (true) {
-        if(curObj == nullptr) {
-            res.type = LOGIC_ERROR;
-            res.res = "Error on locating";
-            return res;
         }
-        if(curCommand->type!=LOCATE) {
-            break;
-        }
-        curObj = curObj->locate(curCommand);
-        curCommand = curCommand->next;
+    } else {
+
     }
-
-    return curObj->execute(curCommand);
-
 }
 
 JSONParser *MondisServer::getJSONParser() {
@@ -525,12 +512,24 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
         return e;
     }
     ExecutionResult res;
+    bool isModifyCommand;
     Command *c = interpreter->getCommand(commandStr);
-    Command *last = c;
-    while (last->next != nullptr) {
-        last = last->next;
+    Command *modify = c;
+    bool isLocate = false;
+    MondisObject *obj = nullptr;
+    if (c->type == LOCATE) {
+        Command *last = c;
+        while (last->next->type == LOCATE) {
+            last = last->next;
+        }
+        modify = last->next;
+        obj = chainLocate(c);
+        res = obj->execute(modify);
+        isLocate = true;
+    } else {
+        res = executor->execute(modify, nullptr);
     }
-    bool isModifyCommand = modifyCommands.find(last->type) != modifyCommands.end();
+    isModifyCommand = modifyCommands.find(modify->type) != modifyCommands.end();
     if (isSlave && isModifyCommand) {
         res.res = "the current server is a slave,can not execute command which will modify database state";
         LOGIC_ERROR_AND_RETURN
@@ -539,7 +538,6 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
         transactionCommands->push(commandStr);
         OK_AND_RETURN
     }
-    res = executor->execute(c, nullptr);
     if (res.type == OK) {
         if (aof) {
             aofFileOut << commandStr + "\n";
@@ -580,10 +578,14 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
             }
         }
         if (isInTransaction || canUndoNotInTransaction) {
-            undoCommands.push_back(getUndoCommand(c));
-            c = last;
+            MultiCommand *undo = nullptr;
+            if (isLocate) {
+                undo = getUndoCommand(nullptr, modify, nullptr);
+            } else {
+                undo = getUndoCommand(c, modify, obj);
+            }
+            undoCommands.push_back(undo);
         }
-        destroyCommand(c);
     } else {
         destroyCommand(c);
     }
@@ -1038,9 +1040,6 @@ ExecutionResult Executor::execute(Command *command, MondisClient *client) {
         res.type = LOGIC_ERROR;
         res.res = "invalid pipeline command";
         return res;
-    } else if (command->type == LOCATE) {
-        ExecutionResult res = server->locateExecute(command);
-        return res;
     }
     ExecutionResult res;
     res.type = LOGIC_ERROR;
@@ -1171,7 +1170,7 @@ MondisObject *MondisServer::chainLocate(Command *command) {
     MondisObject *curObj = curKeySpace->locate(command);
     Command *curCommand = command->next;
     while (true) {
-        if (curCommand == nullptr) {
+        if (curCommand == nullptr || curCommand->type != LOCATE) {
             return curObj;
         }
         if (curObj == nullptr) {

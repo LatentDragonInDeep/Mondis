@@ -63,6 +63,7 @@ public:
 
 };
 
+class MultiCommand;
 class Executor;
 class MondisServer {
 private:
@@ -220,7 +221,18 @@ public:
     MondisServer();
 
     ~MondisServer();
+
     int start(string& confFile);
+
+    ExecutionResult execute(Command *command, MondisClient *client);
+
+    static JSONParser *getJSONParser();
+
+    static void destroyCommand(Command *command);
+
+    ExecutionResult locateExecute(Command *command);
+
+private:
     int runAsDaemon();
 
     void init();
@@ -233,12 +245,7 @@ public:
 
     ExecutionResult execute(string &commandStr, MondisClient *client);
 
-    ExecutionResult execute(Command *command, MondisClient *client);
-
     void handleCommand(MondisClient *client);
-
-    ExecutionResult locateExecute(Command *command);
-    static JSONParser* getJSONParser();
 
     void acceptSocket();
 
@@ -256,7 +263,7 @@ public:
 
     string takeFromPropagateBuffer();
 
-    Command *getUndoCommand(Command *command);
+    MultiCommand *getUndoCommand(Command *command);
 
     void closeTransaction();
 
@@ -270,11 +277,9 @@ public:
     bool isInTransaction = false;
     bool watchedKeysHasModified = false;
 
-    deque<Command *> undoCommands;
+    deque<MultiCommand *> undoCommands;
 
     int hasExecutedCommandNumInTransaction = 0;
-
-    static void destroyCommand(Command *command);
 
     void checkAndHandleIdleClient();
 
@@ -285,6 +290,10 @@ public:
     thread *sendHeartBeatToClients = nullptr;
 
     bool canUndoNotInTransaction = false;
+
+    void execute(MultiCommand *command, MondisClient *client);
+
+    MondisObject *chainLocate(Command *command);
 
 };
 
@@ -306,6 +315,19 @@ private:
     static unordered_set<CommandType> serverCommand;
 public:
     static void init();
+};
+
+class MultiCommand {
+public:
+    Command *locateCommand = nullptr;
+    vector<Command *> modifies;
+
+    ~MultiCommand() {
+        MondisServer::destroyCommand(locateCommand);
+        for (auto c:modifies) {
+            delete c;
+        }
+    }
 };
 
 

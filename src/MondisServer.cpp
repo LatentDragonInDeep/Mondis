@@ -259,7 +259,7 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             curKeySpace->clear();
             JSONParser temp(json);
             temp.parse(curKeySpace);
-            recvFromMaster = new thread([=]() -> {
+            recvFromMaster = new thread([&]() {
                 while (true) {
                     string next = readFromMaster();
                     execute(interpreter->getCommand(next), nullptr);
@@ -371,10 +371,10 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
                 res.res = "has reached max undo command number!";
                 LOGIC_ERROR_AND_RETURN
             }
-            Command *undo = undoCommands.back();
+            MultiCommand *undo = undoCommands.back();
             undoCommands.pop_back();
             execute(undo, client);
-            destroyCommand(undo);
+            delete undo;
             replicaOffset--;
             replicaCommandBuffer->pop_back();
             OK_AND_RETURN;
@@ -383,9 +383,8 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
     INVALID_AND_RETURN
 }
 
-Command *MondisServer::getUndoCommand(Command *command) {
-    //TODO 获得对应的undo命令
-
+MultiCommand *MondisServer::getUndoCommand(Command *command) {
+    //TODO
 }
 
 ExecutionResult MondisServer::locateExecute(Command *command) {
@@ -763,7 +762,7 @@ void MondisServer::init() {
     //检查超时的客户端，从服务器，主服务器并清理
     std::thread checkAndHandle(&MondisServer::checkAndHandleIdleClient, this);
     //向客户端发心跳包
-    sendHeartBeatToClients = new std::thread([&]() -> {
+    sendHeartBeatToClients = new std::thread([&]() {
         while (true) {
             for (auto &client:clients) {
                 client->send("HEART_BEAT_TO");
@@ -772,7 +771,7 @@ void MondisServer::init() {
         }
     });
     //向从服务器发心跳包
-    sendHeartBeatToSlaves = new std::thread([&]() -> {
+    sendHeartBeatToSlaves = new std::thread([&]() {
         while (true) {
             for (auto &slave:slaves) {
                 slave->send("HEART_BEAT_TO");
@@ -1153,6 +1152,34 @@ void MondisServer::closeClient(MondisClient *client) {
     fdToClient.erase(fdToClient.find(client->fd));
 #endif
     delete client;
+}
+
+void MondisServer::execute(MultiCommand *command, MondisClient *client) {
+    if (command->locateCommand == nullptr) {
+        for (auto m:command->modifies) {
+            execute(m, client);
+        }
+    } else {
+        MondisObject *obj = chainLocate(command->locateCommand);
+        for (auto m:command->modifies) {
+            obj->execute(m);
+        }
+    }
+}
+
+MondisObject *MondisServer::chainLocate(Command *command) {
+    MondisObject *curObj = curKeySpace->locate(command);
+    Command *curCommand = command->next;
+    while (true) {
+        if (curCommand == nullptr) {
+            return curObj;
+        }
+        if (curObj == nullptr) {
+            return nullptr;
+        }
+        curObj = curObj->locate(curCommand);
+        curCommand = curCommand->next;
+    }
 }
 
 void Executor::bindServer(MondisServer *sv) {

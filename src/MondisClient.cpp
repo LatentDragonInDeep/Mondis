@@ -56,7 +56,7 @@ void MondisClient::send(const string &res) {
     int hasWrite = 0;
 #ifdef WIN32
     while (hasWrite < res.size()) {
-        ret = send(sock, data + hasWrite, res.size() - hasWrite, 0);
+        ret = ::send(sock, data + hasWrite, res.size() - hasWrite, 0);
         hasWrite += ret;
     }
 #elif defined(linux)

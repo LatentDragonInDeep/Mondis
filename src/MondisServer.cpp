@@ -409,6 +409,9 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
 
 MultiCommand *MondisServer::getUndoCommand(Command *locate, Command *modify, MondisObject *obj) {
     //TODO
+    if (modify->type == UNDO) {
+        return nullptr;
+    }
     MultiCommand *res = new MultiCommand;
     res->locateCommand = locate;
     if (obj == nullptr) {
@@ -428,11 +431,149 @@ MultiCommand *MondisServer::getUndoCommand(Command *locate, Command *modify, Mon
                 ADD_AND_RETURN(res, undo)
             }
             case DEL: {
-
+                TOKEY(modify, 0);
+                MondisObject *original = curKeySpace->get(key);
+                if (original == nullptr) {
+                    return res;
+                }
+                undo->type = BIND;
+                undo->addParam(RAW_PARAM(modify, 0));
+                undo->addParam(original->getJson(), Command::ParamType::STRING);
+                ADD_AND_RETURN(res, undo)
+            }
+            case RENAME: {
+                TOKEY(modify, 0);
+                MondisObject *original = curKeySpace->get(key);
+                if (original == nullptr) {
+                    return res;
+                }
+                undo->type = RENAME;
+                undo->addParam(RAW_PARAM(modify, 1));
+                undo->addParam(RAW_PARAM(modify, 0));
+                ADD_AND_RETURN(res, undo)
+            }
+            case SELECT: {
+                undo->type = SELECT;
+                undo->addParam(to_string(curDbIndex), Command::ParamType::PLAIN);
+                ADD_AND_RETURN(res, undo);
             }
         }
     } else {
+        switch (obj->type) {
+            case RAW_STRING: {
+                switch (modify->type) {
+                    case BIND: {
 
+                    }
+                    case SET_RANGE: {
+
+                    }
+                    case REMOVE_RANGE: {
+
+                    }
+                    case TO_INTEGER: {
+
+                    }
+                    case APPEND: {
+
+                    }
+                }
+            }
+            case RAW_INT: {
+                switch (modify->type) {
+                    case INCR: {
+
+                    }
+                    case INCR_BY: {
+
+                    }
+                    case DECR: {
+
+                    }
+                    case DECR_BY: {
+
+                    }
+                    case TO_STRING: {
+
+                    }
+                }
+            }
+            case LIST: {
+                switch (modify->type) {
+                    case POP_FRONT: {
+
+                    }
+                    case POP_BACK: {
+
+                    }
+                    case PUSH_FRONT: {
+
+                    }
+                    case PUSH_BACK: {
+
+                    }
+                    case BIND: {
+
+                    }
+                }
+            }
+            case SET: {
+                switch (modify->type) {
+                    case ADD: {
+
+                    }
+                    case REMOVE: {
+
+                    }
+                }
+            }
+            case RAW_BIN: {
+                switch (modify->type) {
+                    case BIND: {
+
+                    }
+                    case SET_RANGE: {
+
+                    }
+                    case WRITE: {
+
+                    }
+                }
+
+            }
+            case ZSET: {
+                switch (modify->type) {
+                    case ADD: {
+
+                    }
+                    case REMOVE_BY_RANK: {
+
+                    }
+                    case REMOVE_BY_SCORE: {
+
+                    }
+                    case REMOVE_RANGE_BY_RANK: {
+
+                    }
+                    case REMOVE_RANGE_BY_SCORE: {
+
+                    }
+                    case CHANGE_SCORE: {
+
+                    }
+                }
+            }
+            case HASH: {
+                switch (modify->type) {
+                    case BIND: {
+
+                    }
+                    case DEL: {
+
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -1036,8 +1177,10 @@ void MondisServer::initStaticMember() {
     ADD(modifyCommands, REMOVE_RANGE_BY_SCORE)
     ADD(modifyCommands, WRITE)
     ADD(modifyCommands, TO_STRING)
+    ADD(modifyCommands, TO_INTEGER)
     ADD(modifyCommands, CHANGE_SCORE)
     ADD(modifyCommands, UNDO)
+    ADD(modifyCommands, SELECT)
     ADD(transactionAboutCommands, DISCARD)
     ADD(transactionAboutCommands, EXEC)
     ADD(transactionAboutCommands, WATCH)
@@ -1206,6 +1349,9 @@ void MondisServer::closeClient(MondisClient *client) {
 }
 
 void MondisServer::execute(MultiCommand *command, MondisClient *client) {
+    if (command == nullptr) {
+        return;
+    }
     if (command->locateCommand == nullptr) {
         for (auto m:command->modifies) {
             execute(m, client);

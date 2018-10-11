@@ -127,6 +127,56 @@ ExecutionResult MondisObject::executeString(Command *command) {
             modified();
             OK_AND_RETURN
         }
+        case TO_INTEGER: {
+            int *newData = new int;
+            bool success = util::toInteger(*objectData, *newData);
+            if (success) {
+                delete (string *) objectData;
+                objectData = newData;
+                OK_AND_RETURN
+            }
+            res.res = "can not transform to integer";
+            LOGIC_ERROR_AND_RETURN
+        }
+        case REMOVE_RANGE: {
+            if (command->params.size() == 1) {
+                CHECK_PARAM_TYPE(0, PLAIN)
+                CHECK_AND_DEFINE_INT_LEGAL(0, start);
+                if (start < 0) {
+                    res.res = "start under zero!";
+                    LOGIC_ERROR_AND_RETURN
+                }
+                if (start > data->size()) {
+                    res.res = "start over the size of data!";
+                    LOGIC_ERROR_AND_RETURN
+                }
+                data->erase(data->begin() + start, data->end());
+                OK_AND_RETURN
+            }
+            CHECK_PARAM_NUM(2)
+            CHECK_PARAM_TYPE(0, PLAIN)
+            CHECK_PARAM_TYPE(1, PLAIN)
+            CHECK_AND_DEFINE_INT_LEGAL(0, start);
+            CHECK_AND_DEFINE_INT_LEGAL(1, end);
+            if (start < 0) {
+                res.res = "start under zero!";
+                LOGIC_ERROR_AND_RETURN
+            }
+            if (start > data->size()) {
+                res.res = "start over the size of data!";
+                LOGIC_ERROR_AND_RETURN
+            }
+            if (end < start) {
+                res.res = "the end is smaller than start!";
+                LOGIC_ERROR_AND_RETURN
+            }
+            if (end > data->size()) {
+                data->erase(data->begin() + start, data->end());
+                OK_AND_RETURN
+            }
+            data->erase(data->begin() + start, data->begin() + end);
+            OK_AND_RETURN
+        }
     }
     res.res = "Invalid command";
 

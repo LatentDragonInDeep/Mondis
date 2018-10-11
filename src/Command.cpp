@@ -106,6 +106,7 @@ void CommandInterpreter::init() {
     PUT(SELECT)
     PUT(LOCATE)
     PUT(TO_STRING)
+    PUT(TO_INTEGER)
     PUT(CHECK_POS)
     PUT(CHANGE_SCORE)
     PUT(SET_POS)

@@ -132,6 +132,7 @@ enum CommandType {
     READ,
     WRITE,
     TO_STRING,
+    TO_INTEGER,
     CHECK_POS,
     CHANGE_SCORE,
     LOCATE,

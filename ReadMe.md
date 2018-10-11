@@ -280,7 +280,7 @@ hash的locate命令格式是locate &lt;key&gt;。
 ### 键空间
 与hash相同。
 
-#Mondis配置文件
+# Mondis配置文件
 Mondis配置文件是.conf格式的文本文件，配置项格式为&lt;key&gt;=&lt;value&gt;，&lt;key&gt;必须在每一行的开头，&lt;value&gt;必须在每一行
 的末尾。一个配置项一行，等号前后不能有空格。每一行注释都必须以#开头。server启动的唯一参数就是配置文件路径，如果未指定配置文件，
 将以默认配置进行启动。下面依次说明每一个配置项的作用。

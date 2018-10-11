@@ -572,7 +572,10 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
         }
         undoCommands.push_back(undo);
     }
-    if (res.type == OK) {
+    Log log(commandStr, res);
+    logFileOut << log.toString();
+    logFileOut.flush();
+    if (isModifyCommand && res.type == OK) {
         if (aof) {
             aofFileOut << commandStr + "\n";
             if (aofSyncStrategy == 1) {
@@ -585,11 +588,6 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
                 aofFileOut.flush();
             }
         }
-    }
-    Log log(commandStr, res);
-    logFileOut << log.toString();
-    logFileOut.flush();
-    if (isModifyCommand && res.type == OK) {
         if (replicaCommandBuffer->size() == maxCommandReplicaBufferSize) {
             replicaCommandBuffer->pop_front();
             replicaCommandBuffer->push_back(commandStr);

@@ -1,8 +1,8 @@
 # Mondis
 Mondis is a key-value database powered by redis and add some new feature。
 # 什么是Mondis
-Mondis是一个key-value数据库，它很像redis，但是支持许多redis不支持的新特性。实际上，它的名字mondis就是取自mongodb与redis。后面将会说明这样做的原因。
-下面，让我们学习如何来使用它。
+Mondis是一个key-value数据库，它很像redis，但是支持许多redis不支持的新特性。实际上，它的名字mondis就是取自mongodb与redis。
+下面，让我们了解以及学习如何来使用它。
 # 选择mondis的理由
 ## mondis嵌套
 mondis支持数据结构的任意嵌套，mondis键的取值只能是字符串，但是值的取值可以是string,list,set,zset,hash的任意一种。
@@ -22,9 +22,23 @@ mondis查询类似于redis查询，但是不同的是mondis查询返回的格式
 mondis支持两种持久化方式，json与aof。json类似于rdb，但是持久化的格式是完全兼容的json，
 这使得持久化文件方便迁移并解析。aof持久化则与redis的aof完全相同，除了命令格式。但是目前mondis还不支持aof重写。
 ## 跨平台
+Mondis在设计的时候已经考虑到了平台兼容性的问题，mondis是跨平台的，在windows以及unix系统上都能正常使用。
+不过要在各自的平台上编译二进制文件。
 ## 事务支持回滚
+Mondis的事务支持回滚，就像传统关系型数据库那样。这意味着如果在事务执行过程中某条命令没有执行成功，已经执行的命令就会
+回滚，就像从来没有执行过这条命令一样。然后事务的执行状态将会被重置。
 ## 支持undo(撤销)命令
-## 效率更高
+mondis允许在不开启事务的情况下使用undo（撤销）命令，它的作用是撤销上一条写命令。注意，读命令不会受到影响。你可以连续
+执行任意数量的undo，最多可撤销的命令条数可以在配置文件中设置，这个功能必须在配置文件中开启。但是不建议开启，因为
+会影响mondis的效率。
+## 集群raft支持
+mondis的集群采用了raft算法实现最终一致性，这意味着如果leader节点在任意时刻挂掉了，集群都不会因此受到影响。
+raft算法会处理好所有的一切，包括重新选leader，以及同步到其他所有节点。
+## 写命令重定向
+mondis follower节点可以自动将收到的写命令转发到leader节点执行，这个行为对客户端是完全透明的。这意味着如果a,b,c
+组成了一个集群，a是leader,b,c是follower，那么b,c收到的写命令将会自动转发给a执行，b,c的客户端对此毫不知情，
+就好像这条命令是由b,c执行的一样。此功能需要在配置文件中开启，如果没开启，那么follower节点在收到写命令后拒绝执行
+并返回一个错误。
 ## mondis底层实现相对于redis的改进
 ### list
 在mondis里面，list还是用链表实现。不同的是mondis保存了对象指针与索引的双向映射，这样虽然多占用了一些空间，不过可以方便的定位到所需元素。
@@ -265,4 +279,107 @@ zset的locate命令格式是locate "RANK" &lt;rank&gt;或者locate "SCORE" &lt;s
 hash的locate命令格式是locate &lt;key&gt;。
 ### 键空间
 与hash相同。
+
+#Mondis配置文件
+Mondis配置文件是.conf格式的文本文件，配置项格式为&lt;key&gt;=&lt;value&gt;，&lt;key&gt;必须在每一行的开头，&lt;value&gt;必须在每一行
+的末尾。一个配置项一行，等号前后不能有空格。每一行注释都必须以#开头。server启动的唯一参数就是配置文件路径，如果未指定配置文件，
+将以默认配置进行启动。下面依次说明每一个配置项的作用。
+
+## daemonize=&lt;true|false&gt;
+是否以守护进程方式运行Mondis server，默认为false。在windows上此选项将被忽略。
+
+## port=&lt;integer&gt;
+mondis server的监听端口号。默认为2379。
+
+## username=&lt;string&gt;
+mondis server的登录用户名
+
+## password=&lt;string&gt;
+mondis server的登录密码
+
+## databaseNum=&lt;integer&gt;
+mondis server的数据库（即键空间）数量，默认为16。
+
+## databaseId=&lt;integer&gt;
+mondis server启动以后的默认数据库id。从0到databaseNum-1。
+
+## aof=&lt;true|false&gt;
+是否开启aof持久化。
+
+## aofSyncStrategy=&lt;everySecond|forceSync|osDefault&gt;
+aof持久化同步策略。everySecond为每秒同步，也是默认的同步策略。forceSync为每条写命令强制同步。osDefault完全取决于操作系统。
+
+## aofFile=&lt;string&gt;
+aof持久化文件路径。
+
+## json=&lt;true|false&gt;
+是否开启json持久化。
+
+## jsonFile=&lt;string&gt;
+json持久化文件路径。
+
+## recovery=&lt;aof|json|neither&gt;
+启动时是否从aof或者json文件中恢复。neither表示不恢复，为默认选项。
+
+## workDir=&lt;string&gt;
+工作目录，默认文件均会在此目录下寻找，找不到则自动创建。
+
+## slaveOf=&lt;true|false&gt;
+启动时是否同步主服务器，默认为false
+
+## masterIP=&lt;string&gt;
+主服务器ip。
+
+## masterPort=&lt;integer&gt;
+主服务器端口号
+
+## masterUsername=&lt;string&gt;
+主服务器用户名
+
+## masterPassword=&lt;string&gt;
+主服务器密码
+
+## logFile=&lt;string&gt;
+日志文件路径
+
+## maxClientNum=&lt;integer&gt;
+最大并发客户端数,默认为1024
+
+## maxSlaveNum=&lt;string&gt;
+最大从服务器数，默认为1024.
+
+## maxCommandReplicaBufferSize=&lt;integer&gt;
+复制积压命令缓冲区大小，可以理解为最多保存执行过的写命令的条数。默认为1024*1024,即1048576。此选项不宜设的过小，
+否则在主同步时大概率会进行完全同步影响效率。
+
+## maxCommandPropagateBufferSize=&lt;integer&gt;
+命令传播缓冲区大小，缓存主服务器已经执行完毕，需要传播给从服务器的写命令。默认为1024
+
+## maxUndoCommandBufferSize=&lt;integer&gt;
+undo命令缓冲区大小,可以理解为最多能undo几条命令,大小不能超过命令缓冲区大小。只有在事务中或者开启了
+canUndoNotInTransaction选项才发挥作用。默认为1024
+
+## maxSlaveIdle=&lt;integer&gt;
+最大从服务器空转时间，如果从上一次收到心跳包经过空转时间还没有收到心跳包，就认为从服务器出问题了，自动断开连接
+并从集群中删除此从服务器。当且仅当当前服务器是主服务器时有效，单位毫秒,默认为10000。
+
+## toSlaveHeartBeatDuration=&lt;integer&gt;
+主服务器向从服务器心跳包发送间隔，单位毫秒，默认为1000。
+
+## maxMasterIdle=&lt;integer&gt;
+最大主服务器空转时间，如果从上一次收到心跳包经过空转时间还没有收到心跳包，就认为主服务器出问题了，自动断开连接
+并由此从服务器发起leader选举。当且仅当当前服务器是从服务器时有效，单位毫秒,默认为10000。
+
+## toClientHeartBeatDuration=&lt;integer&gt;
+客户端心跳包发送间隔,单位毫秒,默认为1000。
+
+## maxClientIdle=&lt;integer&gt;
+最大客户端空转时间，如果从上一次收到心跳包经过空转时间还没有收到心跳包，就认为客户端出问题了，自动断开连接。
+单位毫秒,默认为10000。
+
+## canUndoNotInTransaction=&lt;true|false&gt;
+是否在未开启事务的情况下开启undo功能(开启此选项可能会造成一定的性能损失，建议不开启)，默认不开启。
+
+## autoMoveCommandToLeader=&lt;true|false&gt;
+当前服务器为从服务器时，是否自动将客户端的写命令转发到主服务器，如果为false将丢弃这条命令并返回一个错误。默认为true。
 

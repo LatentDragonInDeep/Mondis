@@ -87,7 +87,7 @@ zset里面的元素可以是任意类型，支持set的所有操作，同时支�
 序列化结果是一个json对象，键值对即hash的键值对。
 # Mondis命令
 ## 概述
-mondis有很多命令，分为键空间命令，locate命令与数据对象命令。键空间命令即直接在数据库空间执行的命令，
+mondis有很多命令，分为键空间命令，控制命令，locate命令与数据对象命令。键空间命令即直接在数据库空间执行的命令，
 locate命令即定位命令，用来定位要操作的数据对象。数据对象命令即操作对应数据对象的命令。mondis命令有若干参数，
 参数分为普通参数与string参数，普通参数就是一段连续的token，中间不能有空格，两端没有分号，如abc,1235等。
 字符串参数就是一对引号括起来的参数，中间可以有任意字符。Mondis命令具有多态性，也就是说在操作数据对象时并不需要
@@ -117,17 +117,39 @@ xxxx,开头的LatentDragon将被忽略。注意所有以LatentDragon开头的字
 返回key对应的value底层编码类型。类型有RAW_STRING,RAW_INT,RAW_BIN,LIST,SET,ZSET,HASH
 ### move &lt;new&gt;
 将一对kv迁移到编号为new的键空间中。
+### size
+返回键空间内键的数量
+
+## 控制命令
 ### select &lt;db&gt;
 修改当前键空间为编号为db的键空间。
 ### save &lt;filepath&gt;
 将整个当前键空间以json持久化到file里面。save命令的默认实现是开启子进程持久化，因此不需要担心性能问题。
 mondis不提供bgsave。
+### save_all &lt;filepath&gt;
+将所有键空间以json持久化到file里面。基本与save相同。
 ### login &lt;username&gt; &lt;password&gt;
 以username和password登录
 ### exit
 退出登录并退出Mondis server。
-### size
-返回键空间内键的数量
+### disconnect_client
+断开与发送该命令的客户端的连接
+### disconnect_master
+断开当前服务器与主服务器的连接，仅当当前服务器是从服务器时有效。
+### undo
+撤销所执行的上一条写命令。
+### multi
+开启一个事务。同时最多只能存在一个事务。
+### exec
+执行当前的事务
+### discard
+抛弃当前未执行事务的所有命令并关闭事务。
+### watch &lt;key&gt;
+监视当前键空间的为key的键，如果事务执行前该键对应的value发生了变化则事务执行失败并自动回滚。
+### unwatch &lt;key&gt;
+取消监视当前键空间为key的键。
+
+
 
 ## string命令
 string命令分为两大类，有些只能在RAW_INT上执行，有些可以在RAW_STRING上执行。下面分别介绍

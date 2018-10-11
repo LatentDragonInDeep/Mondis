@@ -402,6 +402,6 @@ canUndoNotInTransaction选项才发挥作用。默认为1024
 ## canUndoNotInTransaction=&lt;true|false&gt;
 是否在未开启事务的情况下开启undo功能(开启此选项可能会造成一定的性能损失，建议不开启)，默认不开启。
 
-## autoMoveCommandToLeader=&lt;true|false&gt;
+## autoMoveCommandToMaster=&lt;true|false&gt;
 当前服务器为从服务器时，是否自动将客户端的写命令转发到主服务器，如果为false将丢弃这条命令并返回一个错误。默认为true。
 

@@ -129,6 +129,8 @@ public:
     JSONParser(const char *filePath);
     void parse(HashMap* keySpace);
 
+    void parseAll(std::vector<HashMap *> &dbs);
+
     MondisObject *parseObject(std::string &content);
 
     KeyValue parseEntry(std::string &content);

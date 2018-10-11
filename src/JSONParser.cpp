@@ -15,6 +15,7 @@ JSONParser::JSONParser(std::string &source) {
     lexicalParser = LexicalParser(source);
 }
 
+
 void JSONParser::parse(HashMap *keySpace) {
     Token next = lexicalParser.nextToken();
     if (next.type != LEFT_ANGLE_BRACKET) {
@@ -228,6 +229,35 @@ JSONParser::JSONParser(const char *filePath) {
 
 JSONParser::JSONParser(std::string &&s) {
     lexicalParser = LexicalParser(s);
+}
+
+void JSONParser::parseAll(std::vector<HashMap *> &dbs) {
+    Token next = lexicalParser.nextToken();
+    if (next.type != LEFT_ANGLE_BRACKET) {
+        return;
+    }
+    KeyValue cur;
+    while (true) {
+        cur = parseEntry(lexicalParser);
+        if (cur.key == nullptr) {
+            break;
+        }
+        int dbIndex = cur.key->intValue;
+        AVLTree *tree = (AVLTree *) cur.value->objectData;
+        AVLTree::AVLIterator iter = tree->iterator();
+        while (iter.next()) {
+            dbs[dbIndex]->put(iter->data->key, iter->data->value);
+            tree->remove(*iter->data->key);
+        }
+    }
+    Token end = lexicalParser.nextToken();
+    if (end.type != RIGHT_ANGLE_BRACKET) {
+        throw new std::invalid_argument("unexpected token!");
+    }
+    Token ter = lexicalParser.nextToken();
+    if (ter.type != TERMINATOR) {
+        throw new std::invalid_argument("unexpected token!");
+    }
 }
 
 Token *Token::leftSquareBracket = new Token(LEFT_SQUARE_BRACKET);

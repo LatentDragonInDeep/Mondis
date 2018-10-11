@@ -293,6 +293,10 @@ private:
 
     MondisObject *chainLocate(Command *command);
 
+    bool autoMoveCommandToMaster = true;
+
+    void saveAll(const string &jsonFile);
+
 };
 
 class Executor {

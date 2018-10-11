@@ -129,6 +129,13 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             save(jsonFile);
             OK_AND_RETURN
         }
+        case SAVE_ALL: {
+            CHECK_PARAM_NUM(1)
+            CHECK_PARAM_TYPE(0, PLAIN)
+            string jsonFile = (*command)[0].content;
+            saveAll(jsonFile);
+            OK_AND_RETURN
+        }
         case LOGIN: {
             CHECK_PARAM_NUM(2)
             CHECK_PARAM_TYPE(0, PLAIN)
@@ -207,7 +214,7 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
         }
         case SLAVE_OF: {
             if (isSlave) {
-                sendToMaster(string("DISCONNECT"));
+                sendToMaster(string("DISCONNECT_SLAVE"));
             }
             CHECK_PARAM_NUM(4);
             CHECK_PARAM_TYPE(0, PLAIN)
@@ -290,20 +297,34 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             res.res = "sync has finished";
             OK_AND_RETURN
         }
-        case DISCONNECT: {
+        case DISCONNECT_CLIENT: {
+            if (client->type != CLIENT) {
+                res.res = "the sender is not a client!";
+                LOGIC_ERROR_AND_RETURN
+            }
             closeClient(client);
             OK_AND_RETURN
         }
+        case DISCONNECT_SLAVE: {
+            if (isSlave) {
+                sendToMaster("DISCONNECT_SLAVE");
+                OK_AND_RETURN
+            }
+            if (isMaster) {
+                if (client->type != SLAVE) {
+                    res.res = "the sender is not a slave!";
+                    LOGIC_ERROR_AND_RETURN
+                }
+                closeClient(client);
+                OK_AND_RETURN
+            }
+        }
         case PING: {
             client->send("PONG");
-            OK_AND_RETURN
-        }
-        case HEART_BEAT_TO: {
             client->updateHeartBeatTime();
-            client->send("HEART_BEAT_REPLY");
             OK_AND_RETURN
         }
-        case HEART_BEAT_REPLY: {
+        case PONG: {
             client->updateHeartBeatTime();
             OK_AND_RETURN
         }
@@ -724,6 +745,12 @@ void MondisServer::applyConf() {
             } else if (kv.second == "false") {
                 canUndoNotInTransaction = false;
             }
+        } else if (kv.first == "autoMoveCommandToMaster") {
+            if (kv.second == "true") {
+                autoMoveCommandToMaster = true;
+            } else if (kv.second == "false") {
+                autoMoveCommandToMaster = false;
+            }
         }
     }
 }
@@ -752,7 +779,7 @@ void MondisServer::init() {
     cout << "is Recovering..." << endl;
     if (recoveryStrategy == "json") {
         JSONParser temp(recoveryFile.c_str());
-        temp.parse(curKeySpace);
+        temp.parseAll(dbs);
     } else if (recoveryStrategy == "aof") {
         recoveryFileIn.open(recoveryFile);
         string command;
@@ -1087,6 +1114,7 @@ void Executor::init() {
     INSERT(RENAME)
     INSERT(TYPE)
     INSERT(SAVE)
+    INSERT(SAVE_ALL)
     INSERT(EXIT)
     INSERT(SELECT)
     INSERT(DEL)
@@ -1094,9 +1122,10 @@ void Executor::init() {
     INSERT(SYNC)
     INSERT(SET_NAME)
     INSERT(SYNC_FINISHED)
-    INSERT(DISCONNECT)
-    INSERT(HEART_BEAT_TO)
-    INSERT(HEART_BEAT_REPLY)
+    INSERT(DISCONNECT_SLAVE)
+    INSERT(DISCONNECT_CLIENT)
+    INSERT(PING)
+    INSERT(PONG)
     INSERT(UNDO)
     INSERT(MULTI)
     INSERT(EXEC)
@@ -1202,6 +1231,46 @@ MondisObject *MondisServer::chainLocate(Command *command) {
         curObj = curObj->locate(curCommand);
         curCommand = curCommand->next;
     }
+}
+
+void MondisServer::saveAll(const string &jsonFile) {
+#ifdef WIN32
+    ofstream out(jsonFile + "2");
+    out << "{\n";
+    for (int i = 0; i < databaseNum; ++i) {
+        out << "\"";
+        out << i;
+        out << "\"";
+        out << " : ";
+        out << dbs[i]->getJson();
+        out << "\n";
+    }
+    out << "}";
+    out.flush();
+    remove(jsonFile.c_str());
+    out.close();
+    rename((jsonFile + "2").c_str(), jsonFile.c_str());
+#elif defined(linux)
+    int pid = fork();
+        if(pid == 0) {
+            ofstream out(jsonFile + "2");
+        out<<"{\n";
+        for (int i = 0; i <databaseNum; ++i) {
+            out<<"\"";
+            out<<i;
+            out<<"\"";
+            out<<" : ";
+            out<<dbs[i]->getJson();
+            out<<"\n";
+        }
+        out<<"}";
+        out.flush();
+        remove(jsonFile.c_str());
+        out.close();
+        rename((jsonFile + "2").c_str(), jsonFile.c_str());
+            exit(0);
+        }
+#endif
 }
 
 void Executor::bindServer(MondisServer *sv) {

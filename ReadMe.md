@@ -430,4 +430,5 @@ canUndoNotInTransaction选项才发挥作用。默认为1024
 ## TO_STRING
 ## TO_INTEGER
 ## CHANGE_SCORE
-## UNDO
+## data->erase(data->begin()+start,data->end());
+                OK_AND_RETURNUNDO

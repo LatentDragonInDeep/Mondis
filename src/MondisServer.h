@@ -29,7 +29,6 @@
 #endif
 
 #include "HashMap.h"
-#include "MondisClient.h"
 #include "Command.h"
 #include "JSONParser.h"
 
@@ -65,6 +64,8 @@ public:
 
 class MultiCommand;
 class Executor;
+
+class MondisClient;
 class MondisServer {
 private:
     int maxCilentNum = 1024;
@@ -100,7 +101,6 @@ private:
     ifstream recoveryFileIn;
     unordered_map<string,string> conf;
     Executor* executor;
-    CommandInterpreter* interpreter;
     string username = "root";
     string password = "admin";
     clock_t preSync = clock();
@@ -218,6 +218,8 @@ private:
 
     bool hasLogin = true;
 public:
+    CommandInterpreter *interpreter;
+
     MondisServer();
 
     ~MondisServer();
@@ -228,17 +230,37 @@ public:
 
     static JSONParser *getJSONParser();
 
-    static void destroyCommand(Command *command);
+    void handleWatchedKey(const string &key);
 
+    bool putToPropagateBuffer(const string &curCommand);
+
+    void incrReplicaOffset() {
+        replicaOffset++;
+    };
+
+    void decrReplicaOffset() {
+        replicaOffset--;
+    };
+
+    void appendLog(string &commandStr, ExecutionResult &res);
+
+    void appendAof(const string &command);
+
+    MondisObject *chainLocate(Command *command);
+
+    static bool isModifyCommand(Command *command) {
+        return modifyCommands.find(command->type) != modifyCommands.end();
+    };
 private:
-    int runAsDaemon();
+    void runAsDaemon();
 
     void init();
 
-    int save(string &jsonFile);
-    int startEventLoop();
+    void save(string &jsonFile);
+
+    void startEventLoop();
     void applyConf();
-    int appendLog(Log& log);
+
     void parseConfFile(string& confFile);
 
     ExecutionResult execute(string &commandStr, MondisClient *client);
@@ -257,27 +279,18 @@ private:
 
     void replicaCommandPropagate(vector<string> &commands, MondisClient *client);
 
-    bool putToPropagateBuffer(const string& curCommand);
-
     string takeFromPropagateBuffer();
 
     MultiCommand *getUndoCommand(Command *locate, Command *modify, MondisObject *obj);
 
-    void closeTransaction();
-
     condition_variable notEmpty;
     mutex notEmptyMtx;
 
-    unordered_set<string> watchedKeys;
-    unordered_set<string> modifiedKeys;
-    queue<string> *transactionCommands;
-
-    bool isInTransaction = false;
-    bool watchedKeysHasModified = false;
-
     deque<MultiCommand *> undoCommands;
 
-    int hasExecutedCommandNumInTransaction = 0;
+    unordered_map<string, unordered_set<MondisClient *>> keyToWatchedClients;
+
+    MondisClient *self;
 
     void checkAndHandleIdleClient();
 
@@ -291,12 +304,9 @@ private:
 
     void execute(MultiCommand *command, MondisClient *client);
 
-    MondisObject *chainLocate(Command *command);
-
     bool autoMoveCommandToMaster = true;
 
     void saveAll(const string &jsonFile);
-
 };
 
 class Executor {
@@ -319,17 +329,77 @@ public:
     static void init();
 };
 
-class MultiCommand {
-public:
-    Command *locateCommand = nullptr;
-    vector<Command *> modifies;
+enum ClientType {
+    MASTER,
+    SLAVE,
+    CLIENT,
+    PEER,
+    SERVER_SELF,
+};
 
-    ~MultiCommand() {
-        MondisServer::destroyCommand(locateCommand);
-        for (auto c:modifies) {
-            delete c;
-        }
-    }
+class MondisClient {
+public:
+    uint64_t id;            /* Client incremental unique ID. */
+#ifdef WIN32
+    SOCKET sock;
+#elif defined(linux)
+    int fd;/* Client socket. */
+#endif
+    ClientType type = CLIENT;
+    int curDbIndex = 0;
+    HashMap *keySpace = nullptr;            /* Pointer to currently SELECTed DB. */
+    string name;             /* As set by CLIENT SETNAME. */
+    vector<string> commandBuffer;         /* Buffer we use to accumulate client queries. */
+    int curCommandIndex = 0;
+    vector<ExecutionResult> *reply;            /* List of reply objects to sendToMaster to the client. */
+    time_t ctime;           /* Client creation time. */
+    time_t lastinteraction; /* Time of the last interaction, used for timeout */
+
+    string ip;
+    string port;
+
+    clock_t preInteraction = clock();
+
+    unordered_set<string> watchedKeys;
+    unordered_set<string> modifiedKeys;
+
+    queue<string> *transactionCommands = nullptr;
+
+    deque<MultiCommand *> *undoCommands = nullptr;
+
+    bool isInTransaction = false;
+    bool watchedKeysHasModified = false;
+
+    int hasExecutedCommandNumInTransaction = 0;
+public:
+    bool hasLogin = false;
+private:
+    static int nextId;
+public:
+#ifdef WIN32
+
+    MondisClient(SOCKET sock);
+
+#elif defined(linux)
+    MondisClient(int fd);
+
+#endif
+
+    MondisClient(ClientType t) : type(t) {};
+
+    ~MondisClient();
+
+    string readCommand();
+
+    void send(const string &res);
+
+    void updateHeartBeatTime();
+
+    void startTransaction();
+
+    void closeTransaction();
+
+    ExecutionResult commitTransaction(MondisServer *server);
 };
 
 

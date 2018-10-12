@@ -42,7 +42,7 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             CHECK_PARAM_TYPE(0, PLAIN)
             CHECK_PARAM_TYPE(1, STRING)
             Key *key = new Key((*command)[0].content);
-            if (client == nullptr) {
+            if (client == self) {
                 curKeySpace->put(key, parser.parseObject((*command)[1].content));
             } else {
                 client->keySpace->put(key, parser.parseObject((*command)[1].content));
@@ -54,7 +54,7 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             CHECK_PARAM_TYPE(0, PLAIN)
             KEY(0)
             MondisObject *data;
-            if (client == nullptr) {
+            if (client == self) {
                 data = curKeySpace->get(key);
             } else {
                 data = client->keySpace->get(key);
@@ -70,7 +70,7 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             CHECK_PARAM_NUM(1)
             CHECK_PARAM_TYPE(0, PLAIN)
             KEY(0)
-            if (client == nullptr) {
+            if (client == self) {
                 curKeySpace->remove(key);
             } else {
                 client->keySpace->remove(key);
@@ -82,7 +82,7 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             CHECK_PARAM_TYPE(0, PLAIN)
             KEY(0)
             bool r;
-            if (client == nullptr) {
+            if (client == self) {
                 r = curKeySpace->containsKey(key);
             } else {
                 r = client->keySpace->containsKey(key);
@@ -95,7 +95,7 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             CHECK_PARAM_TYPE(0, PLAIN)
             KEY(0)
             MondisObject *data;
-            if (client == nullptr) {
+            if (client == self) {
                 data = curKeySpace->get(key);
             } else {
                 data = client->keySpace->get(key);
@@ -109,7 +109,7 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
         }
         case EXIT: {
             CHECK_PARAM_NUM(0)
-            if (client == nullptr) {
+            if (client == self) {
                 system("exit");
             } else {
 #ifdef WIN32
@@ -142,7 +142,7 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             CHECK_PARAM_TYPE(1, PLAIN)
             string userName = (*command)[0].content;
             string pwd = (*command)[1].content;
-            if (client == nullptr) {
+            if (client == self) {
                 if (userName == username && pwd == password) {
                     hasLogin = true;
                     OK_AND_RETURN
@@ -166,7 +166,7 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
                 res.res = "Invalid database id";
                 LOGIC_ERROR_AND_RETURN
             }
-            if (client == nullptr) {
+            if (client == self) {
                 curDbIndex = index;
                 curKeySpace = dbs[curDbIndex];
                 OK_AND_RETURN
@@ -195,7 +195,7 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
         }
         case M_SIZE: {
             CHECK_PARAM_NUM(0);
-            if (client == nullptr) {
+            if (client == self) {
                 res.res = to_string(curKeySpace->size());
             } else {
                 res.res = to_string(client->keySpace->size());
@@ -205,7 +205,7 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
         case SET_NAME: {
             CHECK_PARAM_NUM(1);
             CHECK_PARAM_TYPE(0, PLAIN)
-            if (client == nullptr) {
+            if (client == self) {
                 res.res = "no known client!";
                 LOGIC_ERROR_AND_RETURN;
             }
@@ -329,65 +329,38 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             OK_AND_RETURN
         }
         case MULTI: {
-            isInTransaction = true;
-            transactionCommands = new queue<string>;
+            client->startTransaction();
             OK_AND_RETURN
         }
         case EXEC: {
-            if (!isInTransaction) {
-                res.res = "please start a transaction!";
-                LOGIC_ERROR_AND_RETURN
-            }
-            if (watchedKeysHasModified) {
-                res.res = "can not execute the transaction,because the following keys has been modified.\n";
-                for (auto &key:modifiedKeys) {
-                    res.res += key;
-                    res.res += " ";
-                }
-                LOGIC_ERROR_AND_RETURN
-            }
-            while (!transactionCommands->empty()) {
-                string next = transactionCommands->front();
-                transactionCommands->pop();
-                ExecutionResult res = execute(interpreter->getCommand(next), client);
-                putToPropagateBuffer(next);
-                if (res.type != OK) {
-                    string undo = "UNDO";
-                    while (hasExecutedCommandNumInTransaction > 0) {
-                        execute(interpreter->getCommand(undo), client);
-                        putToPropagateBuffer(undo);
-                        hasExecutedCommandNumInTransaction--;
-                    }
-                    res.res = "error in executing the command ";
-                    res.res += next;
-                    LOGIC_ERROR_AND_RETURN
-                }
-                hasExecutedCommandNumInTransaction++;
-            }
-            closeTransaction();
-            OK_AND_RETURN
+            return client->commitTransaction(this);
         }
         case DISCARD: {
-            closeTransaction();
+            client->closeTransaction();
         }
         case WATCH: {
-            if (!isInTransaction) {
+            if (!client->isInTransaction) {
                 res.res = "please start a transaction!";
                 LOGIC_ERROR_AND_RETURN
             }
             CHECK_PARAM_NUM(1)
             CHECK_PARAM_TYPE(0, PLAIN)
-            watchedKeys.insert(PARAM(0));
+            keyToWatchedClients[PARAM(0)].insert(client);
+            client->watchedKeys.insert(PARAM(0));
             OK_AND_RETURN
         }
         case UNWATCH: {
-            if (!isInTransaction) {
+            if (!client->isInTransaction) {
                 res.res = "please start a transaction!";
                 LOGIC_ERROR_AND_RETURN
             }
             CHECK_PARAM_NUM(1)
             CHECK_PARAM_TYPE(0, PLAIN)
-            watchedKeys.erase(watchedKeys.find(PARAM(0)));
+            keyToWatchedClients[PARAM(0)].erase(keyToWatchedClients[PARAM(0)].find(client));
+            if (keyToWatchedClients[PARAM(0)].size() == 0) {
+                keyToWatchedClients.erase(keyToWatchedClients.find(PARAM(0)));
+            }
+            client->watchedKeys.erase(client->watchedKeys.find(PARAM(0)));
             OK_AND_RETURN
         }
         case UNDO: {
@@ -602,10 +575,8 @@ void MondisServer::parseConfFile(string &confFile) {
     }
 }
 
-int MondisServer::runAsDaemon() {
-#ifdef WIN32
-    return 0;
-#elif defined(linux)
+void MondisServer::runAsDaemon() {
+#ifdef linux
     pid_t pid;
     int fd, i, nfiles;
     pid = fork();
@@ -655,8 +626,9 @@ int MondisServer::runAsDaemon() {
 #endif
 }
 
-int MondisServer::appendLog(Log &log) {
-    logFileOut<<log.toString();
+void MondisServer::appendLog(string &commandStr, ExecutionResult &res) {
+    Log log(commandStr, res);
+    logFileOut << log.toString();
 }
 
 int MondisServer::start(string &confFile) {
@@ -670,13 +642,13 @@ int MondisServer::start(string &confFile) {
     init();
 }
 
-int MondisServer::startEventLoop() {
+void MondisServer::startEventLoop() {
     cout << "start event loop,now you can input command" << endl;
     while (true) {
         cout << username + "@Mondis>";
         string nextCommand;
         getline(std::cin, nextCommand);
-        ExecutionResult res = execute(nextCommand, nullptr);
+        ExecutionResult res = execute(nextCommand, self);
         cout << res.toString();
         cout << endl;
     }
@@ -715,8 +687,8 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
         res.res = "the current server is a slave,can not execute command which will modify database state";
         LOGIC_ERROR_AND_RETURN
     }
-    if (isInTransaction && transactionAboutCommands.find(c->type) == transactionAboutCommands.end()) {
-        transactionCommands->push(commandStr);
+    if (client->isInTransaction && transactionAboutCommands.find(c->type) == transactionAboutCommands.end()) {
+        client->transactionCommands->push(commandStr);
         OK_AND_RETURN
     }
     if (isLocate) {
@@ -725,7 +697,7 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
     } else {
         res = executor->execute(modify, nullptr);
     }
-    if (isModifyCommand && (isInTransaction || canUndoNotInTransaction)) {
+    if (isModifyCommand && (client->isInTransaction || canUndoNotInTransaction)) {
         MultiCommand *undo = nullptr;
         if (isLocate) {
             undo = getUndoCommand(nullptr, modify, nullptr);
@@ -734,51 +706,26 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
         }
         undoCommands.push_back(undo);
     }
-    Log log(commandStr, res);
-    logFileOut << log.toString();
-    logFileOut.flush();
+    appendLog(commandStr, res);
     if (isModifyCommand && res.type == OK) {
-        if (aof) {
-            aofFileOut << commandStr + "\n";
-            if (aofSyncStrategy == 1) {
-                clock_t cur = clock();
-                if (cur - preSync >= 1000) {
-                    aofFileOut.flush();
-                    preSync = cur;
-                }
-            } else if (aofSyncStrategy == 2) {
-                aofFileOut.flush();
-            }
-        }
+        appendAof(commandStr);
         if (replicaCommandBuffer->size() == maxCommandReplicaBufferSize) {
             replicaCommandBuffer->pop_front();
             replicaCommandBuffer->push_back(commandStr);
         }
         replicaOffset++;
         while (!putToPropagateBuffer(commandStr));
-        if (isInTransaction) {
-            switch (c->type) {
-                case DEL:
-                case RENAME:
-                case BIND:
-                case LOCATE: {
-                    if (watchedKeys.find((*c)[0].content) != watchedKeys.end()) {
-                        watchedKeysHasModified = true;
-                        watchedKeys.erase(watchedKeys.find((*c)[0].content));
-                        modifiedKeys.insert((*c)[0].content);
-                    }
-                    break;
-                }
-            }
+        if (client->isInTransaction) {
+            handleWatchedKey((*c)[0].content);
         }
     } else {
-        destroyCommand(c);
+        Command::destroyCommand(c);
     }
 
     return res;
 }
 
-int MondisServer::save(string &jsonFile) {
+void MondisServer::save(string &jsonFile) {
 #ifdef WIN32
     ofstream out(jsonFile + "2");
     out << curKeySpace->getJson();
@@ -925,7 +872,7 @@ void MondisServer::init() {
         recoveryFileIn.open(recoveryFile);
         string command;
         while (getline(recoveryFileIn, command)) {
-            execute(command, nullptr);
+            execute(command, self);
         }
     }
     isRecovering = false;
@@ -1097,6 +1044,7 @@ MondisServer::MondisServer() {
 #endif
     replicaCommandBuffer = new deque<string>;
     commandPropagateBuffer = new queue<string>;
+    self = new MondisClient(SERVER_SELF);
 }
 
 void MondisServer::sendToMaster(const string &res) {
@@ -1117,6 +1065,7 @@ MondisServer::~MondisServer() {
     delete recvFromMaster;
     delete sendHeartBeatToClients;
     delete sendHeartBeatToSlaves;
+    delete self;
 }
 
 void MondisServer::replicaToSlave(MondisClient *client, unsigned dbIndex, unsigned long long slaveReplicaOffset) {
@@ -1214,15 +1163,6 @@ bool MondisServer::putToPropagateBuffer(const string &curCommand) {
     return true;
 }
 
-void MondisServer::closeTransaction() {
-    isInTransaction = false;
-    watchedKeys.clear();
-    modifiedKeys.clear();
-    delete transactionCommands;
-    watchedKeysHasModified = false;
-    hasExecutedCommandNumInTransaction = 0;
-}
-
 ExecutionResult Executor::execute(Command *command, MondisClient *client) {
     if(serverCommand.find(command->type)!=serverCommand.end()) {
         if (command->next == nullptr || command->next->type == VACANT) {
@@ -1275,15 +1215,6 @@ void Executor::init() {
     INSERT(DISCARD)
     INSERT(WATCH)
     INSERT(UNWATCH)
-}
-
-void MondisServer::destroyCommand(Command *command) {
-    Command* cur = command;
-    while (cur!= nullptr) {
-        Command* temp = cur;
-        cur = cur->next;
-        delete temp;
-    }
 }
 
 void MondisServer::checkAndHandleIdleClient() {
@@ -1417,6 +1348,32 @@ void MondisServer::saveAll(const string &jsonFile) {
             exit(0);
         }
 #endif
+}
+
+void MondisServer::handleWatchedKey(const string &key) {
+    if (keyToWatchedClients.find(key) == keyToWatchedClients.end()) {
+        return;
+    }
+    unordered_set<MondisClient *> &vc = keyToWatchedClients[key];
+    for (MondisClient *client:vc) {
+        client->watchedKeysHasModified = true;
+        client->modifiedKeys.insert(key);
+    }
+}
+
+void MondisServer::appendAof(const string &command) {
+    if (aof) {
+        aofFileOut << command + "\n";
+        if (aofSyncStrategy == 1) {
+            clock_t cur = clock();
+            if (cur - preSync >= 1000) {
+                aofFileOut.flush();
+                preSync = cur;
+            }
+        } else if (aofSyncStrategy == 2) {
+            aofFileOut.flush();
+        }
+    }
 }
 
 void Executor::bindServer(MondisServer *sv) {

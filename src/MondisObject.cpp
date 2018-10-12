@@ -129,7 +129,7 @@ ExecutionResult MondisObject::executeString(Command *command) {
         }
         case TO_INTEGER: {
             int *newData = new int;
-            bool success = util::toInteger(*objectData, *newData);
+            bool success = util::toInteger(*data, *newData);
             if (success) {
                 delete (string *) objectData;
                 objectData = newData;

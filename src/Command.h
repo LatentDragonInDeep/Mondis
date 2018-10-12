@@ -231,6 +231,15 @@ public:
     void addParam(Param &p) {
         params.push_back(p);
     }
+
+    static void destroyCommand(Command *command) {
+        Command *cur = command;
+        while (cur != nullptr) {
+            Command *temp = cur;
+            cur = cur->next;
+            delete temp;
+        }
+    }
 };
 
 class CommandInterpreter {
@@ -270,6 +279,19 @@ public:
 public:
     CommandInterpreter();
     Command* getCommand(std::string& raw);
+};
+
+class MultiCommand {
+public:
+    Command *locateCommand = nullptr;
+    std::vector<Command *> modifies;
+
+    ~MultiCommand() {
+        Command::destroyCommand(locateCommand);
+        for (auto c:modifies) {
+            delete c;
+        }
+    }
 };
 
 

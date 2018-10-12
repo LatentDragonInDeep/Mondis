@@ -3,7 +3,7 @@
 //
 
 #include <ctime>
-#include "MondisClient.h"
+#include "MondisServer.h"
 #include <unistd.h>
 
 #ifdef WIN32
@@ -79,4 +79,81 @@ int MondisClient::nextId = 1;
 
 void MondisClient::updateHeartBeatTime() {
     preInteraction = clock();
+}
+
+void MondisClient::closeTransaction() {
+    isInTransaction = false;
+    watchedKeys.clear();
+    modifiedKeys.clear();
+    delete transactionCommands;
+    delete undoCommands;
+    transactionCommands = nullptr;
+    undoCommands = nullptr;
+    watchedKeysHasModified = false;
+    hasExecutedCommandNumInTransaction = 0;
+}
+
+void MondisClient::startTransaction() {
+    isInTransaction = true;
+    transactionCommands = new queue<string>;
+    undoCommands = new deque<MultiCommand *>;
+}
+
+ExecutionResult MondisClient::commitTransaction(MondisServer *server) {
+    ExecutionResult res;
+    if (isInTransaction) {
+        res.res = "please start a transaction!";
+        LOGIC_ERROR_AND_RETURN
+    }
+    if (watchedKeysHasModified) {
+        res.res = "can not execute the transaction,because the following keys has been modified.\n";
+        for (auto &key:modifiedKeys) {
+            res.res += key;
+            res.res += " ";
+        }
+        LOGIC_ERROR_AND_RETURN
+    }
+    vector<string> aofBuffer;
+    while (!transactionCommands->empty()) {
+        ExecutionResult res;
+        string next = transactionCommands->front();
+        transactionCommands->pop();
+        Command *c = server->interpreter->getCommand(next);
+        Command *modify = nullptr;
+        MondisObject *obj = nullptr;
+        if (c->type == LOCATE) {
+            Command *last = c;
+            while (last->next->type == LOCATE) {
+                last = last->next;
+            }
+            modify = last->next;
+            obj = server->chainLocate(c);
+            obj->execute(modify);
+        } else {
+            res = server->execute(c, this);
+        }
+        bool isModify = MondisServer::isModifyCommand(modify);
+        server->appendLog(next, res);
+        if (res.type != OK) {
+            string undo = "UNDO";
+            while (hasExecutedCommandNumInTransaction > 0) {
+                server->execute(server->interpreter->getCommand(undo), this);
+            }
+            res.res = "error in executing the command ";
+            res.res += next;
+            LOGIC_ERROR_AND_RETURN
+        }
+        if (isModify) {
+            aofBuffer.push_back(next);
+        }
+        send(res.toString());
+        server->incrReplicaOffset();
+        server->putToPropagateBuffer(next);
+        hasExecutedCommandNumInTransaction++;
+        server->handleWatchedKey((*c)[0].content);
+    }
+    for (auto &c:aofBuffer) {
+        server->appendAof(c);
+    }
+    closeTransaction();
 }

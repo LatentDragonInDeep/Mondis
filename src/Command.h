@@ -166,6 +166,7 @@ enum ExecutionResultType {
     SYNTAX_ERROR,
     INTERNAL_ERROR,
     LOGIC_ERROR,
+    REDIRECT,
 };
 
 class ExecutionResult {

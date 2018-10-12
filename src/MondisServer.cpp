@@ -662,8 +662,17 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
     }
     CommandStruct cstruct = getCommandStruct(command, client);
     if ((!isMaster) && cstruct.isModify) {
-        res.res = "the current server is a slave,can not undoExecute command which will modify database state";
-        LOGIC_ERROR_AND_RETURN
+        if (autoMoveCommandToMaster) {
+            Command::destroyCommand(command);
+            sendToMaster(commandStr);
+            string resStr = readFromMaster();
+            client->send(resStr);
+            res.type = REDIRECT;
+            return res;
+        } else {
+            res.res = "the current server is a slave,can not undoExecute command which will modify database state";
+            LOGIC_ERROR_AND_RETURN
+        }
     }
     if (client->isInTransaction && transactionAboutCommands.find(command->type) == transactionAboutCommands.end()) {
         client->transactionCommands->push(commandStr);
@@ -834,7 +843,7 @@ void MondisServer::init() {
         recoveryFileIn.open(recoveryFile);
         string command;
         while (getline(recoveryFileIn, command)) {
-            execute(command, self);
+            execute(interpreter->getCommand(command), self);
         }
     }
     isRecovering = false;
@@ -989,8 +998,10 @@ void MondisServer::acceptSocket() {
 void MondisServer::handleCommand(MondisClient *client) {
     string commandStr;
     while ((commandStr = client->readCommand()) != "") {
-        ExecutionResult res = execute(commandStr, nullptr);
-        client->send(res.toString());
+        ExecutionResult res = execute(commandStr, client);
+        if (res.type != REDIRECT) {
+            client->send(res.toString());
+        }
     }
 }
 

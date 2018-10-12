@@ -5,12 +5,10 @@
 
 int main(int argc, char **argv) {
     MondisServer *server = new MondisServer;
+    string confFile;
     if (argc > 1) {
-        string confFile(argv[1]);
-        server->start(confFile);
-    } else {
-        string confFile;
-        server->start(confFile);
+        confFile = argv[1];
     }
+    server->start(confFile);
 }
 

@@ -288,7 +288,7 @@ private:
     condition_variable notEmpty;
     mutex notEmptyMtx;
 
-    deque<MultiCommand *> undoCommands;
+    deque<MultiCommand *> *undoCommands;
 
     unordered_map<string, unordered_set<MondisClient *>> keyToWatchedClients;
 

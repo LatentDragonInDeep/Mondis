@@ -702,6 +702,9 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
         res = executor->execute(modify, nullptr);
     }
     if (isModify && canUndoNotInTransaction) {
+        if (undoCommands->size() == maxUndoCommandBufferSize) {
+            undoCommands->pop_front();
+        }
         MultiCommand *undo = nullptr;
         if (isLocate) {
             undo = getUndoCommand(nullptr, modify, nullptr);
@@ -834,6 +837,7 @@ void MondisServer::applyConf() {
         } else if (kv.first == "canUndoNotInTransaction") {
             if (kv.second == "true") {
                 canUndoNotInTransaction = true;
+                undoCommands = new deque<MultiCommand *>;
             } else if (kv.second == "false") {
                 canUndoNotInTransaction = false;
             }
@@ -1070,6 +1074,9 @@ MondisServer::~MondisServer() {
     delete sendHeartBeatToClients;
     delete sendHeartBeatToSlaves;
     delete self;
+    if (canUndoNotInTransaction) {
+        delete undoCommands;
+    }
 }
 
 void MondisServer::replicaToSlave(MondisClient *client, unsigned dbIndex, unsigned long long slaveReplicaOffset) {

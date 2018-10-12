@@ -16,8 +16,11 @@ mondis嵌套意味着list,zset的元素与hash类型键值对的值可以是另�
 由于mondis支持任意嵌套，有时候我们要操作一个嵌套层数很深的数据对象，此时就需要用到定位命令。
 定位命令是locate，它可以具有不定数量的参数。它的作用就是定位到当前要操作的数据对象上，然后执行操作命令。
 多个locate命令之间需要以|分隔，看上去就像linux的管道命令。
-## mondis查询
-mondis查询类似于redis查询，但是不同的是mondis查询返回的格式是json。这使得mondis更方便使用。
+## json支持
+mondis查询类似于redis查询，但是不同的是mondis查询返回的格式是json。这使得mondis更方便使用。而且mondis
+支持json持久化与恢复。
+## 二进制支持
+mondis添加了对于二进制数据的支持，类似于java的bytebuffer，并且完美支持bytebuffer的所有操作。
 ## mondis持久化
 mondis支持两种持久化方式，json与aof。json类似于rdb，但是持久化的格式是完全兼容的json，
 这使得持久化文件方便迁移并解析。aof持久化则与redis的aof完全相同，除了命令格式。但是目前mondis还不支持aof重写。

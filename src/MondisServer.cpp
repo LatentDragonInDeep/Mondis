@@ -364,6 +364,10 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             OK_AND_RETURN
         }
         case UNDO: {
+            if (!canUndoNotInTransaction) {
+                res.res = "can not undo not in transaction,please enable the function in conf file";
+                LOGIC_ERROR_AND_RETURN
+            }
             if (undoCommands.empty()) {
                 res.res = "has reached max undo command number!";
                 LOGIC_ERROR_AND_RETURN
@@ -665,7 +669,7 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
         res.res = "you haven't login,please login";
         LOGIC_ERROR_AND_RETURN
     }
-    bool isModifyCommand;
+    bool isModify;
     Command *c = interpreter->getCommand(commandStr);
     if (c->type == M_ERROR) {
         res.res = "error command";
@@ -682,7 +686,7 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
         modify = last->next;
         isLocate = true;
     }
-    isModifyCommand = modifyCommands.find(modify->type) != modifyCommands.end();
+    isModify = modifyCommands.find(modify->type) != modifyCommands.end();
     if (isSlave && isModifyCommand) {
         res.res = "the current server is a slave,can not execute command which will modify database state";
         LOGIC_ERROR_AND_RETURN
@@ -697,7 +701,7 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
     } else {
         res = executor->execute(modify, nullptr);
     }
-    if (isModifyCommand && (client->isInTransaction || canUndoNotInTransaction)) {
+    if (isModify && canUndoNotInTransaction) {
         MultiCommand *undo = nullptr;
         if (isLocate) {
             undo = getUndoCommand(nullptr, modify, nullptr);

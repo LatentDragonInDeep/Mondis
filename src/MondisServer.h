@@ -251,6 +251,10 @@ public:
     static bool isModifyCommand(Command *command) {
         return modifyCommands.find(command->type) != modifyCommands.end();
     };
+
+    MultiCommand *getUndoCommand(Command *locate, Command *modify, MondisObject *obj);
+
+    void execute(MultiCommand *command, MondisClient *client);
 private:
     void runAsDaemon();
 
@@ -281,8 +285,6 @@ private:
 
     string takeFromPropagateBuffer();
 
-    MultiCommand *getUndoCommand(Command *locate, Command *modify, MondisObject *obj);
-
     condition_variable notEmpty;
     mutex notEmptyMtx;
 
@@ -301,8 +303,6 @@ private:
     thread *sendHeartBeatToClients = nullptr;
 
     bool canUndoNotInTransaction = false;
-
-    void execute(MultiCommand *command, MondisClient *client);
 
     bool autoMoveCommandToMaster = true;
 

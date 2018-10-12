@@ -135,9 +135,10 @@ ExecutionResult MondisClient::commitTransaction(MondisServer *server) {
         bool isModify = MondisServer::isModifyCommand(modify);
         server->appendLog(next, res);
         if (res.type != OK) {
-            string undo = "UNDO";
             while (hasExecutedCommandNumInTransaction > 0) {
-                server->execute(server->interpreter->getCommand(undo), this);
+                MultiCommand *undo = undoCommands->back();
+                undoCommands->pop_back();
+                server->execute(undo, this);
             }
             res.res = "error in executing the command ";
             res.res += next;
@@ -149,6 +150,7 @@ ExecutionResult MondisClient::commitTransaction(MondisServer *server) {
         send(res.toString());
         server->incrReplicaOffset();
         server->putToPropagateBuffer(next);
+        undoCommands->push_back(server->getUndoCommand(c, modify, obj));
         hasExecutedCommandNumInTransaction++;
         server->handleWatchedKey((*c)[0].content);
     }

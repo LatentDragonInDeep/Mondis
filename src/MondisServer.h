@@ -288,11 +288,11 @@ private:
     condition_variable notEmpty;
     mutex notEmptyMtx;
 
-    deque<MultiCommand *> *undoCommands;
+    deque<MultiCommand *> *undoCommands = nullptr;
 
     unordered_map<string, unordered_set<MondisClient *>> keyToWatchedClients;
 
-    MondisClient *self;
+    MondisClient *self = nullptr;
 
     void checkAndHandleIdleClient();
 

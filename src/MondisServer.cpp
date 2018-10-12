@@ -368,12 +368,12 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
                 res.res = "can not undo not in transaction,please enable the function in conf file";
                 LOGIC_ERROR_AND_RETURN
             }
-            if (undoCommands.empty()) {
+            if (undoCommands->empty()) {
                 res.res = "has reached max undo command number!";
                 LOGIC_ERROR_AND_RETURN
             }
-            MultiCommand *undo = undoCommands.back();
-            undoCommands.pop_back();
+            MultiCommand *undo = undoCommands->back();
+            undoCommands->pop_back();
             execute(undo, client);
             delete undo;
             replicaOffset--;

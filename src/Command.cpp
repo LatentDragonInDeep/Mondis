@@ -216,6 +216,18 @@ void util::toUpperCase(std::string &data) {
     }
 }
 
+bool util::toInteger(std::string &data, long long &res) {
+    try {
+        res = std::stoll(data, 0, 10);
+    } catch (std::invalid_argument &) {
+        return false;
+    }
+    catch (std::out_of_range &) {
+        return false;
+    }
+    return true;
+}
+
 std::string ExecutionResult::typeToStr[] = {"OK", "SYNTAX_ERROR", "INTERNAL_ERROR", "LOGIC_ERROR"};
 
 void Command::init() {

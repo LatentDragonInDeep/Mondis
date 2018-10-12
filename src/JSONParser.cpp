@@ -95,7 +95,7 @@ MondisObject *JSONParser::parseObject(LexicalParser &lp) {
             }
         }
 
-        int *data = new int;
+        long long *data = new long long;
         bool to = util::toInteger(next.content, *data);
         if (!to) {
             res->type = RAW_STRING;

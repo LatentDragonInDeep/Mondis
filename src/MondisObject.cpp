@@ -128,7 +128,7 @@ ExecutionResult MondisObject::executeString(Command *command) {
             OK_AND_RETURN
         }
         case TO_INTEGER: {
-            int *newData = new int;
+            long long *newData = new long long;
             bool success = util::toInteger(*data, *newData);
             if (success) {
                 delete (string *) objectData;
@@ -184,7 +184,7 @@ ExecutionResult MondisObject::executeString(Command *command) {
 }
 
 ExecutionResult MondisObject::executeInteger(Command *command) {
-    int *data = (int *) objectData;
+    long long *data = (long long *) objectData;
     ExecutionResult res;
     switch (command->type) {
         case INCR:
@@ -253,7 +253,7 @@ string MondisObject::getJson() {
             json += "\"";
             break;
         case MondisObjectType::RAW_INT:
-            json += ("\"" + std::to_string(*((int *) objectData)) + "\"");
+            json += ("\"" + std::to_string(*((long long *) objectData)) + "\"");
             break;
         case RAW_BIN:
         case LIST:

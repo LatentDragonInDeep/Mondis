@@ -29,6 +29,7 @@
 
 #define ADD_AND_RETURN(RES, UNDO) RES->modifies.push_back(UNDO);\
                                 return RES;
+#define TO_FULL_KEY_NAME(DBINDEX, KEY) to_string(DBINDEX)+"_"+KEY
 
 unordered_set<CommandType> MondisServer::serverCommand;
 
@@ -302,7 +303,7 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             }
             CHECK_PARAM_NUM(1)
             CHECK_PARAM_TYPE(0, PLAIN)
-            keyToWatchedClients[PARAM(0)].insert(client);
+            keyToWatchedClients[TO_FULL_KEY_NAME(client->curDbIndex, PARAM(0))].insert(client);
             client->watchedKeys.insert(PARAM(0));
             OK_AND_RETURN
         }
@@ -313,11 +314,12 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             }
             CHECK_PARAM_NUM(1)
             CHECK_PARAM_TYPE(0, PLAIN)
-            keyToWatchedClients[PARAM(0)].erase(keyToWatchedClients[PARAM(0)].find(client));
-            if (keyToWatchedClients[PARAM(0)].size() == 0) {
-                keyToWatchedClients.erase(keyToWatchedClients.find(PARAM(0)));
+            keyToWatchedClients[TO_FULL_KEY_NAME(client->curDbIndex, PARAM(0))].erase(
+                    keyToWatchedClients[PARAM(0)].find(client));
+            if (keyToWatchedClients[TO_FULL_KEY_NAME(client->curDbIndex, PARAM(0))].size() == 0) {
+                keyToWatchedClients.erase(keyToWatchedClients.find(TO_FULL_KEY_NAME(client->curDbIndex, PARAM(0))));
             }
-            client->watchedKeys.erase(client->watchedKeys.find(PARAM(0)));
+            client->watchedKeys.erase(client->watchedKeys.find(TO_FULL_KEY_NAME(client->curDbIndex, PARAM(0))));
             OK_AND_RETURN
         }
         case UNDO: {
@@ -712,9 +714,6 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
         }
         replicaOffset++;
         while (!putToPropagateBuffer(commandStr));
-        if (client->isInTransaction) {
-            handleWatchedKey((*command)[0].content);
-        }
     } else {
         Command::destroyCommand(command);
     }
@@ -1361,7 +1360,7 @@ ExecutionResult MondisServer::transactionExecute(CommandStruct &cstruct, MondisC
     ExecutionResult res;
     bool canContinue = true;
     if (cstruct.isModify) {
-        canContinue = handleWatchedKey((*cstruct.operation)[0].content);
+        canContinue = handleWatchedKey(TO_FULL_KEY_NAME(client->curDbIndex, (*cstruct.operation)[0].content));
     }
     if (canContinue) {
         if (cstruct.isLocate) {
@@ -1369,9 +1368,10 @@ ExecutionResult MondisServer::transactionExecute(CommandStruct &cstruct, MondisC
         } else {
             res = execute(cstruct.operation, client);
         }
+        return res;
     } else {
         res.res = "other transaction is watching the key ";
-        res.res += (*cstruct.operation)[0].content;
+        res.res += TO_FULL_KEY_NAME(client->curDbIndex, (*cstruct.operation)[0].content);
         res.res += ",so can undoExecute the command";
         LOGIC_ERROR_AND_RETURN;
     }

@@ -82,6 +82,8 @@
 namespace util {
     bool toInteger(std::string &data, int &res);
 
+    bool toInteger(std::string &data, long long &res);
+
     std::string to_string(bool data);
 
     void toUpperCase(std::string &data);

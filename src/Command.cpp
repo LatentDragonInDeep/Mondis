@@ -126,6 +126,7 @@ void CommandInterpreter::init() {
     PUT(WATCH)
     PUT(UNWATCH)
     PUT(SAVE_ALL)
+    PUT(GET_MASTER)
 }
 
 void CommandInterpreter::LexicalParser::skip() {

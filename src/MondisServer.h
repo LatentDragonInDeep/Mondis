@@ -63,9 +63,31 @@ public:
 };
 
 class MultiCommand;
-class Executor;
 
 class MondisClient;
+
+class CommandStruct {
+public:
+    Command *locate = nullptr;
+    Command *operation = nullptr;
+    MondisObject *obj = nullptr;
+    bool isModify = false;
+    bool isLocate = false;
+
+    CommandStruct() {};
+
+    CommandStruct(CommandStruct &other) {
+        locate = other.locate;
+        operation = other.operation;
+        obj = other.obj;
+        other.locate = nullptr;
+        other.operation = nullptr;
+        other.obj = nullptr;
+        isModify = other.isModify;
+        isLocate = other.isLocate;
+    }
+};
+
 class MondisServer {
 private:
     int maxCilentNum = 1024;
@@ -90,9 +112,7 @@ private:
     int jsonDuration = 10;
     string workDir;
     string logFile;
-    HashMap* curKeySpace;
     vector<HashMap *> dbs;
-    int curDbIndex = 0;
     int daemonize = false;
     static JSONParser parser;
     ofstream logFileOut;
@@ -100,7 +120,6 @@ private:
     ofstream jsonFileOut;
     ifstream recoveryFileIn;
     unordered_map<string,string> conf;
-    Executor* executor;
     string username = "root";
     string password = "admin";
     clock_t preSync = clock();
@@ -112,9 +131,7 @@ private:
     bool isLoading = false;
     bool isRecovering = false;
     bool isReplicatingFromMaster = false;
-    bool isSlave = false;
     bool isMaster = false;
-    bool isLeader = false;
     unordered_set<MondisClient *> slaves;
     unordered_set<MondisClient *> clients;
     unordered_set<MondisClient *> peers;
@@ -230,7 +247,7 @@ public:
 
     static JSONParser *getJSONParser();
 
-    void handleWatchedKey(const string &key);
+    bool handleWatchedKey(const string &key);
 
     bool putToPropagateBuffer(const string &curCommand);
 
@@ -246,21 +263,30 @@ public:
 
     void appendAof(const string &command);
 
-    MondisObject *chainLocate(Command *command);
+    MondisObject *chainLocate(Command *command, MondisClient *client);
 
     static bool isModifyCommand(Command *command) {
+        if (command->type == LOCATE) {
+            while (command->next->type == LOCATE) {
+                command = command->next;
+            }
+        }
         return modifyCommands.find(command->type) != modifyCommands.end();
     };
 
-    MultiCommand *getUndoCommand(Command *locate, Command *modify, MondisObject *obj);
+    MultiCommand *getUndoCommand(CommandStruct &cstruct, MondisClient *client);
 
-    void execute(MultiCommand *command, MondisClient *client);
+    void undoExecute(MultiCommand *command, MondisClient *client);
+
+    ExecutionResult transactionExecute(CommandStruct &cstruct, MondisClient *client);
+
+    CommandStruct getCommandStruct(Command *command, MondisClient *client);
 private:
     void runAsDaemon();
 
     void init();
 
-    void save(string &jsonFile);
+    void save(string &jsonFile, int dbIndex);
 
     void startEventLoop();
     void applyConf();
@@ -307,26 +333,10 @@ private:
     bool autoMoveCommandToMaster = true;
 
     void saveAll(const string &jsonFile);
-};
 
-class Executor {
-public:
+    bool forbidOtherModifyInTransaction = false;
 
-    ExecutionResult execute(Command *command, MondisClient *client);
-    static Executor* getExecutor();
-
-    static void bindServer(MondisServer *server);
-private:
-    Executor();
-    Executor(Executor&) = default;
-    Executor(Executor&&) = default;
-    Executor&operator=(Executor&) = default;
-    Executor&operator=(Executor&&) = default;
-    static Executor* executor;
-    static MondisServer *server;
     static unordered_set<CommandType> serverCommand;
-public:
-    static void init();
 };
 
 enum ClientType {

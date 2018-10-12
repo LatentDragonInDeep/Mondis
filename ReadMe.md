@@ -405,6 +405,8 @@ canUndoNotInTransaction选项才发挥作用。默认为1024
 ## autoMoveCommandToMaster=&lt;true|false&gt;
 当前服务器为从服务器时，是否自动将客户端的写命令转发到主服务器，如果为false将丢弃这条命令并返回一个错误。默认为true。
 
+## forbidOtherModifyInTransaction=<true|false>
+当事务a监控了键key，事务b修改key时是否阻止。如果开启此选项，事务b的修改将会被丢弃并返回一个错误。默认为false。
 # 写命令清单
 ## BIND
 ## DEL
@@ -430,5 +432,4 @@ canUndoNotInTransaction选项才发挥作用。默认为1024
 ## TO_STRING
 ## TO_INTEGER
 ## CHANGE_SCORE
-## data->erase(data->begin()+start,data->end());
-                OK_AND_RETURNUNDO
+## UNDO

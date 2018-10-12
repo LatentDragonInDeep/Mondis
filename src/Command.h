@@ -157,6 +157,7 @@ enum CommandType {
     DISCARD,
     WATCH,
     UNWATCH,
+    GET_MASTER,
 };
 
 enum ExecutionResultType {

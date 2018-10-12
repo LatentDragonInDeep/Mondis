@@ -106,7 +106,7 @@ ExecutionResult MondisClient::commitTransaction(MondisServer *server) {
         LOGIC_ERROR_AND_RETURN
     }
     if (watchedKeysHasModified) {
-        res.res = "can not execute the transaction,because the following keys has been modified.\n";
+        res.res = "can not undoExecute the transaction,because the following keys has been modified.\n";
         for (auto &key:modifiedKeys) {
             res.res += key;
             res.res += " ";
@@ -115,44 +115,29 @@ ExecutionResult MondisClient::commitTransaction(MondisServer *server) {
     }
     vector<string> aofBuffer;
     while (!transactionCommands->empty()) {
-        ExecutionResult res;
         string next = transactionCommands->front();
         transactionCommands->pop();
-        Command *c = server->interpreter->getCommand(next);
-        Command *modify = nullptr;
-        MondisObject *obj = nullptr;
-        if (c->type == LOCATE) {
-            Command *last = c;
-            while (last->next->type == LOCATE) {
-                last = last->next;
-            }
-            modify = last->next;
-            obj = server->chainLocate(c);
-            obj->execute(modify);
-        } else {
-            res = server->execute(c, this);
-        }
-        bool isModify = MondisServer::isModifyCommand(modify);
-        server->appendLog(next, res);
+        Command *command = server->interpreter->getCommand(next);
+        CommandStruct cstruct = server->getCommandStruct(command, this);
+        ExecutionResult res = server->transactionExecute(cstruct, this);
         if (res.type != OK) {
             while (hasExecutedCommandNumInTransaction > 0) {
                 MultiCommand *undo = undoCommands->back();
                 undoCommands->pop_back();
-                server->execute(undo, this);
+                server->undoExecute(undo, this);
             }
             res.res = "error in executing the command ";
             res.res += next;
             LOGIC_ERROR_AND_RETURN
         }
-        if (isModify) {
+        if (cstruct.isModify) {
             aofBuffer.push_back(next);
         }
         send(res.toString());
         server->incrReplicaOffset();
         server->putToPropagateBuffer(next);
-        undoCommands->push_back(server->getUndoCommand(c, modify, obj));
+        undoCommands->push_back(server->getUndoCommand(cstruct, this));
         hasExecutedCommandNumInTransaction++;
-        server->handleWatchedKey((*c)[0].content);
     }
     for (auto &c:aofBuffer) {
         server->appendAof(c);

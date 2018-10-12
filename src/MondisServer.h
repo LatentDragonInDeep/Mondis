@@ -314,8 +314,6 @@ private:
     condition_variable notEmpty;
     mutex notEmptyMtx;
 
-    deque<MultiCommand *> *undoCommands = nullptr;
-
     unordered_map<string, unordered_set<MondisClient *>> keyToWatchedClients;
 
     MondisClient *self = nullptr;
@@ -327,8 +325,6 @@ private:
     thread *recvFromMaster = nullptr;
     thread *sendHeartBeatToSlaves = nullptr;
     thread *sendHeartBeatToClients = nullptr;
-
-    bool canUndoNotInTransaction = false;
 
     bool autoMoveCommandToMaster = true;
 

@@ -322,23 +322,6 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             client->watchedKeys.erase(client->watchedKeys.find(TO_FULL_KEY_NAME(client->curDbIndex, PARAM(0))));
             OK_AND_RETURN
         }
-        case UNDO: {
-            if (!canUndoNotInTransaction) {
-                res.res = "can not undo not in transaction,please enable the function in conf file";
-                LOGIC_ERROR_AND_RETURN
-            }
-            if (undoCommands->empty()) {
-                res.res = "has reached max undo command number!";
-                LOGIC_ERROR_AND_RETURN
-            }
-            MultiCommand *undo = undoCommands->back();
-            undoCommands->pop_back();
-            undoExecute(undo, client);
-            delete undo;
-            replicaOffset--;
-            replicaCommandBuffer->pop_back();
-            OK_AND_RETURN;
-        }
         case GET_MASTER: {
             CHECK_PARAM_NUM(0)
             if (isMaster) {
@@ -387,9 +370,6 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
 
 MultiCommand *MondisServer::getUndoCommand(CommandStruct &cstruct, MondisClient *client) {
     //TODO
-    if (cstruct.operation->type == UNDO) {
-        return nullptr;
-    }
     MultiCommand *res = new MultiCommand;
     res->locateCommand = cstruct.locate;
     if (cstruct.obj == nullptr) {
@@ -693,18 +673,6 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
     if (res.type != OK) {
         return res;
     }
-    if (cstruct.isModify && canUndoNotInTransaction) {
-        if (undoCommands->size() == maxUndoCommandBufferSize) {
-            undoCommands->pop_front();
-        }
-        MultiCommand *undo = nullptr;
-        if (cstruct.isLocate) {
-            undo = getUndoCommand(cstruct, self);
-        } else {
-            undo = getUndoCommand(cstruct, self);
-        }
-        undoCommands->push_back(undo);
-    }
     appendLog(commandStr, res);
     if (isModifyCommand && res.type == OK) {
         appendAof(commandStr);
@@ -823,13 +791,6 @@ void MondisServer::applyConf() {
             toSlaveHeartBeatDuration = atoi(kv.second.c_str());
         } else if (kv.first == "toClientHeartBeatDuration") {
             toClientHeartBeatDuration = atoi(kv.second.c_str());
-        } else if (kv.first == "canUndoNotInTransaction") {
-            if (kv.second == "true") {
-                canUndoNotInTransaction = true;
-                undoCommands = new deque<MultiCommand *>;
-            } else if (kv.second == "false") {
-                canUndoNotInTransaction = false;
-            }
         } else if (kv.first == "autoMoveCommandToMaster") {
             if (kv.second == "true") {
                 autoMoveCommandToMaster = true;
@@ -1067,9 +1028,6 @@ MondisServer::~MondisServer() {
     delete sendHeartBeatToClients;
     delete sendHeartBeatToSlaves;
     delete self;
-    if (canUndoNotInTransaction) {
-        delete undoCommands;
-    }
 }
 
 void MondisServer::replicaToSlave(MondisClient *client, unsigned dbIndex, unsigned long long slaveReplicaOffset) {
@@ -1132,7 +1090,6 @@ void MondisServer::initStaticMember() {
     ADD(modifyCommands, TO_STRING)
     ADD(modifyCommands, TO_INTEGER)
     ADD(modifyCommands, CHANGE_SCORE)
-    ADD(modifyCommands, UNDO)
     ADD(modifyCommands, SELECT)
     ADD(transactionAboutCommands, DISCARD)
     ADD(transactionAboutCommands, EXEC)
@@ -1157,7 +1114,6 @@ void MondisServer::initStaticMember() {
     INSERT(DISCONNECT_CLIENT)
     INSERT(PING)
     INSERT(PONG)
-    INSERT(UNDO)
     INSERT(MULTI)
     INSERT(EXEC)
     INSERT(DISCARD)

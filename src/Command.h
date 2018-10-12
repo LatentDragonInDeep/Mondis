@@ -153,7 +153,6 @@ enum CommandType {
     DISCONNECT_CLIENT,
     PING,
     PONG,
-    UNDO,
     MULTI,
     EXEC,
     DISCARD,

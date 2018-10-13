@@ -11,6 +11,7 @@
 #include <winsock2.h>
 #include <inaddr.h>
 #include <stdio.h>
+#include <random>
 
 #elif defined(linux)
 #include <sys/socket.h>
@@ -168,6 +169,7 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             OK_AND_RETURN
         }
         case SLAVE_OF: {
+            hasVoteFor = true;
             res = beSlaveOf(command, client, PARAM(2), PARAM(3));
             if (res.type == OK) {
                 masterIP = PARAM(0);
@@ -199,9 +201,8 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             epoll_ctl(slaveFd,EPOLL_CTL_ADD,client->fd);
 
 #endif
-            CHECK_PARAM_NUM(2)
+            CHECK_PARAM_NUM(1)
             CHECK_PARAM_TYPE(0, PLAIN)
-            CHECK_PARAM_TYPE(1, PLAIN)
             CHECK_AND_DEFINE_INT_LEGAL(1, offset);
             if (isSlave) {
                 Command *temp = new Command;
@@ -419,11 +420,10 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             if (voteNum > idToPeers.size() / 2) {
                 delete forVote;
                 forVote = nullptr;
+                isVoting = false;
                 for (auto &kv:idToPeers) {
                     kv.second->send("I_AM_NEW_MASTER");
                 }
-                //TODO 更新所有slave的offset最新
-                //TODO 处理双leader的情况
             }
             res.needSend = false;
             OK_AND_RETURN
@@ -433,23 +433,27 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             OK_AND_RETURN
         }
         case MASTER_DEAD: {
-            unsigned long long maxOffset = 0;
-            for (auto &kv:idToPeers) {
-                kv.second->send("UPDATE_OFFSET");
-                unsigned long long cur = atoll(kv.second->read().c_str());
-                if (cur > maxOffset) {
-                    maxOffsetClients.clear();
-                    maxOffsetClients.insert(kv.second);
-                } else if (cur == maxOffset) {
-                    maxOffsetClients.insert(kv.second);
-                }
-            }
+            isVoting = true;
+            delete master;
+            master = nullptr;
             res.needSend = false;
             forVote = new thread(&MondisServer::askForVote, this);
             OK_AND_RETURN;
         }
         case I_AM_NEW_MASTER: {
-            //TODO
+#ifdef WIN32
+            FD_CLR(client->sock, &peerFds);
+#elif defined(linux)
+            epoll_ctl(clientFd,EPOLL_CTL_DEL,client->fd);
+#endif
+            isVoting = false;
+            hasVoteFor = true;
+            delete forVote;
+            delete master;
+            master = client;
+            string sync = "SYNC ";
+            sync += to_string(replicaOffset);
+            sendToMaster(sync);
         }
         case UPDATE_OFFSET: {
             client->send(to_string(replicaOffset));
@@ -741,6 +745,11 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
     if (!client->hasAuthenticate) {
         res.res = "you haven't login,please login";
         LOGIC_ERROR_AND_RETURN
+    }
+    if (isVoting && client->type == CLIENT) {
+        res.res = "master is dead,the cluster is voting for new master";
+        res.type = INTERNAL_ERROR;
+        return res;
     }
     Command *command = interpreter->getCommand(commandStr);
     if (controlCommands.find(command->type) != controlCommands.end()) {
@@ -1093,9 +1102,9 @@ MondisServer::~MondisServer() {
     delete self;
 }
 
-void MondisServer::replicaToSlave(MondisClient *client, unsigned long long slaveReplicaOffset) {
+void MondisServer::replicaToSlave(MondisClient *client, long long slaveReplicaOffset) {
     if (replicaOffset - slaveReplicaOffset > maxCommandReplicaBufferSize) {
-        const unsigned long long start = replicaOffset;
+        const long long start = replicaOffset;
         string *temp = new string;
         getJson(temp);
         client->send(*temp);
@@ -1512,7 +1521,6 @@ MondisClient *MondisServer::buildConnection(const string &ip, int port) {
         return res;
     }
     res = new MondisClient(masterSock);
-    return res;
 #elif defined(linux)
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     sockaddr_in serAddr;
@@ -1524,8 +1532,9 @@ MondisClient *MondisServer::buildConnection(const string &ip, int port) {
         return res;
     }
     master = new MondisClient(masterFd);
-    return res;
 #endif
+    res->hasAuthenticate = true;
+    return res;
 }
 
 void MondisServer::getJson(string *res) {
@@ -1546,12 +1555,16 @@ unordered_set<CommandType> MondisServer::modifyCommands;
 unordered_set<CommandType> MondisServer::transactionAboutCommands;
 unordered_set<CommandType> MondisServer::clientControlCommands;
 
-unsigned MondisServer::curPeerId = 0;
-
 unsigned MondisServer::curClientId = 0;
 
 unsigned MondisServer::nextPeerId() {
-    return ++curPeerId;
+    static std::uniform_int_distribution<int> dis(0, numeric_limits<int>::max());
+    static default_random_engine engine;
+    int id = 0;
+    do {
+        id = dis(engine);
+    } while (idToPeers.find(id) != idToPeers.end());
+    return id;
 }
 
 string MondisServer::nextDefaultClientName() {
@@ -1560,8 +1573,21 @@ string MondisServer::nextDefaultClientName() {
 }
 
 void MondisServer::askForVote() {
-    this_thread::sleep_for(chrono::milliseconds(abs(rand() % maxVoteIdle)));
-    for (auto &kv:idToPeers) {
-        kv.second->send("ASK_FOR_VOTE");
+    while (nullptr == master) {
+        long long maxOffset = 0;
+        for (auto &kv:idToPeers) {
+            kv.second->send("UPDATE_OFFSET");
+            long long cur = atoll(kv.second->read().c_str());
+            if (cur > maxOffset) {
+                maxOffsetClients.clear();
+                maxOffsetClients.insert(kv.second);
+            } else if (cur == maxOffset) {
+                maxOffsetClients.insert(kv.second);
+            }
+        }
+        this_thread::sleep_for(chrono::milliseconds(abs((int) (rand() % maxVoteIdle))));
+        for (auto &kv:idToPeers) {
+            kv.second->send("ASK_FOR_VOTE");
+        }
     }
 }

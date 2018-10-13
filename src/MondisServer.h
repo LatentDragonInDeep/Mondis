@@ -136,7 +136,7 @@ private:
     unordered_map<unsigned, MondisClient *> idToPeers;
     unordered_map<string, MondisClient *> nameToClients;
 
-    unsigned long long replicaOffset = 0;
+    long long replicaOffset = 0;
     deque<string> *replicaCommandBuffer;
     static unordered_set<CommandType> modifyCommands;
     static unordered_set<CommandType> transactionAboutCommands;
@@ -305,7 +305,7 @@ private:
 
     string readFromMaster();
 
-    void replicaToSlave(MondisClient *client, unsigned long long slaveReplicaOffset);
+    void replicaToSlave(MondisClient *client, long long slaveReplicaOffset);
 
     void singleCommandPropagate();
 
@@ -343,11 +343,9 @@ private:
 
     void getJson(string *res);
 
-    static unsigned curPeerId;
-
     static unsigned curClientId;
 
-    static unsigned nextPeerId();
+    unsigned nextPeerId();
 
     static string nextDefaultClientName();
 
@@ -358,6 +356,8 @@ private:
     void askForVote();
 
     const unsigned maxVoteIdle = 10000;
+
+    bool isVoting = false;
 };
 
 enum ClientType {

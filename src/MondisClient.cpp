@@ -144,3 +144,19 @@ ExecutionResult MondisClient::commitTransaction(MondisServer *server) {
     }
     closeTransaction();
 }
+
+string MondisClient::read() {
+    string res;
+    char buffer[4096];
+    int ret;
+#ifdef WIN32
+    while ((ret = recv(sock, buffer, sizeof(buffer), 0)) != 0) {
+        res += string(buffer, ret);
+    }
+#elif defined(linux)
+    while ((ret = ::read(fd, buffer, sizeof(buffer))) != 0) {
+            res += string(buffer, ret);
+    }
+#endif
+    return res;
+}

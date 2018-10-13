@@ -132,9 +132,9 @@ private:
     bool isRecovering = false;
     bool isReplicatingFromMaster = false;
     bool isMaster = false;
-    unordered_set<MondisClient *> slaves;
-    unordered_set<MondisClient *> clients;
-    unordered_set<MondisClient *> peers;
+    bool isSlave = false;
+    unordered_map<unsigned, MondisClient *> idToPeers;
+    unordered_map<string, MondisClient *> nameToClients;
 
     unsigned long long replicaOffset = 0;
     deque<string> *replicaCommandBuffer;
@@ -152,9 +152,12 @@ private:
     string masterUsername;
     string masterPassword;
     string masterIP;
-    string masterPort;
+    int masterPort;
     
     bool slaveOf=false;
+    bool hasVoteFor = false;
+
+    unordered_set<MondisClient *> maxOffsetClients;
 
     MondisClient *master = nullptr;
 #ifdef WIN32
@@ -232,8 +235,6 @@ private:
         }
     }
 #endif
-
-    bool hasLogin = true;
 public:
     CommandInterpreter *interpreter;
 
@@ -303,7 +304,7 @@ private:
 
     string readFromMaster();
 
-    void replicaToSlave(MondisClient *client, unsigned dbIndex, unsigned long long slaveReplicaOffset);
+    void replicaToSlave(MondisClient *client, unsigned long long slaveReplicaOffset);
 
     void singleCommandPropagate();
 
@@ -332,7 +333,22 @@ private:
 
     bool forbidOtherModifyInTransaction = false;
 
-    static unordered_set<CommandType> serverCommand;
+    static unordered_set<CommandType> controlCommands;
+    static unordered_set<CommandType> clientControlCommands;
+
+    ExecutionResult beSlaveOf(Command *command, MondisClient *client, string &masterUsername, string &masterPassword);
+
+    MondisClient *buildConnection(const string &ip, int port);
+
+    void getJson(string *res);
+
+    static unsigned curPeerId;
+
+    static unsigned curClientId;
+
+    static unsigned nextPeerId();
+
+    static string nextDefaultClientName();
 };
 
 enum ClientType {
@@ -345,7 +361,7 @@ enum ClientType {
 
 class MondisClient {
 public:
-    uint64_t id;            /* Client incremental unique ID. */
+    unsigned id;            /* Client incremental unique ID. */
 #ifdef WIN32
     SOCKET sock;
 #elif defined(linux)
@@ -378,7 +394,7 @@ public:
 
     int hasExecutedCommandNumInTransaction = 0;
 public:
-    bool hasLogin = false;
+    bool hasAuthenticate = false;
 private:
     static int nextId;
 public:
@@ -406,6 +422,8 @@ public:
     void closeTransaction();
 
     ExecutionResult commitTransaction(MondisServer *server);
+
+    string read();
 };
 
 

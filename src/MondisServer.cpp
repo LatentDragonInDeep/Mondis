@@ -31,7 +31,7 @@
                                 return RES;
 #define TO_FULL_KEY_NAME(DBINDEX, KEY) to_string(DBINDEX)+"_"+KEY
 
-unordered_set<CommandType> MondisServer::serverCommand;
+unordered_set<CommandType> MondisServer::controlCommands;
 
 JSONParser MondisServer::parser;
 
@@ -119,7 +119,7 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             string userName = (*command)[0].content;
             string pwd = (*command)[1].content;
             if (userName == username && pwd == password) {
-                client->hasLogin = true;
+                client->hasAuthenticate = true;
                 OK_AND_RETURN
             }
             res.res = "username or password error";
@@ -159,101 +159,70 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             res.res = to_string(client->keySpace->size());
             OK_AND_RETURN
         }
-        case SET_NAME: {
+        case SET_CLIENT_NAME: {
             CHECK_PARAM_NUM(1);
             CHECK_PARAM_TYPE(0, PLAIN)
-            if (client == self) {
-                res.res = "no known client!";
-                LOGIC_ERROR_AND_RETURN;
-            }
+            nameToClients.erase(nameToClients.find(client->name));
+            nameToClients[PARAM(0)] = client;
             client->name = PARAM(0);
             OK_AND_RETURN
         }
         case SLAVE_OF: {
-            if (!isMaster) {
-                sendToMaster(string("DISCONNECT_SLAVE"));
+            res = beSlaveOf(command, client, PARAM(2), PARAM(3));
+            if (res.type == OK) {
+                masterIP = PARAM(0);
+                masterPort = atoi(PARAM(1).c_str());
             }
-            CHECK_PARAM_NUM(4);
-            CHECK_PARAM_TYPE(0, PLAIN)
-            isMaster = false;
-#ifdef WIN32
-            WORD sockVersion = MAKEWORD(2, 2);
-            WSADATA data;
-            WSAStartup(sockVersion, &data);
-            SOCKET masterSock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-            sockaddr_in serAddr;
-            serAddr.sin_family = AF_INET;
-            serAddr.sin_port = htons(atoi(PARAM(0).c_str()));
-            serAddr.sin_addr.S_un.S_addr = inet_addr(PARAM(1).c_str());
-            if (connect(masterSock, (sockaddr *) &serAddr, sizeof(serAddr)) == SOCKET_ERROR) {
-                res.res = "can not connect to master" + PARAM(0);
-                closesocket(masterSock);
-                LOGIC_ERROR_AND_RETURN
-            }
-            master = new MondisClient(masterSock);
-            master->type = MASTER;
-#elif defined(linux)
-            int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-            sockaddr_in serAddr;
-            serAddr.sin_family = AF_INET;
-            serAddr.sin_port = htons((u_int16_t)atoi(PARAM(1).c_str()));
-            serAddr.sin_addr.s_addr = htonl(atoi(PARAM(0).c_str()));
-            int masterFd;
-            if((masterFd = connect(sockfd, (struct sockaddr*)&serAddr, sizeof(serAddr)))<0) {
-                res.res = "can not connect to master" + PARAM(0);
-                close(clientFd);
-                LOGIC_ERROR_AND_RETURN
-            }
-            master = new MondisClient(masterFd);
-            master->type = MASTER;
-#endif
-            sendToMaster(string("IS_SLAVE"));
-            sendToMaster(string("PING"));
-            string reply = readFromMaster();
-            if (reply != "PONG") {
-                res.res = "the socket to master is unavailable";
-                res.type = INTERNAL_ERROR;
-                return res;
-            }
-            sendToMaster(string("LOGIN ") + PARAM(2) + " " + PARAM(3));
-            string loginRes = readFromMaster();
-            if (loginRes.substr(0, 2) != "OK") {
-                res.res = "username or password error";
-                LOGIC_ERROR_AND_RETURN
-            }
-            sendToMaster(string("SYNC ") + to_string(replicaOffset) + " " + to_string(client->curDbIndex));
-            string &&json = readFromMaster();
-            for (auto db:dbs) {
-                db->clear();
-            }
-            JSONParser temp(json);
-            temp.parseAll(dbs);
-            recvFromMaster = new thread([&]() {
-                while (true) {
-                    string next = readFromMaster();
-                    execute(interpreter->getCommand(next), nullptr);
-                    putToPropagateBuffer(next);
-                }
-            });
-            if (client != nullptr) {
-                OK_AND_RETURN;
-            }
+            return res;
         }
         case SYNC: {
+            if (idToPeers.size() > maxSlaveNum) {
+                ExecutionResult res;
+                res.type = LOGIC_ERROR;
+                res.res = "can not build connection because has up to max slave number!";
+                client->send(res.toString());
+#ifdef WIN32
+                FD_CLR(client->sock, &clientFds);
+                socketToClient.erase(socketToClient.find(&client->sock));
+#elif defined(linux)
+                epoll_ctl(clientFd,EPOLL_CTL_DEL,client->fd);
+                fdToClient.erase(fdToClient.find(client->fd));
+#endif
+                delete client;
+            }
+            client->type = SLAVE;
+#ifdef WIN32
+            FD_CLR(client->sock, &clientFds);
+            FD_SET(client->sock, &slaveFds);
+#elif defined(linux)
+            epoll_ctl(clientFd,EPOLL_CTL_DEL,client->fd);
+            epoll_ctl(slaveFd,EPOLL_CTL_ADD,client->fd);
+
+#endif
             CHECK_PARAM_NUM(2)
             CHECK_PARAM_TYPE(0, PLAIN)
             CHECK_PARAM_TYPE(1, PLAIN)
-            CHECK_AND_DEFINE_INT_LEGAL(0, dbIndex);
             CHECK_AND_DEFINE_INT_LEGAL(1, offset);
-            slaves.insert(client);
+            if (isSlave) {
+                Command *temp = new Command;
+                temp->type = GET_MASTER;
+                ExecutionResult realRes = execute(temp, nullptr);
+                Command::destroyCommand(temp);
+                res.res = "the target server is a slave,if you want continue,please input correct master "
+                          "ip and port.the target server's master ip and port is ";
+                res.res += realRes.res;
+                delete client;
+                LOGIC_ERROR_AND_RETURN
+            }
+            idToPeers[nextPeerId()] = client;
             client->type = SLAVE;
-            std::thread t(&MondisServer::replicaToSlave, this, client, dbIndex, offset);
+            std::thread t(&MondisServer::replicaToSlave, this, client, offset);
             OK_AND_RETURN
         }
         case SYNC_FINISHED: {
             CHECK_PARAM_NUM(0)
             isReplicatingFromMaster = false;
-            res.res = "sync has finished";
+            res.needSend = false;
             OK_AND_RETURN
         }
         case DISCONNECT_CLIENT: {
@@ -274,16 +243,20 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
                 OK_AND_RETURN
             } else {
                 sendToMaster("DISCONNECT_SLAVE");
-                OK_AND_RETURN
+                string resStr = readFromMaster();
+                res = ExecutionResult::stringToResult(resStr);
+                return res;
             }
         }
         case PING: {
             client->send("PONG");
             client->updateHeartBeatTime();
+            res.needSend = false;
             OK_AND_RETURN
         }
         case PONG: {
             client->updateHeartBeatTime();
+            res.needSend = false;
             OK_AND_RETURN
         }
         case MULTI: {
@@ -356,13 +329,75 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
                 res.res += " master port:";
                 res.res += to_string(port);
                 OK_AND_RETURN
-            } else {
+            } else if (isSlave) {
                 res.res += "master ip:";
                 res.res += masterIP;
                 res.res += " master port:";
                 res.res += masterPort;
                 OK_AND_RETURN
+            } else {
+                res.res = "current server has no master";
+                LOGIC_ERROR_AND_RETURN
             }
+        }
+        case NEW_PEER: {
+            if (client->type != MASTER) {
+                res.res = "the command is not from master!";
+                LOGIC_ERROR_AND_RETURN
+            }
+            CHECK_PARAM_NUM(3)
+            CHECK_PARAM_TYPE(0, PLAIN)
+            CHECK_PARAM_TYPE(1, PLAIN)
+            CHECK_PARAM_TYPE(2, PLAIN)
+            MondisClient *peer = buildConnection(PARAM(0), atoi(PARAM(1).c_str()));
+            if (peer == nullptr) {
+                res.res = "can not connect to peer which ip is ";
+                res.res += PARAM(0);
+                res.res += " port is ";
+                res.res += PARAM(1);
+            }
+            idToPeers[atoi(PARAM(2).c_str())] = client;
+            string c = "MASTER_INVITE ";
+            c += masterIP;
+            c += " ";
+            c += masterPort;
+            peer->send(c);
+        }
+        case IS_CLIENT: {
+            if (nameToClients.size() > maxCilentNum) {
+                res.type = LOGIC_ERROR;
+                res.res = "can not build connection because has up to max client number!";
+                client->send(res.toString());
+#ifdef WIN32
+                FD_CLR(client->sock, &clientFds);
+                socketToClient.erase(socketToClient.find(&client->sock));
+#elif defined(linux)
+                epoll_ctl(clientFd,EPOLL_CTL_DEL,client->fd);
+                fdToClient.erase(fdToClient.find(client->fd));
+#endif
+                delete client;
+            }
+            client->type = CLIENT;
+            nameToClients[nextDefaultClientName()] = client;
+            OK_AND_RETURN
+        }
+        case MASTER_INVITE: {
+
+        }
+        case ASK_FOR_VOTE: {
+
+        }
+        case VOTE: {
+
+        }
+        case UNVOTE: {
+
+        }
+        case MASTER_DEAD: {
+
+        }
+        case I_AM_NEW_MASTER: {
+
         }
     }
     INVALID_AND_RETURN
@@ -646,12 +681,12 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
         propagateCV.wait(lck);
     }
     ExecutionResult res;
-    if (!hasLogin) {
+    if (!client->hasAuthenticate) {
         res.res = "you haven't login,please login";
         LOGIC_ERROR_AND_RETURN
     }
     Command *command = interpreter->getCommand(commandStr);
-    if (serverCommand.find(command->type) != serverCommand.end()) {
+    if (controlCommands.find(command->type) != controlCommands.end()) {
         if (command->next == nullptr || command->next->type == VACANT) {
             res = execute(command, client);
             return res;
@@ -661,18 +696,21 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
         LOGIC_ERROR_AND_RETURN
     }
     CommandStruct cstruct = getCommandStruct(command, client);
-    if ((!isMaster) && cstruct.isModify) {
+    if (isSlave && cstruct.isModify) {
         if (autoMoveCommandToMaster) {
             Command::destroyCommand(command);
             sendToMaster(commandStr);
             string resStr = readFromMaster();
             client->send(resStr);
-            res.type = REDIRECT;
             return res;
         } else {
             res.res = "the current server is a slave,can not undoExecute command which will modify database state";
             LOGIC_ERROR_AND_RETURN
         }
+    }
+    if (client->type == CLIENT && clientControlCommands.find(cstruct.operation->type) == clientControlCommands.end()) {
+        res.res = "this command can not execute from a client";
+        LOGIC_ERROR_AND_RETURN
     }
     if (client->isInTransaction && transactionAboutCommands.find(command->type) == transactionAboutCommands.end()) {
         client->transactionCommands->push(commandStr);
@@ -779,7 +817,7 @@ void MondisServer::applyConf() {
         } else if(kv.first == "masterIP" ) {
             masterIP = kv.second;
         } else if(kv.first == "masterPort") {
-            masterPort = kv.second;
+            masterPort = atoi(kv.second.c_str());
         } else if(kv.first == "slaveOf") {
             if(kv.second == "true") {
                 slaveOf = true;
@@ -822,6 +860,7 @@ void MondisServer::init() {
     JSONParser::LexicalParser::init();
     Command::init();
     CommandInterpreter::init();
+    ExecutionResult::init();
     initStaticMember();
     interpreter = new CommandInterpreter;
     for (int i = 0; i < databaseNum; ++i) {
@@ -875,8 +914,8 @@ void MondisServer::init() {
     //向客户端发心跳包
     sendHeartBeatToClients = new std::thread([&]() {
         while (true) {
-            for (auto &client:clients) {
-                client->send("HEART_BEAT_TO");
+            for (auto &kv:nameToClients) {
+                kv.second->send("HEART_BEAT_TO");
             }
             std::this_thread::sleep_for(chrono::milliseconds(toClientHeartBeatDuration));
         }
@@ -884,8 +923,8 @@ void MondisServer::init() {
     //向从服务器发心跳包
     sendHeartBeatToSlaves = new std::thread([&]() {
         while (true) {
-            for (auto &slave:slaves) {
-                slave->send("HEART_BEAT_TO");
+            for (auto &kv:idToPeers) {
+                kv.second->send("HEART_BEAT_TO");
             }
             std::this_thread::sleep_for(chrono::milliseconds(toSlaveHeartBeatDuration));
         }
@@ -915,34 +954,13 @@ void MondisServer::acceptSocket() {
         sockaddr_in remoteAddr;
         int len = sizeof(remoteAddr);
         SOCKET clientSock = accept(servSock, (SOCKADDR *) &remoteAddr, &len);
-        string auth = read(clientSock);
         MondisClient *client = new MondisClient(clientSock);
-        if (auth == "IS_CLIENT") {
-            if (clients.size() > maxCilentNum) {
-                ExecutionResult res;
-                res.type = LOGIC_ERROR;
-                res.res = "can not build connection because has up to max client number!";
-                send(clientSock, res.toString());
-                delete client;
-                continue;
-            }
-            client->type = CLIENT;
-            FD_SET(clientSock, &clientFds);
-            clients.insert(client);
-
-        } else if (auth == "IS_SLAVE") {
-            if (clients.size() > maxCilentNum) {
-                ExecutionResult res;
-                res.type = LOGIC_ERROR;
-                res.res = "can not build connection because has up to max slave number!";
-                send(clientSock, res.toString());
-                continue;
-            }
-            client->type = SLAVE;
-            FD_SET(clientSock, &slaveFds);
-            slaves.insert(client);
-        }
         socketToClient[&client->sock] = client;
+        getpeername(clientSock, (sockaddr *) &remoteAddr, &len);
+        client->ip = inet_ntoa(remoteAddr.sin_addr);
+        client->port = ntohs(remoteAddr.sin_port);
+        socketToClient[&client->sock] = client;
+        FD_SET(clientSock, &clientFds);
     }
 #elif defined(linux)
     int socket_fd;
@@ -956,41 +974,17 @@ void MondisServer::acceptSocket() {
     bind(socket_fd,(sockaddr*)&servaddr, sizeof(servaddr));
     listen(socket_fd,10);
     while (true) {
-        connect_fd = accept(socket_fd, (struct sockaddr*)NULL, NULL);
+        sockaddr_in clientAddr;
+        int len = sizeof(clientAddr);
+        connect_fd = accept(socket_fd, (struct sockaddr*)clientAddr, &len);
         string auth = read(clientSock);
         MondisClient *client = new MondisClient(clientSock);
-        if(auth == "IS_CLIENT") {
-            if (clients.size() > maxCilentNum) {
-                ExecutionResult res;
-                res.type = LOGIC_ERROR;
-                res.res = "can not build connection because has up to max client number!";
-                send(connect_fd, res.toString());
-                delete client;
-                continue;
-            }
-            epoll_event event;
-            event.events = EPOLLIN|EPOLLET;
-            client->type = CLIENT;
-            epoll_ctl(clientsEpollFd, EPOLL_CTL_ADD, connect_fd, &event);
-            clients.insert(client);
-
-        } else if(auth == "IS_SLAVE") {
-            if (clients.size() > maxCilentNum) {
-                ExecutionResult res;
-                res.type = LOGIC_ERROR;
-                res.res = "can not build connection because has up to max slave number!";
-                send(clientSock, res.toString());
-                delete client;
-                continue;
-            }
-            client->type = SLAVE;
-            epoll_event event;
-            event.events = EPOLLIN|EPOLLET;
-            epoll_ctl(slavesEpollFd, EPOLL_CTL_ADD, connect_fd, &event);
-            slaves.insert(client);
-        }
+        getsockname(connect_fd,(sockaddr*)&clientAddr,&len);
+        client->ip = inet_ntoa(clientAddr.sin_addr);
+        client->port=ntohs(clientAddr.sin_port);
         fcntl(connect_fd,F_SETFL,O_NONBLOCK);
         fdToClient[connect_fd] = client;
+        epoll_ctl(clientFd,EPOLL_CTL_ADD,connect_fd);
     }
 #endif
 }
@@ -999,7 +993,7 @@ void MondisServer::handleCommand(MondisClient *client) {
     string commandStr;
     while ((commandStr = client->readCommand()) != "") {
         ExecutionResult res = execute(commandStr, client);
-        if (res.type != REDIRECT) {
+        if (res.needSend) {
             client->send(res.toString());
         }
     }
@@ -1018,6 +1012,7 @@ MondisServer::MondisServer() {
     replicaCommandBuffer = new deque<string>;
     commandPropagateBuffer = new queue<string>;
     self = new MondisClient(SERVER_SELF);
+    self->hasAuthenticate = true;
 }
 
 void MondisServer::sendToMaster(const string &res) {
@@ -1041,11 +1036,13 @@ MondisServer::~MondisServer() {
     delete self;
 }
 
-void MondisServer::replicaToSlave(MondisClient *client, unsigned dbIndex, unsigned long long slaveReplicaOffset) {
+void MondisServer::replicaToSlave(MondisClient *client, unsigned long long slaveReplicaOffset) {
     if (replicaOffset - slaveReplicaOffset > maxCommandReplicaBufferSize) {
         const unsigned long long start = replicaOffset;
-        const string &json = dbs[dbIndex]->getJson();
-        client->send(json);
+        string *temp = new string;
+        getJson(temp);
+        client->send(*temp);
+        delete temp;
         isPropagating = true;
         vector<string> commands(replicaCommandBuffer->begin() + (replicaOffset - start), replicaCommandBuffer->end());
         replicaCommandPropagate(commands, client);
@@ -1064,8 +1061,8 @@ void MondisServer::replicaToSlave(MondisClient *client, unsigned dbIndex, unsign
 void MondisServer::singleCommandPropagate() {
     while (true) {
         const string& cur = takeFromPropagateBuffer();
-        for (MondisClient *slave:slaves) {
-            slave->send(cur);
+        for (auto &kv:idToPeers) {
+            kv.second->send(cur);
         }
     }
 }
@@ -1106,31 +1103,59 @@ void MondisServer::initStaticMember() {
     ADD(transactionAboutCommands, EXEC)
     ADD(transactionAboutCommands, WATCH)
     ADD(transactionAboutCommands, UNWATCH)
-    INSERT(BIND)
-    INSERT(GET)
-    INSERT(LOGIN)
-    INSERT(EXISTS)
-    INSERT(RENAME)
-    INSERT(TYPE)
-    INSERT(SAVE)
-    INSERT(SAVE_ALL)
-    INSERT(EXIT)
-    INSERT(SELECT)
-    INSERT(DEL)
-    INSERT(SLAVE_OF)
-    INSERT(SYNC)
-    INSERT(SET_NAME)
-    INSERT(SYNC_FINISHED)
-    INSERT(DISCONNECT_SLAVE)
-    INSERT(DISCONNECT_CLIENT)
-    INSERT(PING)
-    INSERT(PONG)
-    INSERT(MULTI)
-    INSERT(EXEC)
-    INSERT(DISCARD)
-    INSERT(WATCH)
-    INSERT(UNWATCH)
-    INSERT(GET_MASTER)
+    ADD(clientControlCommands, BIND)
+    ADD(clientControlCommands, GET)
+    ADD(clientControlCommands, LOGIN)
+    ADD(clientControlCommands, EXISTS)
+    ADD(clientControlCommands, RENAME)
+    ADD(clientControlCommands, TYPE)
+    ADD(clientControlCommands, SAVE)
+    ADD(clientControlCommands, SAVE_ALL)
+    ADD(clientControlCommands, EXIT)
+    ADD(clientControlCommands, SELECT)
+    ADD(clientControlCommands, DEL)
+    ADD(clientControlCommands, SLAVE_OF)
+    ADD(clientControlCommands, SET_CLIENT_NAME)
+    ADD(clientControlCommands, MULTI)
+    ADD(clientControlCommands, EXEC)
+    ADD(clientControlCommands, DISCARD)
+    ADD(clientControlCommands, WATCH)
+    ADD(clientControlCommands, UNWATCH)
+    ADD(clientControlCommands, GET_MASTER)
+    ADD(clientControlCommands, PING)
+    ADD(clientControlCommands, PONG)
+    ADD(controlCommands, BIND)
+    ADD(controlCommands, GET)
+    ADD(controlCommands, LOGIN)
+    ADD(controlCommands, EXISTS)
+    ADD(controlCommands, RENAME)
+    ADD(controlCommands, TYPE)
+    ADD(controlCommands, SAVE)
+    ADD(controlCommands, SAVE_ALL)
+    ADD(controlCommands, EXIT)
+    ADD(controlCommands, SELECT)
+    ADD(controlCommands, DEL)
+    ADD(controlCommands, SLAVE_OF)
+    ADD(controlCommands, SYNC)
+    ADD(controlCommands, SET_CLIENT_NAME)
+    ADD(controlCommands, SYNC_FINISHED)
+    ADD(controlCommands, DISCONNECT_SLAVE)
+    ADD(controlCommands, DISCONNECT_CLIENT)
+    ADD(controlCommands, PING)
+    ADD(controlCommands, PONG)
+    ADD(controlCommands, MULTI)
+    ADD(controlCommands, EXEC)
+    ADD(controlCommands, DISCARD)
+    ADD(controlCommands, WATCH)
+    ADD(controlCommands, UNWATCH)
+    ADD(controlCommands, GET_MASTER)
+    ADD(controlCommands, NEW_PEER)
+    ADD(controlCommands, IS_CLIENT)
+    ADD(controlCommands, VOTE)
+    ADD(controlCommands, UNVOTE)
+    ADD(controlCommands, ASK_FOR_VOTE)
+    ADD(controlCommands, MASTER_DEAD)
+    ADD(controlCommands, I_AM_NEW_MASTER)
 }
 
 string MondisServer::readFromMaster() {
@@ -1203,19 +1228,19 @@ void MondisServer::closeClient(MondisClient *client) {
 #ifdef WIN32
     if (client->type == CLIENT) {
         FD_CLR(client->sock, &clientFds);
-        clients.erase(clients.find(client));
+        nameToClients.erase(nameToClients.find(client->name));
     } else if (client->type == SLAVE) {
         FD_CLR(client->sock, &slaveFds);
-        slaves.erase(slaves.find(client));
+        idToPeers.erase(idToPeers.find(client->id));
     }
     socketToClient.erase(socketToClient.find(&client->sock));
 #elif defined(linux)
     if(client->type == CLIENT) {
         epoll_ctl(clientsEpollFd, EPOLL_CTL_DEL, client->fd, nullptr);
-        clients.erase(clients.find(client));
+        nameToClients.erase(nameToClients.find(client->name));
     } else if(client->type == SLAVE) {
         epoll_ctl(slavesEpollFd, EPOLL_CTL_DEL, client->fd, nullptr);
-        slaves.erase(slaves.find(client));
+        idToPeers.erase(idToPeers.find(client->id));
     }
     fdToClient.erase(fdToClient.find(client->fd));
 #endif
@@ -1255,39 +1280,27 @@ MondisObject *MondisServer::chainLocate(Command *command, MondisClient *client) 
 
 void MondisServer::saveAll(const string &jsonFile) {
 #ifdef WIN32
+    string *temp = new string;
+    getJson(temp);
     ofstream out(jsonFile + "2");
-    out << "{\n";
-    for (int i = 0; i < databaseNum; ++i) {
-        out << "\"";
-        out << i;
-        out << "\"";
-        out << " : ";
-        out << dbs[i]->getJson();
-        out << "\n";
-    }
-    out << "}";
+    out << temp;
     out.flush();
     remove(jsonFile.c_str());
     out.close();
+    delete temp;
     rename((jsonFile + "2").c_str(), jsonFile.c_str());
 #elif defined(linux)
     int pid = fork();
         if(pid == 0) {
+            string* temp = new string;
+            getJson(temp);
             ofstream out(jsonFile + "2");
-        out<<"{\n";
-        for (int i = 0; i <databaseNum; ++i) {
-            out<<"\"";
-            out<<i;
-            out<<"\"";
-            out<<" : ";
-            out<<dbs[i]->getJson();
-            out<<"\n";
-        }
-        out<<"}";
-        out.flush();
-        remove(jsonFile.c_str());
-        out.close();
-        rename((jsonFile + "2").c_str(), jsonFile.c_str());
+            out << temp;
+            out.flush();
+            remove(jsonFile.c_str());
+            out.close();
+            delete temp;
+            rename((jsonFile + "2").c_str(), jsonFile.c_str());
             exit(0);
         }
 #endif
@@ -1362,9 +1375,116 @@ CommandStruct MondisServer::getCommandStruct(Command *command, MondisClient *cli
     return res;
 }
 
+ExecutionResult
+MondisServer::beSlaveOf(Command *command, MondisClient *client, string &masterUsername, string &masterPassword) {
+    ExecutionResult res;
+    if (isSlave) {
+        sendToMaster(string("DISCONNECT_SLAVE"));
+    }
+    CHECK_PARAM_NUM(4);
+    CHECK_PARAM_TYPE(0, PLAIN)
+    string login = "LOGIN ";
+    login += masterUsername;
+    login += " ";
+    login += masterPassword;
+    isMaster = false;
+    MondisClient *c = buildConnection(PARAM(2), atoi(PARAM(3).c_str()));
+    if (c == nullptr) {
+        res.res = "can not connect to the master!";
+        res.type = INTERNAL_ERROR;
+        return res;
+    }
+    master = c;
+    sendToMaster(string("PING"));
+    string reply = readFromMaster();
+    if (reply != "PONG") {
+        res.res = "the socket to master is unavailable";
+        res.type = INTERNAL_ERROR;
+        return res;
+    }
+    sendToMaster(login);
+    ExecutionResult loginRes = ExecutionResult::stringToResult(readFromMaster());
+    if (loginRes.type != OK) {
+        res.res = "username or password error";
+        LOGIC_ERROR_AND_RETURN
+    }
+    sendToMaster(string("SYNC ") + to_string(replicaOffset));
+    string &&json = readFromMaster();
+    for (auto db:dbs) {
+        db->clear();
+    }
+    JSONParser temp(json);
+    temp.parseAll(dbs);
+    recvFromMaster = new thread([&]() {
+        while (true) {
+            string next = readFromMaster();
+            execute(interpreter->getCommand(next), nullptr);
+            putToPropagateBuffer(next);
+        }
+    });
+    if (command != nullptr) {
+        OK_AND_RETURN;
+    }
+}
 
+MondisClient *MondisServer::buildConnection(const string &ip, int port) {
+    MondisClient *res = nullptr;
+#ifdef WIN32
+    WORD sockVersion = MAKEWORD(2, 2);
+    WSADATA data;
+    WSAStartup(sockVersion, &data);
+    SOCKET masterSock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    sockaddr_in serAddr;
+    serAddr.sin_family = AF_INET;
+    serAddr.sin_port = htons(port);
+    serAddr.sin_addr.S_un.S_addr = inet_addr(ip.c_str());
+    if (connect(masterSock, (sockaddr *) &serAddr, sizeof(serAddr)) == SOCKET_ERROR) {
+        return res;
+    }
+    res = new MondisClient(masterSock);
+    return res;
+#elif defined(linux)
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    sockaddr_in serAddr;
+    serAddr.sin_family = AF_INET;
+    serAddr.sin_port = htons((u_int16_t)port);
+    inet_pton(AF_INET,ip.c_str(),&servAddr.sin_addr);
+    int masterFd;
+    if((masterFd = connect(sockfd, (struct sockaddr*)&serAddr, sizeof(serAddr)))<0) {
+        return res;
+    }
+    master = new MondisClient(masterFd);
+    return res;
+#endif
+}
 
+void MondisServer::getJson(string *res) {
+    (*res) += "{\n";
+    for (int i = 0; i < databaseNum; ++i) {
+        (*res) += "\"";
+        (*res) += i;
+        (*res) += "\"";
+        (*res) += " : ";
+        (*res) += dbs[i]->getJson();
+        (*res) += "\n";
+    }
+    (*res) += "}";
+}
 
 
 unordered_set<CommandType> MondisServer::modifyCommands;
 unordered_set<CommandType> MondisServer::transactionAboutCommands;
+unordered_set<CommandType> MondisServer::clientControlCommands;
+
+unsigned MondisServer::curPeerId = 0;
+
+unsigned MondisServer::curClientId = 0;
+
+unsigned MondisServer::nextPeerId() {
+    return ++curPeerId;
+}
+
+string MondisServer::nextDefaultClientName() {
+    string prefix = "client_";
+    return prefix + to_string(++curClientId);
+}

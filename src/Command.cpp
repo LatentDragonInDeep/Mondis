@@ -111,7 +111,7 @@ void CommandInterpreter::init() {
     PUT(CHANGE_SCORE)
     PUT(SET_POS)
     PUT(COUNT)
-    PUT(SET_NAME)
+    PUT(SET_CLIENT_NAME)
     PUT(SLAVE_OF)
     PUT(SYNC)
     PUT(SYNC_FINISHED)
@@ -126,6 +126,14 @@ void CommandInterpreter::init() {
     PUT(UNWATCH)
     PUT(SAVE_ALL)
     PUT(GET_MASTER)
+    PUT(NEW_PEER)
+    PUT(IS_CLIENT)
+    PUT(MASTER_INVITE)
+    PUT(ASK_FOR_VOTE)
+    PUT(VOTE)
+    PUT(UNVOTE)
+    PUT(MASTER_DEAD)
+    PUT(I_AM_NEW_MASTER)
 }
 
 void CommandInterpreter::LexicalParser::skip() {
@@ -285,3 +293,5 @@ void Command::init() {
     MAP(WATCH)
     MAP(UNWATCH)
 }
+
+std::unordered_map<std::string, ExecutionResultType> ExecutionResult::strToType;

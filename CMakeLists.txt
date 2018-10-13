@@ -9,7 +9,7 @@ ENDIF ()
 add_compile_options(-w -o2 -D_GLIBCXX_HAS_GTHREADS -D_GLIBCXX_USE_C99_STDINT_TR1 -D_GLIBCXX_USE_NANOSLEEP)
 set(CMAKE_EXE_LINKER_FLAGS -static)
 
-add_executable(Mondis ${SRC_DIRS} src/ReplicaCluster.cpp src/ReplicaCluster.h src/MondisCluster.cpp src/MondisCluster.h)
+add_executable(Mondis ${SRC_DIRS} src/ReplicaCluster.cpp src/MondisCluster.cpp src/MondisCluster.h)
 IF (WIN32)
     target_link_libraries(Mondis ws2_32)
 ELSEIF(UNIX)

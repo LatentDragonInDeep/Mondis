@@ -17,7 +17,7 @@
 
 #define MAP(TYPE) typeToStr[TYPE] = #TYPE;
 
-#define INSERT(TYPE) serverCommand.insert(CommandType::TYPE);
+#define INSERT(TYPE) controlCommands.insert(CommandType::TYPE);
 
 #define CHECK_PARAM_NUM(x) if(command->params.size()!=x) {\
                              res.type = SYNTAX_ERROR;\
@@ -145,7 +145,7 @@ enum CommandType {
     SELECT,
     VACANT,
     M_ERROR,
-    SET_NAME,
+    SET_CLIENT_NAME,
     SLAVE_OF,
     SYNC,
     SYNC_FINISHED,//通知从服务器同步完成
@@ -159,6 +159,15 @@ enum CommandType {
     WATCH,
     UNWATCH,
     GET_MASTER,
+    NEW_PEER,
+    IS_CLIENT,
+    MASTER_INVITE,
+    ASK_FOR_VOTE,
+    VOTE,
+    UNVOTE,
+    MASTER_DEAD,
+    I_AM_NEW_MASTER,
+
 };
 
 enum ExecutionResultType {
@@ -166,14 +175,15 @@ enum ExecutionResultType {
     SYNTAX_ERROR,
     INTERNAL_ERROR,
     LOGIC_ERROR,
-    REDIRECT,
 };
 
 class ExecutionResult {
 public:
     static std::string typeToStr[];
+    static std::unordered_map<std::string, ExecutionResultType> strToType;
     ExecutionResultType type;
     std::string res;
+    bool needSend = true;
     ExecutionResult():type(LOGIC_ERROR){};
     std::string toString() {
         std::string res;
@@ -185,6 +195,23 @@ public:
 
     std::string getTypeStr() {
         return typeToStr[type];
+    }
+
+    static void init() {
+        strToType["OK"] = OK;
+        strToType["SYNTAX_ERROR"] = SYNTAX_ERROR;
+        strToType["INTERNAL_ERROR"] = INTERNAL_ERROR;
+        strToType["LOGIC_ERROR"] = LOGIC_ERROR;
+    }
+
+    static ExecutionResult stringToResult(const std::string &data) {
+        ExecutionResult value;
+        int divider = data.find_first_of(" ");
+        std::string typeStr = data.substr(0, divider);
+        std::string resStr = data.substr(divider + 1);
+        value.type = strToType[typeStr];
+        value.res = resStr;
+        return value;
     }
 };
 

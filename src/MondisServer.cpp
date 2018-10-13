@@ -803,8 +803,6 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
         }
         replicaOffset++;
         while (!putToPropagateBuffer(commandStr));
-    } else {
-        Command::destroyCommand(command);
     }
 
     return res;
@@ -1448,8 +1446,12 @@ ExecutionResult MondisServer::transactionExecute(CommandStruct &cstruct, MondisC
         } else {
             res = execute(cstruct.operation, client);
         }
+        Command::destroyCommand(cstruct.locate);
+        Command::destroyCommand(cstruct.operation);
         return res;
     } else {
+        Command::destroyCommand(cstruct.locate);
+        Command::destroyCommand(cstruct.operation);
         res.res = "other transaction is watching the key ";
         res.res += TO_FULL_KEY_NAME(client->curDbIndex, (*cstruct.operation)[0].content);
         res.res += ",so can undoExecute the command";

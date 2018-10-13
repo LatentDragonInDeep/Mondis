@@ -226,6 +226,10 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             isReplicatingFromMaster = false;
             res.needSend = false;
             id = atoi(PARAM(0).c_str());
+            recvFromMaster = new std::thread([&]() {
+                string commandStr = readFromMaster();
+                execute(interpreter->getCommand(commandStr), self);
+            });
             OK_AND_RETURN
         }
         case DISCONNECT_CLIENT: {
@@ -435,6 +439,8 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
         case MASTER_DEAD: {
             isVoting = true;
             delete master;
+            delete recvFromMaster;
+            recvFromMaster = nullptr;
             master = nullptr;
             res.needSend = false;
             forVote = new thread(&MondisServer::askForVote, this);
@@ -934,18 +940,18 @@ void MondisServer::init() {
     }
     self->keySpace = dbs[self->curDbIndex];
     if (aof) {
-        aofFileOut.open(aofFile, ios::app);
+        aofFileOut.open(workDir + "/" + aofFile, ios::app);
     }
     if (json) {
-        jsonFileOut.open(jsonFile, ios::app);
+        jsonFileOut.open(workDir + "/" + jsonFile, ios::app);
     }
     isRecovering = true;
     cout << "is Recovering..." << endl;
     if (recoveryStrategy == "json") {
-        JSONParser temp(recoveryFile.c_str());
+        JSONParser temp((workDir + "/" + recoveryFile).c_str());
         temp.parseAll(dbs);
     } else if (recoveryStrategy == "aof") {
-        recoveryFileIn.open(recoveryFile);
+        recoveryFileIn.open(workDir + "/" + recoveryFile);
         string command;
         while (getline(recoveryFileIn, command)) {
             execute(interpreter->getCommand(command), self);
@@ -955,7 +961,7 @@ void MondisServer::init() {
     if (daemonize) {
         runAsDaemon();
     }
-    logFileOut.open(logFile, ios::app);
+    logFileOut.open(workDir + "/" + logFile, ios::app);
     if (slaveOf) {
         isReplicatingFromMaster = true;
         cout << "is Replicating from master..." << endl;
@@ -973,34 +979,25 @@ void MondisServer::init() {
     std::thread accept(&MondisServer::acceptSocket, this);
     //控制台事件循环
     std::thread eventLoop(&MondisServer::startEventLoop, this);
-    //命令传播
-    std::thread propagateIO(&MondisServer::singleCommandPropagate, this);
     //检查超时的客户端，从服务器，主服务器并清理
     std::thread checkAndHandle(&MondisServer::checkAndHandleIdleClient, this);
     //向客户端发心跳包
     sendHeartBeatToClients = new std::thread([&]() {
         while (true) {
+            if (nameToClients.size() == 0) {
+                unique_lock lck(hasClientMtx);
+                hasClientCV.wait(lck);
+            }
             for (auto &kv:nameToClients) {
-                kv.second->send("HEART_BEAT_TO");
+                kv.second->send("PING");
             }
             std::this_thread::sleep_for(chrono::milliseconds(toClientHeartBeatDuration));
         }
     });
-    //向从服务器发心跳包
-    sendHeartBeatToSlaves = new std::thread([&]() {
-        while (true) {
-            for (auto &kv:idToPeers) {
-                kv.second->send("HEART_BEAT_TO");
-            }
-            std::this_thread::sleep_for(chrono::milliseconds(toSlaveHeartBeatDuration));
-        }
-    });
 #ifdef WIN32
-    selectAndHandle(clientFds);
-    std::thread handleSlaves(&MondisServer::selectAndHandle, this, peerFds);
+    selectAndHandle(&clientFds);
 #elif defined(linux)
     selectAndHandle(clientsEpollFd,clientEvents);
-    std::thread handleSlaves(&MondisServer::selectAndHandle,this,slavesEpollFd,slaveEvents);
 #endif
 }
 
@@ -1027,6 +1024,7 @@ void MondisServer::acceptSocket() {
         client->port = ntohs(remoteAddr.sin_port);
         socketToClient[&client->sock] = client;
         FD_SET(clientSock, &clientFds);
+        hasClientCV.notify_all();
     }
 #elif defined(linux)
     int socket_fd;
@@ -1051,6 +1049,7 @@ void MondisServer::acceptSocket() {
         fcntl(connect_fd,F_SETFL,O_NONBLOCK);
         fdToClient[connect_fd] = client;
         epoll_ctl(clientFd,EPOLL_CTL_ADD,connect_fd);
+        hasClientCV.notify_all();
     }
 #endif
 }
@@ -1134,6 +1133,26 @@ void MondisServer::replicaToSlave(MondisClient *client, long long slaveReplicaOf
     }
     isPropagating = false;
     propagateCV.notify_all();
+    if (sendHeartBeatToSlaves == nullptr) {
+        sendHeartBeatToSlaves = new std::thread([&]() {
+            while (true) {
+                for (auto &kv:idToPeers) {
+                    kv.second->send("PING");
+                }
+                std::this_thread::sleep_for(chrono::milliseconds(toSlaveHeartBeatDuration));
+            }
+        });
+    }
+    if (handleSlaves == nullptr) {
+#ifdef WIN32
+        handleSlaves = new std::thread(&MondisServer::selectAndHandle, this, &peerFds);
+#elif defined(linux)
+        handleSlaves = new std::thread(&MondisServer::selectAndHandle,this,slavesEpollFd,slaveEvents);
+#endif
+    }
+    if (propagateIO == nullptr) {
+        propagateIO = new std::thread(&MondisServer::singleCommandPropagate, this);
+    }
 }
 
 void MondisServer::singleCommandPropagate() {
@@ -1294,7 +1313,7 @@ void MondisServer::checkAndHandleIdleClient() {
             }
         }
 #endif
-        if (current - master->preInteraction > maxMasterIdle) {
+        if (isSlave && master != nullptr && current - master->preInteraction > maxMasterIdle) {
             delete master;
             master = nullptr;
             delete recvFromMaster;

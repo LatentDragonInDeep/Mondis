@@ -186,9 +186,9 @@ private:
         return res;
     };
 
-    void selectAndHandle(fd_set &fds) {
+    void selectAndHandle(fd_set *fds) {
         while (true) {
-            int ret = select(0, &fds, nullptr, nullptr, nullptr);
+            int ret = select(0, fds, nullptr, nullptr, nullptr);
             if (ret == 0) {
                 continue;
             }
@@ -327,6 +327,11 @@ private:
     thread *recvFromMaster = nullptr;
     thread *sendHeartBeatToSlaves = nullptr;
     thread *sendHeartBeatToClients = nullptr;
+    thread *handleSlaves = nullptr;
+    thread *propagateIO = nullptr;
+
+    condition_variable hasClientCV;
+    mutex hasClientMtx;
 
     bool autoMoveCommandToMaster = true;
 

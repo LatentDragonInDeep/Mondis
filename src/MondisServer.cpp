@@ -748,10 +748,6 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
         propagateCV.wait(lck);
     }
     ExecutionResult res;
-    if (!client->hasAuthenticate) {
-        res.res = "you haven't login,please login";
-        LOGIC_ERROR_AND_RETURN
-    }
     if (isVoting && client->type == CLIENT) {
         res.res = "master is dead,the cluster is voting for new master";
         res.type = INTERNAL_ERROR;
@@ -765,9 +761,15 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
         }
     } else if (command->type != LOCATE) {
         res.res = "Invalid command";
+        Command::destroyCommand(command);
         LOGIC_ERROR_AND_RETURN
     }
     CommandStruct cstruct = getCommandStruct(command, client);
+    if ((!client->hasAuthenticate) && (cstruct.operation->type != LOGIN)) {
+        Command::destroyCommand(command);
+        res.res = "you haven't login,please login";
+        LOGIC_ERROR_AND_RETURN
+    }
     if (isSlave && cstruct.isModify) {
         if (autoMoveCommandToMaster) {
             Command::destroyCommand(command);

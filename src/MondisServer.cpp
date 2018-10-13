@@ -193,7 +193,7 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             client->type = SLAVE;
 #ifdef WIN32
             FD_CLR(client->sock, &clientFds);
-            FD_SET(client->sock, &slaveFds);
+            FD_SET(client->sock, &peerFds);
 #elif defined(linux)
             epoll_ctl(clientFd,EPOLL_CTL_DEL,client->fd);
             epoll_ctl(slaveFd,EPOLL_CTL_ADD,client->fd);
@@ -220,9 +220,11 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             OK_AND_RETURN
         }
         case SYNC_FINISHED: {
-            CHECK_PARAM_NUM(0)
+            CHECK_PARAM_NUM(1)
+            CHECK_PARAM_TYPE(0, PLAIN)
             isReplicatingFromMaster = false;
             res.needSend = false;
+            id = atoi(PARAM(0).c_str());
             OK_AND_RETURN
         }
         case DISCONNECT_CLIENT: {
@@ -382,22 +384,77 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             OK_AND_RETURN
         }
         case MASTER_INVITE: {
-
+            CHECK_PARAM_NUM(3);
+            CHECK_PARAM_TYPE(0, PLAIN)
+            CHECK_PARAM_TYPE(1, PLAIN)
+            CHECK_PARAM_TYPE(2, PLAIN)
+            if (PARAM(0) == masterIP && atoi(PARAM(1).c_str()) == masterPort) {
+                client->hasAuthenticate = true;
+#ifdef WIN32
+                FD_CLR(client->sock, &clientFds);
+                FD_SET(client->sock, &peerFds);
+#elif defined(linux)
+                epoll_ctl(clientFd,EPOLL_CTL_DEL,client->fd);
+                epoll_ctl(peerFd,EPOLL_CTL_ADD,client->fd);
+#endif
+                idToPeers[atoi(PARAM(2).c_str())] = client;
+                res.needSend = false;
+                OK_AND_RETURN
+            }
+            res.res = "wrong master ip or port";
+            LOGIC_ERROR_AND_RETURN
         }
         case ASK_FOR_VOTE: {
-
+            if (hasVoteFor) {
+                client->send("UNVOTE");
+            } else if (maxOffsetClients.find(client) != maxOffsetClients.end()) {
+                client->send("VOTE");
+                hasVoteFor = true;
+            }
+            res.needSend = false;
+            OK_AND_RETURN
         }
         case VOTE: {
-
+            voteNum++;
+            if (voteNum > idToPeers.size() / 2) {
+                delete forVote;
+                forVote = nullptr;
+                for (auto &kv:idToPeers) {
+                    kv.second->send("I_AM_NEW_MASTER");
+                }
+                //TODO 更新所有slave的offset最新
+                //TODO 处理双leader的情况
+            }
+            res.needSend = false;
+            OK_AND_RETURN
         }
         case UNVOTE: {
-
+            res.needSend = false;
+            OK_AND_RETURN
         }
         case MASTER_DEAD: {
-
+            unsigned long long maxOffset = 0;
+            for (auto &kv:idToPeers) {
+                kv.second->send("UPDATE_OFFSET");
+                unsigned long long cur = atoll(kv.second->read().c_str());
+                if (cur > maxOffset) {
+                    maxOffsetClients.clear();
+                    maxOffsetClients.insert(kv.second);
+                } else if (cur == maxOffset) {
+                    maxOffsetClients.insert(kv.second);
+                }
+            }
+            res.needSend = false;
+            forVote = new thread(&MondisServer::askForVote, this);
+            OK_AND_RETURN;
         }
         case I_AM_NEW_MASTER: {
-
+            //TODO
+        }
+        case UPDATE_OFFSET: {
+            client->send(to_string(replicaOffset));
+            res.needSend = false;
+            OK_AND_RETURN
         }
     }
     INVALID_AND_RETURN
@@ -931,7 +988,7 @@ void MondisServer::init() {
     });
 #ifdef WIN32
     selectAndHandle(clientFds);
-    std::thread handleSlaves(&MondisServer::selectAndHandle, this, slaveFds);
+    std::thread handleSlaves(&MondisServer::selectAndHandle, this, peerFds);
 #elif defined(linux)
     selectAndHandle(clientsEpollFd,clientEvents);
     std::thread handleSlaves(&MondisServer::selectAndHandle,this,slavesEpollFd,slaveEvents);
@@ -1002,7 +1059,7 @@ void MondisServer::handleCommand(MondisClient *client) {
 MondisServer::MondisServer() {
 #ifdef WIN32
     FD_ZERO(&clientFds);
-    FD_ZERO(&slaveFds);
+    FD_ZERO(&peerFds);
 #elif defined(linux)
     clientsEpollFd = epoll_create(1024);
     clientEvents = new epoll_event[1024];
@@ -1046,16 +1103,28 @@ void MondisServer::replicaToSlave(MondisClient *client, unsigned long long slave
         isPropagating = true;
         vector<string> commands(replicaCommandBuffer->begin() + (replicaOffset - start), replicaCommandBuffer->end());
         replicaCommandPropagate(commands, client);
-        isPropagating = false;
-        propagateCV.notify_all();
     } else {
         isPropagating = true;
         vector<string> commands(replicaCommandBuffer->begin() + (replicaOffset - slaveReplicaOffset),
                                 replicaCommandBuffer->end());
         replicaCommandPropagate(commands, client);
-        isPropagating = false;
-        propagateCV.notify_all();
     }
+    string finished = "SYNC_FINISHED ";
+    finished += to_string(client->id);
+    client->send(finished);
+
+    string newPeer = "NEW_PEER ";
+    newPeer += client->ip;
+    newPeer += " ";
+    newPeer += to_string(client->port);
+
+    for (auto &kv:idToPeers) {
+        if (kv.second != client) {
+            kv.second->send(newPeer);
+        }
+    }
+    isPropagating = false;
+    propagateCV.notify_all();
 }
 
 void MondisServer::singleCommandPropagate() {
@@ -1156,6 +1225,7 @@ void MondisServer::initStaticMember() {
     ADD(controlCommands, ASK_FOR_VOTE)
     ADD(controlCommands, MASTER_DEAD)
     ADD(controlCommands, I_AM_NEW_MASTER)
+    ADD(controlCommands, UPDATE_OFFSET)
 }
 
 string MondisServer::readFromMaster() {
@@ -1230,7 +1300,7 @@ void MondisServer::closeClient(MondisClient *client) {
         FD_CLR(client->sock, &clientFds);
         nameToClients.erase(nameToClients.find(client->name));
     } else if (client->type == SLAVE) {
-        FD_CLR(client->sock, &slaveFds);
+        FD_CLR(client->sock, &peerFds);
         idToPeers.erase(idToPeers.find(client->id));
     }
     socketToClient.erase(socketToClient.find(&client->sock));
@@ -1487,4 +1557,11 @@ unsigned MondisServer::nextPeerId() {
 string MondisServer::nextDefaultClientName() {
     string prefix = "client_";
     return prefix + to_string(++curClientId);
+}
+
+void MondisServer::askForVote() {
+    this_thread::sleep_for(chrono::milliseconds(abs(rand() % maxVoteIdle)));
+    for (auto &kv:idToPeers) {
+        kv.second->send("ASK_FOR_VOTE");
+    }
 }

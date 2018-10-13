@@ -292,6 +292,7 @@ void Command::init() {
     MAP(DISCARD)
     MAP(WATCH)
     MAP(UNWATCH)
+    MAP(UPDATE_OFFSET)
 }
 
 std::unordered_map<std::string, ExecutionResultType> ExecutionResult::strToType;

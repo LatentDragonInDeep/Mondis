@@ -162,7 +162,7 @@ private:
     MondisClient *master = nullptr;
 #ifdef WIN32
     fd_set clientFds;
-    fd_set slaveFds;
+    fd_set peerFds;
     unordered_map<SOCKET *, MondisClient *> socketToClient;
 
     void send(SOCKET &sock, const string &res) {
@@ -236,6 +236,7 @@ private:
     }
 #endif
 public:
+    unsigned id;
     CommandInterpreter *interpreter;
 
     MondisServer();
@@ -349,6 +350,14 @@ private:
     static unsigned nextPeerId();
 
     static string nextDefaultClientName();
+
+    unsigned voteNum = 0;
+
+    thread *forVote = nullptr;
+
+    void askForVote();
+
+    const unsigned maxVoteIdle = 10000;
 };
 
 enum ClientType {
@@ -378,7 +387,7 @@ public:
     time_t lastinteraction; /* Time of the last interaction, used for timeout */
 
     string ip;
-    string port;
+    int port;
 
     clock_t preInteraction = clock();
 

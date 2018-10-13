@@ -167,7 +167,7 @@ enum CommandType {
     UNVOTE,
     MASTER_DEAD,
     I_AM_NEW_MASTER,
-
+    UPDATE_OFFSET,
 };
 
 enum ExecutionResultType {

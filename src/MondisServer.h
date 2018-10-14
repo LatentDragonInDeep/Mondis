@@ -20,6 +20,7 @@
 #ifdef WIN32
 
 #include <winsock2.h>
+#include <winsock.h>
 #include <inaddr.h>
 #include <stdio.h>
 
@@ -144,8 +145,10 @@ private:
     static void initStaticMember();
 
     bool isPropagating = false;
-    condition_variable propagateCV;
-    mutex propagateMtx;
+    condition_variable redirectCV;
+    mutex redirectMtx;
+
+    bool isRedirecting = false;
 
     queue<string> *commandPropagateBuffer;
     
@@ -180,10 +183,13 @@ private:
         string res;
         char buffer[4096];
         int ret;
-        while ((ret = recv(sock, buffer, sizeof(buffer), 0)) != 0) {
+        while (true) {
+            ret = recv(sock, buffer, sizeof(buffer), 0);
+            if (ret == SOCKET_ERROR) {
+                return res;
+            }
             res += string(buffer, ret);
         }
-        return res;
     };
 
     void selectAndHandle(fd_set *fds) {
@@ -303,7 +309,7 @@ private:
 
     void sendToMaster(const string &res);
 
-    string readFromMaster();
+    string readFromMaster(bool isBlocking);
 
     void replicaToSlave(MondisClient *client, long long slaveReplicaOffset);
 
@@ -320,7 +326,7 @@ private:
 
     MondisClient *self = nullptr;
 
-    void checkAndHandleIdleClient();
+    void checkAndHandleIdleConnection();
 
     void closeClient(MondisClient *c);
 
@@ -367,9 +373,8 @@ private:
 
 enum ClientType {
     MASTER,
-    SLAVE,
-    CLIENT,
     PEER,
+    CLIENT,
     SERVER_SELF,
 };
 

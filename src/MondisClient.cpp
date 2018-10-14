@@ -32,7 +32,7 @@ string MondisClient::readCommand() {
         commandStr += string(buffer, ret);
     }
 #elif defined(linux)
-    while ((ret = read(fd, buffer, sizeof(buffer))) != 0) {
+    while ((ret = ::read(fd, buffer, sizeof(buffer))) != 0) {
         commandStr += string(buffer, ret);
     }
 #endif

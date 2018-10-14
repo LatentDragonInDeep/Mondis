@@ -5,19 +5,22 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <thread>
+#include <random>
 
 #ifdef WIN32
 
 #include <winsock2.h>
 #include <inaddr.h>
 #include <stdio.h>
-#include <random>
 
 #elif defined(linux)
 #include <sys/socket.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/epoll.h>
+#include <netdb.h>
+#include <arpa/inet.h>
+
 #endif
 
 #include "Command.h"
@@ -195,7 +198,7 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
                 FD_CLR(client->sock, &clientFds);
                 socketToClient.erase(socketToClient.find(&client->sock));
 #elif defined(linux)
-                epoll_ctl(clientFd,EPOLL_CTL_DEL,client->fd);
+                epoll_ctl(clientsEpollFd,EPOLL_CTL_DEL,client->fd, nullptr);
                 fdToClient.erase(fdToClient.find(client->fd));
 #endif
                 delete client;
@@ -205,8 +208,8 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             FD_CLR(client->sock, &clientFds);
             FD_SET(client->sock, &peerFds);
 #elif defined(linux)
-            epoll_ctl(clientFd,EPOLL_CTL_DEL,client->fd);
-            epoll_ctl(slaveFd,EPOLL_CTL_ADD,client->fd);
+            epoll_ctl(clientsEpollFd,EPOLL_CTL_DEL,client->fd, nullptr);
+            epoll_ctl(peersEpollFd,EPOLL_CTL_ADD,client->fd, nullptr);
 
 #endif
             CHECK_PARAM_NUM(1)
@@ -398,13 +401,15 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
                 FD_CLR(client->sock, &clientFds);
                 socketToClient.erase(socketToClient.find(&client->sock));
 #elif defined(linux)
-                epoll_ctl(clientFd,EPOLL_CTL_DEL,client->fd);
+                epoll_ctl(clientsEpollFd,EPOLL_CTL_DEL,client->fd, nullptr);
                 fdToClient.erase(fdToClient.find(client->fd));
 #endif
                 delete client;
             }
             client->type = CLIENT;
             nameToClients[nextDefaultClientName()] = client;
+            lock_guard<mutex> g(hasClientMtx);
+            hasClientCV.notify_all();
             OK_AND_RETURN
         }
         case MASTER_INVITE: {
@@ -418,8 +423,10 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
                 FD_CLR(client->sock, &clientFds);
                 FD_SET(client->sock, &peerFds);
 #elif defined(linux)
-                epoll_ctl(clientFd,EPOLL_CTL_DEL,client->fd);
-                epoll_ctl(peerFd,EPOLL_CTL_ADD,client->fd);
+                epoll_event event;
+                event.events =
+                epoll_ctl(clientsEpollFd,EPOLL_CTL_DEL,client->fd, nullptr);
+                epoll_ctl(peersEpollFd,EPOLL_CTL_ADD,client->fd,&listenEvent);
 #endif
                 idToPeers[atoi(PARAM(2).c_str())] = client;
                 res.needSend = false;
@@ -469,7 +476,7 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
 #ifdef WIN32
             FD_CLR(client->sock, &peerFds);
 #elif defined(linux)
-            epoll_ctl(clientFd,EPOLL_CTL_DEL,client->fd);
+            epoll_ctl(clientsEpollFd,EPOLL_CTL_DEL,client->fd, nullptr);
 #endif
             isVoting = false;
             hasVoteFor = true;
@@ -728,7 +735,6 @@ void MondisServer::runAsDaemon() {
      /* 改变工作目录和文件掩码常量 */
      chdir("/");
      umask(0);
-     return 0;
 #endif
 }
 
@@ -842,7 +848,7 @@ void MondisServer::save(string &jsonFile, int dbIndex) {
     int pid = fork();
     if(pid == 0) {
         ofstream out(jsonFile + "2");
-        out << curKeySpace->getJson();
+        out << dbs[dbIndex]->getJson();
         out.flush();
         remove(jsonFile.c_str());
         out.close();
@@ -1005,11 +1011,11 @@ void MondisServer::init() {
     std::thread checkAndHandle(&MondisServer::checkAndHandleIdleConnection, this);
     //向客户端发心跳包
     sendHeartBeatToClients = new std::thread([&]() {
+        unique_lock<std::mutex> lck(hasClientMtx);
         while (true) {
-            if (nameToClients.size() == 0) {
-                unique_lock lck(hasClientMtx);
-                hasClientCV.wait(lck);
-            }
+            hasClientCV.wait(lck,[=]()-> bool{
+                return nameToClients.size()!=0;
+            });
             for (auto &kv:nameToClients) {
                 kv.second->send("PING");
             }
@@ -1038,7 +1044,7 @@ void MondisServer::acceptSocket() {
     while (true) {
         sockaddr_in remoteAddr;
         int len = sizeof(remoteAddr);
-        SOCKET clientSock = accept(servSock, (SOCKADDR *) &remoteAddr, &len);
+        SOCKET clientSock = accept(servSock, (SOCKADDR *)nullptr, nullptr);
         MondisClient *client = new MondisClient(clientSock);
         unsigned long iMode = 0;
         ioctlsocket(clientSock, FIONBIO, &iMode);
@@ -1048,33 +1054,28 @@ void MondisServer::acceptSocket() {
         client->port = ntohs(remoteAddr.sin_port);
         socketToClient[&client->sock] = client;
         FD_SET(clientSock, &clientFds);
-        hasClientCV.notify_all();
     }
 #elif defined(linux)
     int socket_fd;
-    int connect_fd;
-    struct sockaddr_in servaddr;
+    int clientFd;
+    sockaddr_in servaddr;
     servaddr.sin_family = PF_INET;
     servaddr.sin_addr.s_addr = htonl(atoi("127.0.0.1"));
     servaddr.sin_port = htons(port);
     socket_fd = socket(AF_INET,SOCK_STREAM,0);
-    int flags = fcntl(socket_fd, F_GETFL, 0);
-    fcntl(socket_fd,F_SETFL,flags|O_NONBLOCK);
-    bind(socket_fd,(sockaddr*)&servaddr, sizeof(servaddr));
     listen(socket_fd,10);
     while (true) {
         sockaddr_in clientAddr;
-        int len = sizeof(clientAddr);
-        connect_fd = accept(socket_fd, (struct sockaddr*)clientAddr, &len);
-        string auth = read(clientSock);
-        MondisClient *client = new MondisClient(clientSock);
-        getsockname(connect_fd,(sockaddr*)&clientAddr,&len);
+        socklen_t len = sizeof(clientAddr);
+        clientFd = accept(socket_fd, (sockaddr*)&clientAddr,&len);
+        MondisClient *client = new MondisClient(clientFd);
+        ::getsockname(clientFd,(sockaddr*)&clientAddr,&len);
         client->ip = inet_ntoa(clientAddr.sin_addr);
         client->port=ntohs(clientAddr.sin_port);
-        fcntl(connect_fd,F_SETFL,O_NONBLOCK);
-        fdToClient[connect_fd] = client;
-        epoll_ctl(clientFd,EPOLL_CTL_ADD,connect_fd);
-        hasClientCV.notify_all();
+        int flags = fcntl(clientFd, F_GETFL, 0);
+        fcntl(clientFd,F_SETFL,flags|O_NONBLOCK);
+        fdToClient[clientFd] = client;
+        epoll_ctl(clientFd,EPOLL_CTL_ADD,clientFd,&listenEvent);
     }
 #endif
 }
@@ -1096,8 +1097,9 @@ MondisServer::MondisServer() {
 #elif defined(linux)
     clientsEpollFd = epoll_create(1024);
     clientEvents = new epoll_event[1024];
-    slavesEpollFd = epoll_create(1024);
-    slaveEvents = new epoll_event[1024];
+    peersEpollFd = epoll_create(1024);
+    peerEvents = new epoll_event[1024];
+    listenEvent.events = EPOLLET|EPOLLIN;
 #endif
     replicaCommandBuffer = new deque<string>;
     commandPropagateBuffer = new queue<string>;
@@ -1116,7 +1118,7 @@ void MondisServer::sendToMaster(const string &res) {
 MondisServer::~MondisServer() {
 #ifdef linux
     delete[] clientEvents;
-    delete[] slaveEvents;
+    delete[] peerEvents;
 #endif
     delete replicaCommandBuffer;
     delete commandPropagateBuffer;
@@ -1171,7 +1173,7 @@ void MondisServer::replicaToSlave(MondisClient *client, long long slaveReplicaOf
 #ifdef WIN32
         handleSlaves = new std::thread(&MondisServer::selectAndHandle, this, &peerFds);
 #elif defined(linux)
-        handleSlaves = new std::thread(&MondisServer::selectAndHandle,this,slavesEpollFd,slaveEvents);
+        handleSlaves = new std::thread(&MondisServer::selectAndHandle,this,peersEpollFd,peerEvents);
 #endif
     }
     if (propagateIO == nullptr) {
@@ -1376,7 +1378,7 @@ void MondisServer::closeClient(MondisClient *client) {
         epoll_ctl(clientsEpollFd, EPOLL_CTL_DEL, client->fd, nullptr);
         nameToClients.erase(nameToClients.find(client->name));
     } else if(client->type == PEER) {
-        epoll_ctl(slavesEpollFd, EPOLL_CTL_DEL, client->fd, nullptr);
+        epoll_ctl(peersEpollFd, EPOLL_CTL_DEL, client->fd, nullptr);
         idToPeers.erase(idToPeers.find(client->id));
     }
     fdToClient.erase(fdToClient.find(client->fd));
@@ -1583,7 +1585,7 @@ MondisClient *MondisServer::buildConnection(const string &ip, int port) {
     sockaddr_in serAddr;
     serAddr.sin_family = AF_INET;
     serAddr.sin_port = htons((u_int16_t)port);
-    inet_pton(AF_INET,ip.c_str(),&servAddr.sin_addr);
+    inet_pton(AF_INET,ip.c_str(),&serAddr.sin_addr);
     int masterFd;
     if((masterFd = connect(sockfd, (struct sockaddr*)&serAddr, sizeof(serAddr)))<0) {
         return res;

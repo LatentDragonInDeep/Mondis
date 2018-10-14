@@ -208,9 +208,10 @@ private:
     }
 #elif defined(linux)
     int clientsEpollFd;
-    int slavesEpollFd;
+    int peersEpollFd;
     epoll_event* clientEvents;
-    epoll_event* slaveEvents;
+    epoll_event* peerEvents;
+    struct epoll_event listenEvent;
     unordered_map<int,MondisClient*> fdToClient;
     void send(int fd, const string& data) {
         char buffer[4096];

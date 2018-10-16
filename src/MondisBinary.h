@@ -35,8 +35,6 @@ public:
 
     char get(unsigned i);
 
-    void put(unsigned i, char data);
-
     unsigned read(unsigned length, char *buffer);
 
     unsigned write(unsigned length,char *buffer);

@@ -32,6 +32,7 @@
 #include "HashMap.h"
 #include "Command.h"
 #include "JSONParser.h"
+#include "SplayTree.h"
 
 class Log{
 private:
@@ -91,10 +92,9 @@ public:
 
 class MondisServer {
 private:
-    int maxCilentNum = 1024;
+    int maxClientNum = 1024;
     int maxCommandReplicaBufferSize = 1024 * 1024;
     int maxCommandPropagateBufferSize = 1024;
-    int maxUndoCommandBufferSize = 1024;
     int maxSlaveNum = 1024;
     int maxSlaveIdle = 10000;
     int maxMasterIdle = 10000;
@@ -104,7 +104,6 @@ private:
 
     pid_t pid;
     std::string configfile;
-    std::string executable;
     int port = 6379;
     int databaseNum = 16;
     bool aof = true;
@@ -234,7 +233,7 @@ private:
     };
     void selectAndHandle(int epollFd,epoll_event* events) {
         while (true) {
-            int nfds = epoll_wait(epollFd, events, maxCilentNum, -1);
+            int nfds = epoll_wait(epollFd, events, maxClientNum, -1);
             for(int i=0;i<nfds;i++) {
                 MondisClient* client = fdToClient[events[i].data.fd];
                 handleCommand(client);
@@ -334,7 +333,7 @@ private:
     thread *recvFromMaster = nullptr;
     thread *sendHeartBeatToSlaves = nullptr;
     thread *sendHeartBeatToClients = nullptr;
-    thread *handleSlaves = nullptr;
+    thread *recvFromSlaves = nullptr;
     thread *propagateIO = nullptr;
 
     condition_variable hasClientCV;

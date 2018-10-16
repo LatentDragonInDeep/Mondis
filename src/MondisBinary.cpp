@@ -26,11 +26,6 @@ char MondisBinary::get(unsigned i) {
     return heapBuffer[i];
 }
 
-void MondisBinary::put(unsigned i, char data) {
-    heapBuffer[i] = data;
-    modified();
-}
-
 unsigned MondisBinary::read(unsigned length, char *buffer) {
     if(position>=capacity) {
         return 0;
@@ -138,48 +133,6 @@ ExecutionResult MondisBinary::execute(Command *command) {
             res.res += heapBuffer[pos];
             OK_AND_RETURN
         }
-        case SET_RANGE: {
-            CHECK_PARAM_NUM(3)
-            CHECK_PARAM_TYPE(0, PLAIN);
-            CHECK_PARAM_TYPE(1, PLAIN);
-            CHECK_PARAM_TYPE(2, STRING);
-            CHECK_AND_DEFINE_INT_LEGAL(0, start)
-            CHECK_AND_DEFINE_INT_LEGAL(1, end)
-            if (start < 0 || end > capacity || start >= end) {
-                res.res = "read or write out of range";
-                LOGIC_ERROR_AND_RETURN
-            }
-            if (PARAM(2).size() < end - start) {
-                res.res = "data length too shrot!";
-                LOGIC_ERROR_AND_RETURN
-            }
-            memcpy(heapBuffer + start, (*command)[2].content.data(), end - start);
-            modified();
-            OK_AND_RETURN
-        }
-        case GET_RANGE: {
-            if (command->params.size() == 1) {
-                CHECK_PARAM_TYPE(0, PLAIN);
-                CHECK_AND_DEFINE_INT_LEGAL(0, start)
-                if (start < 0) {
-                    res.res = "read or write out of range";
-                    LOGIC_ERROR_AND_RETURN
-                }
-                res.res = string(heapBuffer + start, capacity - start);
-                OK_AND_RETURN
-            }
-            CHECK_PARAM_NUM(2)
-            CHECK_PARAM_TYPE(0, PLAIN);
-            CHECK_PARAM_TYPE(1, PLAIN);
-            CHECK_AND_DEFINE_INT_LEGAL(0, start)
-            CHECK_AND_DEFINE_INT_LEGAL(1, end)
-            if (start < 0 || end > capacity || start > end) {
-                res.res = "read or write out of range";
-                LOGIC_ERROR_AND_RETURN
-            }
-            res.res = string(heapBuffer + start, end - start);
-            OK_AND_RETURN
-        }
         case READ_CHAR: {
             READ_TYPE(char)
         }
@@ -195,7 +148,7 @@ ExecutionResult MondisBinary::execute(Command *command) {
         case READ_LONG_LONG: {
             READ_TYPE(long long)
         }
-        case BACK: {
+        case BACKWARD: {
             CHECK_PARAM_NUM(1)
             CHECK_PARAM_TYPE(0, PLAIN)
             CHECK_AND_DEFINE_INT_LEGAL(0, off)
@@ -210,19 +163,39 @@ ExecutionResult MondisBinary::execute(Command *command) {
             OK_AND_RETURN
         }
         case READ: {
-            CHECK_PARAM_NUM(1)
-            CHECK_PARAM_TYPE(0, PLAIN)
-            CHECK_AND_DEFINE_INT_LEGAL(0, readable)
-            char *buffer = new char[readable];
-            readable = read(readable, buffer);
-            res.res = string(buffer, readable);
-            delete[] buffer;
-            OK_AND_RETURN
+            if (command->params.size() == 0) {
+                char *buffer = new char[capacity - position];
+                read(capacity - position, buffer);
+                res.res = string(buffer, capacity - position);
+                delete[] buffer;
+                OK_AND_RETURN
+            } else if (command->params.size() == 1) {
+                CHECK_PARAM_TYPE(0, PLAIN)
+                CHECK_AND_DEFINE_INT_LEGAL(0, readable)
+                char *buffer = new char[readable];
+                readable = read(readable, buffer);
+                res.res = string(buffer, readable);
+                delete[] buffer;
+                OK_AND_RETURN
+            } else {
+                res.res = "argument num error!";
+                LOGIC_ERROR_AND_RETURN
+            }
         }
         case WRITE: {
-            CHECK_PARAM_NUM(1)
-            CHECK_PARAM_TYPE(0, STRING)
-            write((*command)[0].content.size(), (*command)[0].content.data());
+            CHECK_PARAM_NUM(2)
+            CHECK_PARAM_TYPE(0, PLAIN)
+            CHECK_PARAM_TYPE(1, STRING)
+            CHECK_AND_DEFINE_INT_LEGAL(0, length);
+            if (length < 0) {
+                res.res = "length under zero!";
+                LOGIC_ERROR_AND_RETURN
+            }
+            if (length > PARAM(0).size()) {
+                res.res = "data length is too short!";
+                LOGIC_ERROR_AND_RETURN
+            }
+            write(length, PARAM(0).data());
             modified();
             OK_AND_RETURN
         }
@@ -233,7 +206,7 @@ ExecutionResult MondisBinary::execute(Command *command) {
             setPosition(pos);
             OK_AND_RETURN
         }
-        case CHECK_POS: {
+        case GET_POS: {
             CHECK_PARAM_NUM(0)
             res.res = to_string(position);
             OK_AND_RETURN

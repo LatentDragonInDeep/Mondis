@@ -17,8 +17,6 @@
 
 #define MAP(TYPE) typeToStr[TYPE] = #TYPE;
 
-#define INSERT(TYPE) controlCommands.insert(CommandType::TYPE);
-
 #define CHECK_PARAM_NUM(x) if(command->params.size()!=x) {\
                              res.type = SYNTAX_ERROR;\
                              res.res = "arguments num error";\
@@ -103,7 +101,9 @@ enum CommandType {
     DECR,
     INCR_BY,
     DECR_BY,
-    APPEND,
+    INSERT, \
+    FRONT,
+    BACK,
     PUSH_FRONT,
     PUSH_BACK,
     POP_FRONT,
@@ -117,25 +117,26 @@ enum CommandType {
     REMOVE_RANGE_BY_RANK,
     REMOVE_RANGE_BY_SCORE,
     COUNT_RANGE,
+    RANK_TO_SCORE,
+    SCORE_TO_RANK,
     GET_BY_RANK,
     GET_BY_SCORE,
     GET_RANGE_BY_RANK,
     GET_RANGE_BY_SCORE,
-    PERSIST,
     READ_FROM,
     READ_CHAR,
     READ_SHORT,
     READ_INT,
     READ_LONG,
     READ_LONG_LONG,
-    BACK,
+    BACKWARD,
     FORWARD,
     SET_POS,
     READ,
     WRITE,
     TO_STRING,
     TO_INTEGER,
-    CHECK_POS,
+    GET_POS,
     CHANGE_SCORE,
     LOCATE,
     SAVE,
@@ -300,9 +301,6 @@ private:
         Token nextToken();
 
     };
-
-    Token pre;
-    LexicalParser* parser;
     static std::unordered_map<std::string,CommandType> map;
 public:
     static void init();
@@ -314,11 +312,11 @@ public:
 class MultiCommand {
 public:
     Command *locateCommand = nullptr;
-    std::vector<Command *> modifies;
+    std::vector<Command *> operations;
 
     ~MultiCommand() {
         Command::destroyCommand(locateCommand);
-        for (auto c:modifies) {
+        for (auto c:operations) {
             delete c;
         }
     }

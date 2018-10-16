@@ -34,50 +34,14 @@ public:
         SplayTree* tree;
         SplayTreeNode* cur;
         stack<SplayTreeNode*> s;
-        void dfs(SplayTreeNode* cur) {
-            while (cur!= nullptr) {
-                s.push(cur);
-                cur=cur->left;
-            }
-        }
-    public:
-        SplayIterator(SplayTree* avlTree):tree(avlTree),cur(avlTree->root)
-        {
-            dfs(cur);
-        }
-        SplayTreeNode* operator->() {
-            return cur;
-        };
 
-        bool next() {
-            if(s.empty())
-            {
-                return false;
-            }
-            cur = s.top();
-            s.pop();
-            while (true) {
-                if (cur == tree->head) {
-                    dfs(cur->right);
-                    if (s.empty()) {
-                        return false;
-                    }
-                    cur = s.top();
-                    s.pop();
-                    continue;
-                } else if (cur == tree->tail) {
-                    if (s.empty()) {
-                        return false;
-                    }
-                    cur = s.top();
-                    s.pop();
-                    break;
-                }
-                break;
-            }
-            dfs(cur->right);
-            return true;
-        }
+        void dfs(SplayTreeNode *cur);
+    public:
+        SplayIterator(SplayTree *avlTree);
+
+        SplayTreeNode *operator->();;
+
+        bool next();
     };
     SplayTree();
     ~SplayTree();
@@ -86,10 +50,10 @@ public:
     bool removeByRank(int rank);
     MondisObject* getByScore(int score);
     MondisObject* getByRank(int rank);
-
-private:
     MondisObject* getByRank(SplayTreeNode* root,int rank);
     SplayTreeNode* getNodeByRank(SplayTreeNode* root,int rank);
+
+    SplayTreeNode *getNodeByRank(int rank);
     SplayTreeNode* getNodeByScore(int score);
     bool remove(SplayTreeNode* target);
 public:
@@ -109,6 +73,10 @@ public:
 
     MondisObject *locate(Command *command);
 
+    SplayTreeNode *getLowerBound(int score, bool canEqual);
+
+    SplayTreeNode *getUpperBound(int score, bool canEqual);
+
 private:
     void splay(SplayTreeNode *cur, SplayTreeNode *target);
     void sizeUpdate(SplayTreeNode* cur, int delta);
@@ -121,8 +89,6 @@ private:
     SplayTreeNode* getSuccessor(SplayTreeNode* root);
     SplayTreeNode* getPredecessor(SplayTreeNode* root);
     void inOrderTraversal(SplayTreeNode* root,vector<MondisObject*>* res);
-    SplayTreeNode *getLowerBound(int score);
-    SplayTreeNode *getUpperBound(int score);
 };
 
 

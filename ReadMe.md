@@ -166,8 +166,8 @@ string命令分为两大类，有些只能在RAW_INT上执行，有些可以在R
 将从start到end的子串设为new。从new的第一个字符开始设置，多余的部分会被截断。
 ### strlen
 返回该字符串的长度
-### append [new]
-将new添加到原来字符串的末尾。
+### insert &lt;location&gt; [new]
+将new插入到原来字符串第location个字符之前。
 ##RAW_INT命令
 ### incr
 值加一。
@@ -185,13 +185,6 @@ string命令分为两大类，有些只能在RAW_INT上执行，有些可以在R
 返回position处的字符。
 ### set &lt;position&gt; [char]
 设置position处的字符为char。char的长度必须为1。
-### get_range &lt;start&gt; &lt;end&gt;
-获得从start到end的子数组的字符串表示，包括start处的字符不包括end。
-###set_range &lt;start&gt; [new]
-将从start开始长度等于new的子数组设为new。从new的第一个字符开始设置,如果new的长度大于从start开始到
-结尾的子串，new多余的部分会被截断。
-### set_range &lt;start&gt; &lt;end&gt; [new]
-将从start到end的子数组设为new。从new的第一个字符开始设置，多余的部分会被截断。
 ### set_position &lt;pos&gt;
 将当前读写指针设为pos。
 ### forward &lt;increment&gt;
@@ -211,7 +204,7 @@ read系列命令在剩余长度小于想要读取的长度时，会读到末尾�
 ### read_long_long
 从当前读写指针读十六个字节
 ### read &lt;length&gt;
-从当前读写指针读length个字节
+从当前读写指针读length个字节。如果省略参数，会一次性读完剩下所有字节。
 ### write &lt;length&gt; [data]
 从当前读写指针开始从data里面读取length个字节长度的数据到binary里面。data的长度必须大于等于length，
 如果剩余可读区间小于length，则length多余的部分会被截断。
@@ -225,6 +218,10 @@ read系列命令在剩余长度小于想要读取的长度时，会读到末尾�
 获取list的第index个元素
 ### size
 返回list中元素数量
+### front
+获取第一个元素，不弹出
+### back
+获取最后一个元素，不弹出
 ### push_front [data]
 将data添加到list开头
 ### push_back [data]
@@ -271,6 +268,10 @@ read系列命令在剩余长度小于想要读取的长度时，会读到末尾�
 返回zset中元素数量
 ### change &lt;old&gt; &lt;new&gt;
 将分数为old的元素的分数变为new。如果分数为old的元素不存在，或者分数为new的元素已存在，则出错。
+### score_to_rank &lt;score&gt;
+获得分数为score的元素对应的名次，如果没有这样的元素，则出错。
+### rank_to_score &lt;score&gt;
+获得排名为rank的元素的分数。
 
 ## hash命令
 ### set &lt;key&gt; [value]
@@ -401,7 +402,7 @@ canUndoNotInTransaction选项才发挥作用。默认为1024
 ## autoMoveCommandToMaster=&lt;true|false&gt;
 当前服务器为从服务器时，是否自动将客户端的写命令转发到主服务器，如果为false将丢弃这条命令并返回一个错误。默认为true。
 
-## forbidOtherModifyInTransaction=<true|false>
+## forbidOtherModifyInTransaction=&lt;true|false&gt;
 当事务a监控了键key，事务b修改key时是否阻止。如果开启此选项，事务b的修改将会被丢弃并返回一个错误。默认为false。
 # 写命令清单
 ## BIND
@@ -413,7 +414,7 @@ canUndoNotInTransaction选项才发挥作用。默认为1024
 ## DECR
 ## INCR_BY
 ## DECR_BY
-## APPEND
+## INSERT
 ## PUSH_FRONT
 ## PUSH_BACK
 ## POP_FRONT

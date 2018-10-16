@@ -119,12 +119,13 @@ ExecutionResult MondisClient::commitTransaction(MondisServer *server) {
         transactionCommands->pop();
         Command *command = server->interpreter->getCommand(next);
         CommandStruct cstruct = server->getCommandStruct(command, this);
+        MultiCommand *undo = server->getUndoCommand(cstruct, this);
         ExecutionResult res = server->transactionExecute(cstruct, this);
         if (res.type != OK) {
             while (hasExecutedCommandNumInTransaction > 0) {
-                MultiCommand *undo = undoCommands->back();
+                MultiCommand *un = undoCommands->back();
                 undoCommands->pop_back();
-                server->undoExecute(undo, this);
+                server->undoExecute(un, this);
             }
             res.res = "error in executing the command ";
             res.res += next;
@@ -136,7 +137,7 @@ ExecutionResult MondisClient::commitTransaction(MondisServer *server) {
         send(res.toString());
         server->incrReplicaOffset();
         server->putToPropagateBuffer(next);
-        undoCommands->push_back(server->getUndoCommand(cstruct, this));
+        undoCommands->push_back(undo);
         hasExecutedCommandNumInTransaction++;
     }
     for (auto &c:aofBuffer) {

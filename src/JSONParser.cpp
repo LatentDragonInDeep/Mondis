@@ -90,7 +90,7 @@ MondisObject *JSONParser::parseObject(LexicalParser &lp) {
                 MondisBinary *binary = MondisBinary::allocate(next.content.size() - 12);
                 binary->write(next.content.size() - 12, next.content.data() + 12);
                 binary->setPosition(0);
-                res->objectData = (void*)binary;
+                res->objData = (void *) binary;
                 return res;
             }
         }
@@ -99,12 +99,12 @@ MondisObject *JSONParser::parseObject(LexicalParser &lp) {
         bool to = util::toInteger(next.content, *data);
         if (!to) {
             res->type = RAW_STRING;
-            res->objectData = (void *) new string(next.content);
+            res->objData = (void *) new string(next.content);
             delete data;
             return res;
         }
         res->type = RAW_INT;
-        res->objectData = (void*)data;
+        res->objData = (void *) data;
         return res;
     } else {
         lp.back();
@@ -128,7 +128,7 @@ MondisObject *JSONParser::parseJSONObject(LexicalParser &lp, bool isNeedNext, bo
         }
         tree->insert(new KeyValue(cur.key, cur.value));
     }
-    res->objectData = (void*)tree;
+    res->objData = (void *) tree;
     matchToken(lp, RIGHT_ANGLE_BRACKET);
     return res;
 }
@@ -145,7 +145,7 @@ MondisObject *JSONParser::parseJSONArray(LexicalParser &lp, bool isNeedNext) {
                 list:
                 res->type = LIST;
                 MondisList *data = new MondisList;
-                res->objectData = data;
+                res->objData = data;
                 MondisObject *cur = nullptr;
                 while (true) {
                     cur = parseObject(lp);
@@ -161,7 +161,7 @@ MondisObject *JSONParser::parseJSONArray(LexicalParser &lp, bool isNeedNext) {
             } else if (first->getJson() == "\"SET\"") {
                 res->type = SET;
                 HashMap *data = new HashMap(true, true);
-                res->objectData = data;
+                res->objData = data;
                 MondisObject *cur = nullptr;
                 while (true) {
                     cur = parseObject(lp);
@@ -182,7 +182,7 @@ MondisObject *JSONParser::parseJSONArray(LexicalParser &lp, bool isNeedNext) {
             } else if (first->getJson() == "\"ZSET\"") {
                 res->type = ZSET;
                 SplayTree *data = new SplayTree;
-                res->objectData = data;
+                res->objData = data;
                 MondisObject *cur = nullptr;
                 MondisObject *next = nullptr;
                 while (true) {
@@ -209,7 +209,7 @@ MondisObject *JSONParser::parseJSONArray(LexicalParser &lp, bool isNeedNext) {
 
     } else {
         res->type = LIST;
-        res->objectData = new MondisList;
+        res->objData = new MondisList;
         return res;
     }
 }
@@ -243,7 +243,7 @@ void JSONParser::parseAll(std::vector<HashMap *> &dbs) {
             break;
         }
         int dbIndex = cur.key->intValue;
-        AVLTree *tree = (AVLTree *) cur.value->objectData;
+        AVLTree *tree = (AVLTree *) cur.value->objData;
         AVLTree::AVLIterator iter = tree->iterator();
         while (iter.next()) {
             dbs[dbIndex]->put(iter->data->key, iter->data->value);

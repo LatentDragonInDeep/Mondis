@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include <thread>
 #include <random>
+#include <memory>
 
 #ifdef WIN32
 
@@ -31,9 +32,12 @@
 #define ERROR_EXIT(MESSAGE) cout<<MESSAGE;\
                             exit(1);
 
-#define ADD_AND_RETURN(RES, UNDO) RES->modifies.push_back(UNDO);\
+#define ADD_AND_RETURN(RES, UNDO) RES->operations.push_back(UNDO);\
                                 return RES;
 #define TO_FULL_KEY_NAME(DBINDEX, KEY) to_string(DBINDEX)+"_"+KEY
+
+#define PARAM_TYPE_STRING Command::ParamType::STRING
+#define PARAM_TYPE_PLAIN Command::ParamType::PLAIN
 
 unordered_set<CommandType> MondisServer::controlCommands;
 
@@ -393,7 +397,7 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             peer->send(c);
         }
         case IS_CLIENT: {
-            if (nameToClients.size() > maxCilentNum) {
+            if (nameToClients.size() > maxClientNum) {
                 res.type = LOGIC_ERROR;
                 res.res = "can not build connection because has up to max client number!";
                 client->send(res.toString());
@@ -497,11 +501,11 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
 }
 
 MultiCommand *MondisServer::getUndoCommand(CommandStruct &cstruct, MondisClient *client) {
-    //TODO
     MultiCommand *res = new MultiCommand;
     res->locateCommand = cstruct.locate;
+
+    Command *undo = new Command;
     if (cstruct.obj == nullptr) {
-        Command *undo = new Command;
         switch (cstruct.operation->type) {
             case BIND: {
                 TOKEY(cstruct.operation, 0);
@@ -509,7 +513,7 @@ MultiCommand *MondisServer::getUndoCommand(CommandStruct &cstruct, MondisClient 
                 if (original != nullptr) {
                     undo->type = BIND;
                     undo->addParam(RAW_PARAM(cstruct.operation, 0));
-                    undo->addParam(original->getJson(), Command::ParamType::STRING);
+                    undo->addParam(original->getJson(), PARAM_TYPE_STRING);
                 } else {
                     undo->type = DEL;
                     undo->addParam(RAW_PARAM(cstruct.operation, 0));
@@ -524,7 +528,7 @@ MultiCommand *MondisServer::getUndoCommand(CommandStruct &cstruct, MondisClient 
                 }
                 undo->type = BIND;
                 undo->addParam(RAW_PARAM(cstruct.operation, 0));
-                undo->addParam(original->getJson(), Command::ParamType::STRING);
+                undo->addParam(original->getJson(), PARAM_TYPE_STRING);
                 ADD_AND_RETURN(res, undo)
             }
             case RENAME: {
@@ -540,89 +544,200 @@ MultiCommand *MondisServer::getUndoCommand(CommandStruct &cstruct, MondisClient 
             }
             case SELECT: {
                 undo->type = SELECT;
-                undo->addParam(to_string(client->curDbIndex), Command::ParamType::PLAIN);
+                undo->addParam(to_string(client->curDbIndex), PARAM_TYPE_PLAIN);
                 ADD_AND_RETURN(res, undo);
             }
         }
     } else {
+        unique_ptr<Command> assist(new Command);
         switch (cstruct.obj->type) {
             case RAW_STRING: {
                 switch (cstruct.operation->type) {
                     case BIND: {
-
+                        undo->type = BIND;
+                        assist->type = GET;
+                        assist->addParam(RAW_PARAM(cstruct.operation, 0));
+                        undo->addParam(RAW_PARAM(cstruct.operation, 0));
+                        ExecutionResult temp = cstruct.obj->execute(assist.get());
+                        undo->addParam(temp.res, PARAM_TYPE_STRING);
+                        ADD_AND_RETURN(res, undo);
                     }
                     case SET_RANGE: {
-
+                        undo->type = SET_RANGE;
+                        assist->type = GET_RANGE;
+                        if (cstruct.operation->params.size() == 1) {
+                            undo->addParam(RAW_PARAM(cstruct.operation, 0));
+                            assist->addParam(RAW_PARAM(cstruct.operation, 0));
+                            ExecutionResult temp = cstruct.obj->execute(assist.get());
+                            undo->addParam(temp.res, PARAM_TYPE_STRING);
+                            ADD_AND_RETURN(res, undo)
+                        } else if (cstruct.operation->params.size() == 2) {
+                            undo->addParam(RAW_PARAM(cstruct.operation, 0));
+                            undo->addParam(RAW_PARAM(cstruct.operation, 1));
+                            assist->addParam(RAW_PARAM(cstruct.operation, 0));
+                            assist->addParam(RAW_PARAM(cstruct.operation, 1));
+                            ExecutionResult temp = cstruct.obj->execute(assist.get());
+                            undo->addParam(temp.res, PARAM_TYPE_STRING);
+                            ADD_AND_RETURN(res, undo)
+                        }
+                        return res;
                     }
                     case REMOVE_RANGE: {
-
+                        if (cstruct.operation->params.size() == 1) {
+                            undo->type = INSERT;
+                            assist->type = GET_RANGE;
+                            undo->addParam(RAW_PARAM(cstruct.operation, 0));
+                            assist->addParam(RAW_PARAM(cstruct.operation, 0));
+                            ExecutionResult temp = cstruct.obj->execute(assist.get());
+                            undo->addParam(temp.res, PARAM_TYPE_STRING);
+                            ADD_AND_RETURN(res, undo);
+                        } else if (cstruct.operation->params.size() == 2) {
+                            undo->type = INSERT;
+                            assist->type = GET_RANGE;
+                            undo->addParam(RAW_PARAM(cstruct.operation, 0));
+                            assist->addParam(RAW_PARAM(cstruct.operation, 0));
+                            assist->addParam(RAW_PARAM(cstruct.operation, 1));
+                            ExecutionResult temp = cstruct.obj->execute(assist.get());
+                            undo->addParam(temp.res, PARAM_TYPE_STRING);
+                            ADD_AND_RETURN(res, undo);
+                        }
+                        return res;
                     }
                     case TO_INTEGER: {
-
+                        undo->type = TO_STRING;
+                        ADD_AND_RETURN(res, undo);
                     }
-                    case APPEND: {
-
+                    case INSERT: {
+                        undo->type = REMOVE_RANGE;
+                        undo->addParam(RAW_PARAM(cstruct.operation, 0));
+                        undo->addParam(to_string(atoi(RAW_PARAM(cstruct.operation, 0).content.c_str())
+                                                 + RAW_PARAM(cstruct.operation, 1).content.size()), PARAM_TYPE_PLAIN);
+                        ADD_AND_RETURN(res, undo);
                     }
                 }
             }
             case RAW_INT: {
                 switch (cstruct.operation->type) {
                     case INCR: {
-
+                        undo->type = DECR;
+                        ADD_AND_RETURN(res, undo);
                     }
                     case INCR_BY: {
-
+                        undo->type = DECR_BY;
+                        undo->addParam(RAW_PARAM(cstruct.operation, 0));
+                        ADD_AND_RETURN(res, undo);
                     }
                     case DECR: {
-
+                        undo->type = INCR;
+                        ADD_AND_RETURN(res, undo);
                     }
                     case DECR_BY: {
-
+                        undo->type = INCR_BY;
+                        undo->addParam(RAW_PARAM(cstruct.operation, 0));
+                        ADD_AND_RETURN(res, undo);
                     }
                     case TO_STRING: {
-
+                        undo->type = TO_INTEGER;
+                        ADD_AND_RETURN(res, undo);
                     }
                 }
             }
             case LIST: {
                 switch (cstruct.operation->type) {
                     case POP_FRONT: {
-
+                        assist->type = FRONT;
+                        ExecutionResult temp = cstruct.obj->execute(assist.get());
+                        undo->type = PUSH_FRONT;
+                        undo->addParam(temp.res, PARAM_TYPE_STRING);
+                        ADD_AND_RETURN(res, undo)
                     }
                     case POP_BACK: {
-
+                        assist->type = BACK;
+                        ExecutionResult temp = cstruct.obj->execute(assist.get());
+                        undo->type = PUSH_BACK;
+                        undo->addParam(temp.res, PARAM_TYPE_STRING);
+                        ADD_AND_RETURN(res, undo)
                     }
                     case PUSH_FRONT: {
-
+                        undo->type = POP_FRONT;
+                        ADD_AND_RETURN(res, undo)
                     }
                     case PUSH_BACK: {
-
+                        undo->type = POP_BACK;
+                        ADD_AND_RETURN(res, undo)
                     }
                     case BIND: {
-
+                        assist->type = GET;
+                        assist->addParam(RAW_PARAM(cstruct.operation, 0));
+                        ExecutionResult temp = cstruct.obj->execute(assist.get());
+                        undo->type = BIND;
+                        undo->addParam(RAW_PARAM(cstruct.operation, 0));
+                        if (temp.type = OK) {
+                            undo->addParam(temp.res, PARAM_TYPE_STRING);
+                        }
+                        ADD_AND_RETURN(res, undo);
                     }
                 }
             }
             case SET: {
                 switch (cstruct.operation->type) {
                     case ADD: {
-
+                        undo->type = REMOVE;
+                        undo->addParam(RAW_PARAM(cstruct.operation, 0));
+                        ADD_AND_RETURN(res, undo);
                     }
                     case REMOVE: {
-
+                        assist->type = EXISTS;
+                        assist->addParam(RAW_PARAM(cstruct.operation, 0));
+                        ExecutionResult temp = cstruct.obj->execute(assist.get());
+                        if (temp.res == "true") {
+                            undo->type = ADD;
+                            undo->addParam(RAW_PARAM(cstruct.operation, 0));
+                        }
+                        ADD_AND_RETURN(res, undo);
                     }
                 }
             }
             case RAW_BIN: {
                 switch (cstruct.operation->type) {
                     case BIND: {
-
-                    }
-                    case SET_RANGE: {
-
+                        undo->type = BIND;
+                        assist->type = GET;
+                        assist->addParam(RAW_PARAM(cstruct.operation, 0));
+                        undo->addParam(RAW_PARAM(cstruct.operation, 0));
+                        ExecutionResult temp = cstruct.obj->execute(assist.get());
+                        undo->addParam(temp.res, PARAM_TYPE_STRING);
+                        ADD_AND_RETURN(res, undo);
                     }
                     case WRITE: {
-
+                        assist->type = GET_POS;
+                        ExecutionResult temp1 = cstruct.obj->execute(assist.get());
+                        undo->addParam(temp1.res, PARAM_TYPE_PLAIN);
+                        res->operations.push_back(undo);
+                        assist->type = READ;
+                        ExecutionResult temp2 = cstruct.obj->execute(assist.get());
+                        int length = atoi(RAW_PARAM(cstruct.operation, 0).content.c_str());
+                        Command *undo2 = new Command;
+                        undo2->type = WRITE;
+                        undo2->addParam(to_string(length < temp2.res.size() ? length : temp2.res.size()),
+                                        PARAM_TYPE_PLAIN);
+                        undo2->addParam(temp2.res, PARAM_TYPE_STRING);
+                        ADD_AND_RETURN(res, undo2);
+                    }
+                    case SET_POS:
+                    case READ_CHAR:
+                    case READ_SHORT:
+                    case READ_INT:
+                    case READ_LONG:
+                    case READ_LONG_LONG:
+                    case FORWARD:
+                    case BACKWARD:
+                    case READ: {
+                        assist->type = GET_POS;
+                        ExecutionResult temp = cstruct.obj->execute(assist.get());
+                        undo->type = SET_POS;
+                        undo->addParam(temp.res, PARAM_TYPE_PLAIN);
+                        ADD_AND_RETURN(res, undo)
                     }
                 }
 
@@ -630,32 +745,110 @@ MultiCommand *MondisServer::getUndoCommand(CommandStruct &cstruct, MondisClient 
             case ZSET: {
                 switch (cstruct.operation->type) {
                     case ADD: {
-
+                        undo->type = REMOVE_BY_SCORE;
+                        undo->addParam(RAW_PARAM(cstruct.operation, 0));
+                        ADD_AND_RETURN(res, undo);
                     }
                     case REMOVE_BY_RANK: {
-
+                        assist->type = GET_BY_RANK;
+                        assist->addParam(RAW_PARAM(cstruct.operation, 0));
+                        ExecutionResult temp1 = cstruct.obj->execute(assist.get());
+                        if (temp1.type != OK) {
+                            return res;
+                        }
+                        assist->type = RANK_TO_SCORE;
+                        ExecutionResult temp2 = cstruct.obj->execute(assist.get());
+                        undo->type = ADD;
+                        undo->addParam(temp2.res, PARAM_TYPE_PLAIN);
+                        undo->addParam(temp1.res, PARAM_TYPE_STRING);
+                        ADD_AND_RETURN(res, undo)
                     }
                     case REMOVE_BY_SCORE: {
-
+                        assist->type = GET_BY_SCORE;
+                        assist->addParam(RAW_PARAM(cstruct.operation, 0));
+                        ExecutionResult temp1 = cstruct.obj->execute(assist.get());
+                        if (temp1.type != OK) {
+                            return res;
+                        }
+                        undo->type = ADD;
+                        undo->addParam(RAW_PARAM(cstruct.operation, 0));
+                        undo->addParam(temp1.res, PARAM_TYPE_STRING);
+                        ADD_AND_RETURN(res, undo)
                     }
                     case REMOVE_RANGE_BY_RANK: {
-
+                        SplayTree *tree = (SplayTree *) cstruct.obj->objData;
+                        int rankStart = atoi(RAW_PARAM(cstruct.operation, 0).content.c_str());
+                        int rankEnd = atoi(RAW_PARAM(cstruct.operation, 1).content.c_str());
+                        for (int i = rankStart; i < rankEnd; ++i) {
+                            Command *un = new Command;
+                            SplayTreeNode *node = tree->getNodeByRank(i);
+                            un->type = ADD;
+                            un->addParam(to_string(node->score), PARAM_TYPE_PLAIN);
+                            un->addParam(node->data->getJson(), PARAM_TYPE_STRING);
+                            res->operations.push_back(un);
+                        }
+                        return res;
                     }
                     case REMOVE_RANGE_BY_SCORE: {
+                        SplayTree *tree = (SplayTree *) cstruct.obj->objData;
+                        int scoreStart = atoi(RAW_PARAM(cstruct.operation, 0).content.c_str());
+                        int scoreEnd = atoi(RAW_PARAM(cstruct.operation, 1).content.c_str());
+                        SplayTreeNode *firstNode = tree->getUpperBound(scoreStart, true);
+                        assist->type = SCORE_TO_RANK;
+                        assist->addParam(to_string(firstNode->score), PARAM_TYPE_PLAIN);
+                        ExecutionResult temp1 = cstruct.obj->execute(assist.get());
+                        int rankStart = atoi(temp1.res.c_str());
+                        assist->params.clear();
+                        SplayTreeNode *lastNode = tree->getLowerBound(scoreEnd, true);
+                        assist->type = SCORE_TO_RANK;
+                        assist->addParam(to_string(lastNode->score), PARAM_TYPE_PLAIN);
+                        ExecutionResult temp2 = cstruct.obj->execute(assist.get());
+                        int rankEnd = atoi(temp2.res.c_str());
 
+                        for (int i = rankStart; i < rankEnd; ++i) {
+                            Command *un = new Command;
+                            SplayTreeNode *node = tree->getNodeByScore(i);
+                            un->type = ADD;
+                            un->addParam(to_string(node->score), PARAM_TYPE_PLAIN);
+                            un->addParam(node->data->getJson(), PARAM_TYPE_STRING);
+                            res->operations.push_back(un);
+                        }
+                        return res;
                     }
                     case CHANGE_SCORE: {
-
+                        undo->type = CHANGE_SCORE;
+                        undo->addParam(RAW_PARAM(cstruct.operation, 1));
+                        undo->addParam(RAW_PARAM(cstruct.operation, 0));
+                        ADD_AND_RETURN(res, undo);
                     }
                 }
             }
             case HASH: {
                 switch (cstruct.operation->type) {
                     case BIND: {
-
+                        assist->type = GET;
+                        assist->addParam(RAW_PARAM(cstruct.operation, 0));
+                        ExecutionResult temp = cstruct.obj->execute(assist.get());
+                        if (temp.type == OK) {
+                            undo->type = BIND;
+                            undo->addParam(RAW_PARAM(cstruct.operation, 0));
+                            undo->addParam(temp.res, PARAM_TYPE_STRING);
+                        } else {
+                            undo->type = DEL;
+                            undo->addParam(RAW_PARAM(cstruct.operation, 0));
+                        }
+                        ADD_AND_RETURN(res, undo);
                     }
                     case DEL: {
-
+                        assist->type = GET;
+                        assist->addParam(RAW_PARAM(cstruct.operation, 0));
+                        ExecutionResult temp = cstruct.obj->execute(assist.get());
+                        if (temp.type == OK) {
+                            undo->type = BIND;
+                            undo->addParam(RAW_PARAM(cstruct.operation, 0));
+                            undo->addParam(temp.res, PARAM_TYPE_STRING);
+                        }
+                        ADD_AND_RETURN(res, undo);
                     }
                 }
             }
@@ -815,6 +1008,8 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
         LOGIC_ERROR_AND_RETURN
     }
     if (client->isInTransaction && transactionAboutCommands.find(command->type) == transactionAboutCommands.end()) {
+        Command::destroyCommand(cstruct.operation);
+        Command::destroyCommand(cstruct.locate);
         client->transactionCommands->push(commandStr);
         OK_AND_RETURN
     }
@@ -905,7 +1100,7 @@ void MondisServer::applyConf() {
         } else if (kv.first == "recoveryFile") {
             recoveryFile = kv.second;
         } else if(kv.first == "maxClientNum") {
-            maxCilentNum=atoi(kv.second.c_str());
+            maxClientNum = atoi(kv.second.c_str());
         } else if(kv.first == "maxCommandReplicaBufferSize") {
             maxCommandPropagateBufferSize = atoi(kv.second.c_str());
         } else if(kv.first == "maxCommandPropagateBufferSize" ) {
@@ -1169,11 +1364,11 @@ void MondisServer::replicaToSlave(MondisClient *client, long long slaveReplicaOf
             }
         });
     }
-    if (handleSlaves == nullptr) {
+    if (recvFromSlaves == nullptr) {
 #ifdef WIN32
-        handleSlaves = new std::thread(&MondisServer::selectAndHandle, this, &peerFds);
+        recvFromSlaves = new std::thread(&MondisServer::selectAndHandle, this, &peerFds);
 #elif defined(linux)
-        handleSlaves = new std::thread(&MondisServer::selectAndHandle,this,peersEpollFd,peerEvents);
+        recvFromSlaves = new std::thread(&MondisServer::selectAndHandle,this,peersEpollFd,peerEvents);
 #endif
     }
     if (propagateIO == nullptr) {
@@ -1206,7 +1401,7 @@ void MondisServer::initStaticMember() {
     ADD(modifyCommands, DECR)
     ADD(modifyCommands, INCR_BY)
     ADD(modifyCommands, DECR_BY)
-    ADD(modifyCommands, APPEND)
+    ADD(modifyCommands, INSERT)
     ADD(modifyCommands, PUSH_FRONT)
     ADD(modifyCommands, PUSH_BACK)
     ADD(modifyCommands, POP_FRONT)
@@ -1222,6 +1417,15 @@ void MondisServer::initStaticMember() {
     ADD(modifyCommands, TO_INTEGER)
     ADD(modifyCommands, CHANGE_SCORE)
     ADD(modifyCommands, SELECT)
+    ADD(modifyCommands, SET_POS)
+    ADD(modifyCommands, READ)
+    ADD(modifyCommands, READ_CHAR)
+    ADD(modifyCommands, READ_SHORT)
+    ADD(modifyCommands, READ_INT)
+    ADD(modifyCommands, READ_LONG)
+    ADD(modifyCommands, READ_LONG_LONG)
+    ADD(modifyCommands, FORWARD)
+    ADD(modifyCommands, BACKWARD)
     ADD(transactionAboutCommands, DISCARD)
     ADD(transactionAboutCommands, EXEC)
     ADD(transactionAboutCommands, WATCH)
@@ -1325,11 +1529,11 @@ void MondisServer::checkAndHandleIdleConnection() {
         for (auto &kv:socketToClient) {
             MondisClient *c = kv.second;
             if (c->type == CLIENT) {
-                if (current - c->preInteraction > toClientHeartBeatDuration) {
+                if (current - c->preInteraction > maxClientIdle) {
                     closeClient(c);
                 }
             } else if (c->type == PEER) {
-                if (current - c->preInteraction > toSlaveHeartBeatDuration) {
+                if (current - c->preInteraction > maxSlaveIdle) {
                     closeClient(c);
                 }
             }
@@ -1391,13 +1595,15 @@ void MondisServer::undoExecute(MultiCommand *command, MondisClient *client) {
         return;
     }
     if (command->locateCommand == nullptr) {
-        for (auto m:command->modifies) {
+        for (auto m:command->operations) {
             execute(m, client);
+            Command::destroyCommand(m);
         }
     } else {
         MondisObject *obj = chainLocate(command->locateCommand, client);
-        for (auto m:command->modifies) {
+        for (auto m:command->operations) {
             obj->execute(m);
+            Command::destroyCommand(m);
         }
     }
 }

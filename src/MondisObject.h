@@ -52,7 +52,7 @@ public:
 class MondisObject {
 public:
     MondisObjectType type = MondisObjectType::EMPTY;
-    void * objectData;
+    void *objData;
 
     ~MondisObject();
 private:

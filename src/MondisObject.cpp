@@ -43,17 +43,17 @@ void handleEscapeChar(string &raw) {
 MondisObject::~MondisObject() {
     switch (type) {
         case MondisObjectType::RAW_STRING:
-            delete reinterpret_cast<string *>(objectData);
+            delete reinterpret_cast<string *>(objData);
             break;
         case MondisObjectType::RAW_INT:
-            delete reinterpret_cast<int *>(objectData);
+            delete reinterpret_cast<int *>(objData);
             break;
         case RAW_BIN:
         case LIST:
         case SET:
         case ZSET:
         case HASH:
-            MondisData *data = (MondisData *) (objectData);
+            MondisData *data = (MondisData *) (objData);
             delete data;
             break;
     }
@@ -63,12 +63,12 @@ MondisObject *MondisObject::locate(Command *command) {
     if (type == RAW_INT || type == RAW_STRING || type == RAW_BIN) {
         return nullptr;
     }
-    MondisData *data = (MondisData *) objectData;
+    MondisData *data = (MondisData *) objData;
     return data->locate(command);
 }
 
 ExecutionResult MondisObject::executeString(Command *command) {
-    string *data = (string *) objectData;
+    string *data = (string *) objData;
     ExecutionResult res;
     switch (command->type) {
         case BIND: {
@@ -93,27 +93,51 @@ ExecutionResult MondisObject::executeString(Command *command) {
             OK_AND_RETURN
         }
         case SET_RANGE: {
-            CHECK_PARAM_NUM(3)
-            CHECK_START_AND_DEFINE(0)
-            CHECK_END_AND_DEFINE(1, data->size())
-            if ((*command)[2].content.size() < end - start) {
-                res.res = "data length too short!";
-                return res;
+            if (command->params.size() == 2) {
+                CHECK_PARAM_TYPE(0, PLAIN)
+                CHECK_PARAM_TYPE(1, STRING)
+                CHECK_START_AND_DEFINE(0)
+                if ((*command)[2].content.size() < data->size() - start) {
+                    res.res = "data length too short!";
+                    return res;
+                }
+                for (int i = start; i < data->size(); ++i) {
+                    (*data)[i] = (*command)[2].content[i - start];
+                }
+                modified();
+                OK_AND_RETURN
+            } else if (command->params.size() == 3) {
+                CHECK_START_AND_DEFINE(0)
+                CHECK_END_AND_DEFINE(1, data->size())
+                if ((*command)[2].content.size() < end - start) {
+                    res.res = "data length too short!";
+                    return res;
+                }
+                for (int i = start; i < end; ++i) {
+                    (*data)[i] = (*command)[2].content[i - start];
+                }
+                modified();
+                OK_AND_RETURN
+            } else {
+                res.res = "arguments num error!";
+                LOGIC_ERROR_AND_RETURN
             }
-            for (int i = start; i < end; ++i) {
-                (*data)[i] = (*command)[2].content[i - start];
-            }
-            modified();
-            OK_AND_RETURN
         }
         case GET_RANGE: {
-            CHECK_PARAM_NUM(2)
-            CHECK_START_AND_DEFINE(0)
-            CHECK_END_AND_DEFINE(1, data->size())
-
-            res.res = data->substr(start, end - start);
-
-            OK_AND_RETURN
+            if (command->params.size() == 1) {
+                CHECK_START_AND_DEFINE(0)
+                res.res = data->substr(start, data->size() - start);
+                OK_AND_RETURN
+            }
+            if (command->params.size() == 2) {
+                CHECK_START_AND_DEFINE(0)
+                CHECK_END_AND_DEFINE(1, data->size())
+                res.res = data->substr(start, end - start);
+                OK_AND_RETURN
+            } else {
+                res.res = "arguments num error!";
+                LOGIC_ERROR_AND_RETURN
+            }
         }
         case STRLEN: {
             CHECK_PARAM_NUM(0)
@@ -121,9 +145,16 @@ ExecutionResult MondisObject::executeString(Command *command) {
 
             OK_AND_RETURN
         }
-        case APPEND: {
-            CHECK_PARAM_NUM(1)
-            (*data) += (*command)[0].content;
+        case INSERT: {
+            CHECK_PARAM_NUM(2)
+            CHECK_PARAM_TYPE(0, PLAIN)
+            CHECK_PARAM_TYPE(1, STRING)
+            CHECK_AND_DEFINE_INT_LEGAL(0, index);
+            if (index < 0 || index > data->size()) {
+                res.res = "index out of range";
+                LOGIC_ERROR_AND_RETURN
+            }
+            data->insert(index, PARAM(1));
             modified();
             OK_AND_RETURN
         }
@@ -131,8 +162,8 @@ ExecutionResult MondisObject::executeString(Command *command) {
             long long *newData = new long long;
             bool success = util::toInteger(*data, *newData);
             if (success) {
-                delete (string *) objectData;
-                objectData = newData;
+                delete (string *) objData;
+                objData = newData;
                 OK_AND_RETURN
             }
             res.res = "can not transform to integer";
@@ -184,7 +215,7 @@ ExecutionResult MondisObject::executeString(Command *command) {
 }
 
 ExecutionResult MondisObject::executeInteger(Command *command) {
-    long long *data = (long long *) objectData;
+    long long *data = (long long *) objData;
     ExecutionResult res;
     switch (command->type) {
         case INCR:
@@ -215,7 +246,7 @@ ExecutionResult MondisObject::executeInteger(Command *command) {
             string *str = new string(to_string(*data));
             type = RAW_STRING;
             delete data;
-            objectData = str;
+            objData = str;
             modified();
             OK_AND_RETURN
         }
@@ -235,7 +266,7 @@ ExecutionResult MondisObject::execute(Command *command) {
     } else if (type == RAW_INT) {
         return executeInteger(command);
     } else {
-        MondisData *data = (MondisData *) objectData;
+        MondisData *data = (MondisData *) objData;
         return data->execute(command);
     }
 }
@@ -247,20 +278,20 @@ string MondisObject::getJson() {
     json = "";
     switch (type) {
         case MondisObjectType::RAW_STRING:
-            handleEscapeChar(*(string *) objectData);
+            handleEscapeChar(*(string *) objData);
             json += "\"";
-            json += *(string *) objectData;
+            json += *(string *) objData;
             json += "\"";
             break;
         case MondisObjectType::RAW_INT:
-            json += ("\"" + std::to_string(*((long long *) objectData)) + "\"");
+            json += ("\"" + std::to_string(*((long long *) objData)) + "\"");
             break;
         case RAW_BIN:
         case LIST:
         case SET:
         case ZSET:
         case HASH:
-            MondisData *data = static_cast<MondisData *>(objectData);
+            MondisData *data = static_cast<MondisData *>(objData);
             json = data->getJson();
     }
 

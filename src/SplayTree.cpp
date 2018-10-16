@@ -161,8 +161,8 @@ unsigned SplayTree::count(int startScore, int endScore) {
         }
         return 0;
     }
-    SplayTreeNode *from = getUpperBound(startScore - 1);
-    SplayTreeNode *to = getLowerBound(endScore - 1);
+    SplayTreeNode *from = getLowerBound(startScore, false);
+    SplayTreeNode *to = getUpperBound(endScore, true);
     splay(from, nullptr);
     splay(to, from);
     return getSize(root->right->left);
@@ -338,7 +338,7 @@ SplayTreeNode *SplayTree::getSuccessor(SplayTreeNode *root) {
 }
 
 bool SplayTree::removeByRank(int rank) {
-    SplayTreeNode* target = getNodeByRank(root,rank);
+    SplayTreeNode *target = getNodeByRank(rank);
     return remove(target);
 }
 
@@ -430,8 +430,8 @@ void SplayTree::removeRangeByRank(int start, int end) {
         return;
     }
     modified();
-    SplayTreeNode *from = getNodeByRank(root, start - 1);
-    SplayTreeNode *to = getNodeByRank(root, end);
+    SplayTreeNode *from = getNodeByRank(start - 1);
+    SplayTreeNode *to = getNodeByRank(end);
     splay(from, nullptr);
     splay(to, from);
     sizeUpdate(root->right,-getSize(root->right->left));
@@ -443,12 +443,12 @@ void SplayTree::getRangeByRank(int start, int end, vector<MondisObject*> *res) {
     if (start == end) {
         return;
     } else if (start + 1 == end) {
-        SplayTreeNode *from = getNodeByRank(root, start);
+        SplayTreeNode *from = getNodeByRank(start);
         res->push_back(from->data);
         return;
     }
-    SplayTreeNode *from = getNodeByRank(root, start - 1);
-    SplayTreeNode *to = getNodeByRank(root, end);
+    SplayTreeNode *from = getNodeByRank(start - 1);
+    SplayTreeNode *to = getNodeByRank(end);
     splay(from, nullptr);
     splay(to, from);
     inOrderTraversal(root->right->left,res);
@@ -468,8 +468,8 @@ void SplayTree::removeRangeByScore(int startScore, int endScore) {
         return;
     }
     modified();
-    SplayTreeNode *from = getUpperBound(startScore - 1);
-    SplayTreeNode *to = getLowerBound(endScore - 1);
+    SplayTreeNode *from = getLowerBound(startScore, false);
+    SplayTreeNode *to = getLowerBound(endScore, true);
     if(from == tail||to == head) {
         return;
     }
@@ -491,8 +491,8 @@ void SplayTree::getRangeByScore(int startScore, int endScore, vector<MondisObjec
     if(startScore == endScore) {
         return;
     }
-    SplayTreeNode *from = getUpperBound(startScore - 1);
-    SplayTreeNode *to = getLowerBound(endScore - 1);
+    SplayTreeNode *from = getLowerBound(startScore, false);
+    SplayTreeNode *to = getUpperBound(endScore, true);
     if(from == tail||to == head) {
         return;
     }
@@ -507,10 +507,13 @@ void SplayTree::getRangeByScore(int startScore, int endScore, vector<MondisObjec
 }
 
 //大于score的最小元素
-SplayTreeNode *SplayTree::getLowerBound(int score) {
+SplayTreeNode *SplayTree::getUpperBound(int score, bool canEqual) {
     SplayTreeNode* cur = root;
     while (true) {
         if(cur->score == score) {
+            if (canEqual) {
+                return cur;
+            }
             return getSuccessor(cur);
         } else if(cur->score > score) {
             if(cur->left == nullptr) {
@@ -527,11 +530,14 @@ SplayTreeNode *SplayTree::getLowerBound(int score) {
 }
 
 //不大于score的最大元素
-SplayTreeNode *SplayTree::getUpperBound(int score) {
+SplayTreeNode *SplayTree::getLowerBound(int score, bool canEqual) {
     SplayTreeNode* cur = root;
     while (true) {
         if(cur->score == score) {
-            return cur;
+            if (canEqual) {
+                return cur;
+            }
+            return getPredecessor(cur);
         } else if(cur->score < score) {
             if(cur->right == nullptr) {
                 return cur;
@@ -754,6 +760,25 @@ ExecutionResult SplayTree::execute(Command *command) {
             insert(newScore, data);
             OK_AND_RETURN
         }
+        case RANK_TO_SCORE: {
+            CHECK_PARAM_NUM(1)
+            CHECK_PARAM_TYPE(0, PLAIN)
+            CHECK_AND_DEFINE_INT_LEGAL(0, rank)
+            if (rank < 1 || rank > size()) {
+                res.res = "rank is out of range!";
+                LOGIC_ERROR_AND_RETURN
+            }
+            SplayTreeNode *node = getNodeByRank(rank);
+            res.res = to_string(node->score);
+            OK_AND_RETURN
+        }
+        case SCORE_TO_RANK: {
+            CHECK_PARAM_NUM(1)
+            CHECK_PARAM_TYPE(0, PLAIN)
+            CHECK_AND_DEFINE_INT_LEGAL(0, score)
+            res.res = to_string(count(numeric_limits<int>::min(), score) + 1);
+            OK_AND_RETURN
+        }
     }
     INVALID_AND_RETURN
 }
@@ -803,8 +828,51 @@ string SplayTree::toJsonWithScore() {
     return res;
 }
 
+SplayTreeNode *SplayTree::getNodeByRank(int rank) {
+    return getNodeByRank(root, rank);
+}
 
 
+SplayTree::SplayIterator::SplayIterator(SplayTree *avlTree) : tree(avlTree), cur(avlTree->root) {
+    dfs(cur);
+}
 
+bool SplayTree::SplayIterator::next() {
+    if (s.empty()) {
+        return false;
+    }
+    cur = s.top();
+    s.pop();
+    while (true) {
+        if (cur == tree->head) {
+            dfs(cur->right);
+            if (s.empty()) {
+                return false;
+            }
+            cur = s.top();
+            s.pop();
+            continue;
+        } else if (cur == tree->tail) {
+            if (s.empty()) {
+                return false;
+            }
+            cur = s.top();
+            s.pop();
+            break;
+        }
+        break;
+    }
+    dfs(cur->right);
+    return true;
+}
 
+SplayTreeNode *SplayTree::SplayIterator::operator->() {
+    return cur;
+}
 
+void SplayTree::SplayIterator::dfs(SplayTreeNode *cur) {
+    while (cur != nullptr) {
+        s.push(cur);
+        cur = cur->left;
+    }
+}

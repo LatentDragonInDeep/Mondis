@@ -321,7 +321,7 @@ ExecutionResult AVLTree::execute(Command *command) {
             auto *obj = getValue(key);
             if (obj == nullptr) {
                 res.res = "the key " + PARAM(0) + " does not exists";
-                INVALID_AND_RETURN;
+                LOGIC_ERROR_AND_RETURN
             }
             res.res = obj->getJson();
             OK_AND_RETURN;

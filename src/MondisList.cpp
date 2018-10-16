@@ -244,6 +244,24 @@ ExecutionResult MondisList::execute(Command *command) {
             res.res = get(index)->getJson();
             OK_AND_RETURN
         }
+        case FRONT: {
+            CHECK_PARAM_NUM(0)
+            if (size() == 0) {
+                res.res = "no element exists";
+                LOGIC_ERROR_AND_RETURN
+            }
+            res.res = get(0)->getJson();
+            OK_AND_RETURN;
+        }
+        case BACK: {
+            CHECK_PARAM_NUM(0)
+            if (size() == 0) {
+                res.res = "no element exists";
+                LOGIC_ERROR_AND_RETURN
+            }
+            res.res = get(size() - 1)->getJson();
+            OK_AND_RETURN;
+        }
         case PUSH_FRONT: {
             CHECK_PARAM_NUM(1)
             CHECK_PARAM_TYPE(0, STRING)

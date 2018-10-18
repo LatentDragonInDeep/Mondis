@@ -58,7 +58,7 @@ void MondisClient::startTransaction() {
 
 ExecutionResult MondisClient::commitTransaction(MondisServer *server) {
     ExecutionResult res;
-    if (isInTransaction) {
+    if (!isInTransaction) {
         res.res = "please start a transaction!";
         LOGIC_ERROR_AND_RETURN
     }

@@ -5,23 +5,22 @@
 #include <ctime>
 #include "MondisServer.h"
 #include <unistd.h>
+#include <netinet/in.h>
 
 void MondisClient::send(const string &res) {
     char buffer[4096];
     int ret;
     const char *data = res.data();
     int hasWrite = 0;
-#ifdef WIN32
     while (hasWrite < res.size()) {
+#ifdef WIN32
         ret = ::send(sock, data + hasWrite, res.size() - hasWrite, 0);
+#elif defined(linux)
+        ret = ::send(fd,data+hasWrite,res.size()-hasWrite,0);
+#endif
         hasWrite += ret;
     }
-#elif defined(linux)
-    while (hasWrite<res.size()) {
-        ret = write(fd,data+hasWrite,res.size()-hasWrite);
-        hasWrite+=ret;
-    }
-#endif
+
 }
 
 MondisClient::~MondisClient() {
@@ -106,9 +105,12 @@ string MondisClient::read() {
     string res;
     char buffer[4096];
     int ret;
-#ifdef WIN32
     while (true) {
+#ifdef WIN32
         ret = ::recv(sock, buffer, sizeof(buffer), 0);
+#elif defined(linux)
+        ret = ::recv(fd,buffer, sizeof(buffer),0);
+#endif
         if (ret == -1) {
             return res;
         }
@@ -117,12 +119,6 @@ string MondisClient::read() {
         }
         res += string(buffer, ret);
     }
-#elif defined(linux)
-    while ((ret = ::read(fd, buffer, sizeof(buffer))) != 0) {
-            res += string(buffer, ret);
-    }
-#endif
-    return res;
 }
 
 #ifdef WIN32

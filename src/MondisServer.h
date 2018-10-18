@@ -27,6 +27,7 @@
 #elif defined(linux)
 #include <sys/epoll.h>
 #include <unistd.h>
+#include <sys/socket.h>
 #endif
 
 #include "HashMap.h"
@@ -258,50 +259,6 @@ private:
             res += string(buffer, ret);
         }
     };
-
-    void selectAndHandle(bool isClient) {
-        timeval timeout;
-        timeout.tv_sec = 0;
-        timeout.tv_usec = 500000;
-        fd_set *fds = nullptr;
-        while (true) {
-            if (isClient) {
-                FD_ZERO(&clientFds);
-                for (auto &kv:nameToClients) {
-                    FD_SET(kv.second->sock, &clientFds);
-                }
-                fds = &clientFds;
-            } else {
-                FD_ZERO(&peerFds);
-                for (auto &kv:idToPeers) {
-                    FD_SET(kv.second->sock, &clientFds);
-                }
-                fds = &peerFds;
-            }
-            int ret = select(0, fds, nullptr, nullptr, &timeout);
-            if (ret <= 0) {
-                continue;
-            }
-            vector<MondisClient *> needDeleted;
-            for (auto pair:socketToClient) {
-                if (FD_ISSET(pair.first, fds)) {
-                    MondisClient *client = pair.second;
-                    string commandStr = client->read();
-                    if (commandStr == "CLOSED" || commandStr == "") {
-                        needDeleted.push_back(pair.second);
-                        continue;
-                    }
-                    ExecutionResult res = execute(commandStr, client);
-                    if (res.needSend) {
-                        client->send(res.toString());
-                    }
-                }
-            }
-            for (auto c:needDeleted) {
-                closeClient(c);
-            }
-        }
-    }
 #elif defined(linux)
     int clientsEpollFd;
     int peersEpollFd;
@@ -328,19 +285,9 @@ private:
         }
         return res;
     };
-    void selectAndHandle(int epollFd,epoll_event* events) {
-        while (true) {
-            int nfds = epoll_wait(epollFd, events, maxClientNum, 500);
-            if(nfds == 0) {
-                continue;
-            }
-            for(int i=0;i<nfds;i++) {
-                MondisClient* client = fdToClient[events[i].data.fd];
-                handleCommand(client);
-            }
-        }
-    }
 #endif
+
+    void selectAndHandle(bool isClient);
 public:
     unsigned id;
     CommandInterpreter *interpreter;

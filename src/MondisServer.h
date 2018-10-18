@@ -64,9 +64,75 @@ public:
 
 };
 
-class MultiCommand;
+class MondisServer;
 
-class MondisClient;
+enum ClientType {
+    MASTER,
+    PEER,
+    CLIENT,
+    SERVER_SELF,
+};
+
+class MondisClient {
+public:
+    unsigned id;            /* Client incremental unique ID. */
+#ifdef WIN32
+    SOCKET sock;
+#elif defined(linux)
+    int fd;/* Client socket. */
+#endif
+    ClientType type = CLIENT;
+    int curDbIndex = 0;
+    HashMap *keySpace = nullptr;            /* Pointer to currently SELECTed DB. */
+    string name;             /* As set by CLIENT SETNAME. */
+    vector<string> commandBuffer;         /* Buffer we use to accumulate client queries. */
+    int curCommandIndex = 0;
+    vector<ExecutionResult> *reply;            /* List of reply objects to sendToMaster to the client. */
+    string ip;
+    int port;
+
+    long long preInteraction = chrono::duration_cast<chrono::milliseconds>(
+            chrono::system_clock::now().time_since_epoch()).count();
+
+    unordered_set<string> watchedKeys;
+    unordered_set<string> modifiedKeys;
+
+    queue<string> *transactionCommands = nullptr;
+
+    deque<MultiCommand *> *undoCommands = nullptr;
+
+    bool isInTransaction = false;
+    bool watchedKeysHasModified = false;
+
+    int hasExecutedCommandNumInTransaction = 0;
+public:
+    bool hasAuthenticate = false;
+private:
+    static int nextId;
+public:
+#ifdef WIN32
+
+    MondisClient(MondisServer *server, SOCKET sock);
+
+#elif defined(linux)
+    MondisClient(MondisServer* server,int fd);
+
+#endif
+
+    ~MondisClient();
+
+    void send(const string &res);
+
+    void updateHeartBeatTime();
+
+    void startTransaction();
+
+    void closeTransaction();
+
+    ExecutionResult commitTransaction(MondisServer *server);
+
+    string read();
+};
 
 class CommandStruct {
 public:
@@ -92,6 +158,7 @@ public:
 
 class MondisServer {
 private:
+    friend class MondisClient;
     int maxClientNum = 1024;
     int maxCommandReplicaBufferSize = 1024 * 1024;
     int maxCommandPropagateBufferSize = 1024;
@@ -166,7 +233,7 @@ private:
 #ifdef WIN32
     fd_set clientFds;
     fd_set peerFds;
-    unordered_map<SOCKET *, MondisClient *> socketToClient;
+    unordered_map<SOCKET, MondisClient *> socketToClient;
 
     void send(SOCKET &sock, const string &res) {
         char buffer[4096];
@@ -192,20 +259,46 @@ private:
         }
     };
 
-    void selectAndHandle(fd_set *fds) {
+    void selectAndHandle(bool isClient) {
         timeval timeout;
         timeout.tv_sec = 0;
         timeout.tv_usec = 500000;
+        fd_set *fds = nullptr;
         while (true) {
+            if (isClient) {
+                FD_ZERO(&clientFds);
+                for (auto &kv:nameToClients) {
+                    FD_SET(kv.second->sock, &clientFds);
+                }
+                fds = &clientFds;
+            } else {
+                FD_ZERO(&peerFds);
+                for (auto &kv:idToPeers) {
+                    FD_SET(kv.second->sock, &clientFds);
+                }
+                fds = &peerFds;
+            }
             int ret = select(0, fds, nullptr, nullptr, &timeout);
-            if (ret == -1) {
+            if (ret <= 0) {
                 continue;
             }
-            for (auto &pair:socketToClient) {
-                if (FD_ISSET(*pair.first, &clientFds)) {
+            vector<MondisClient *> needDeleted;
+            for (auto pair:socketToClient) {
+                if (FD_ISSET(pair.first, fds)) {
                     MondisClient *client = pair.second;
-                    handleCommand(client);
+                    string commandStr = client->read();
+                    if (commandStr == "CLOSED" || commandStr == "") {
+                        needDeleted.push_back(pair.second);
+                        continue;
+                    }
+                    ExecutionResult res = execute(commandStr, client);
+                    if (res.needSend) {
+                        client->send(res.toString());
+                    }
                 }
+            }
+            for (auto c:needDeleted) {
+                closeClient(c);
             }
         }
     }
@@ -266,13 +359,7 @@ public:
 
     bool putToPropagateBuffer(const string &curCommand);
 
-    void incrReplicaOffset() {
-        replicaOffset++;
-    };
-
-    void decrReplicaOffset() {
-        replicaOffset--;
-    };
+    void incrReplicaOffset();
 
     void appendLog(string &commandStr, ExecutionResult &res);
 
@@ -280,14 +367,7 @@ public:
 
     MondisObject *chainLocate(Command *command, MondisClient *client);
 
-    static bool isModifyCommand(Command *command) {
-        if (command->type == LOCATE) {
-            while (command->next->type == LOCATE) {
-                command = command->next;
-            }
-        }
-        return modifyCommands.find(command->type) != modifyCommands.end();
-    };
+    static bool isModifyCommand(Command *command);;
 
     MultiCommand *getUndoCommand(CommandStruct &cstruct, MondisClient *client);
 
@@ -309,8 +389,6 @@ private:
     void parseConfFile(string& confFile);
 
     ExecutionResult execute(string &commandStr, MondisClient *client);
-
-    void handleCommand(MondisClient *client);
 
     void acceptSocket();
 
@@ -342,10 +420,6 @@ private:
     thread *sendHeartBeatToClients = nullptr;
     thread *recvFromSlaves = nullptr;
     thread *propagateIO = nullptr;
-
-    condition_variable hasClientCV;
-    mutex hasClientMtx;
-
     bool autoMoveCommandToMaster = true;
 
     void saveAll(const string &jsonFile);
@@ -376,78 +450,6 @@ private:
     const unsigned maxVoteIdle = 10000;
 
     bool isVoting = false;
-};
-
-enum ClientType {
-    MASTER,
-    PEER,
-    CLIENT,
-    SERVER_SELF,
-};
-
-class MondisClient {
-public:
-    unsigned id;            /* Client incremental unique ID. */
-#ifdef WIN32
-    SOCKET sock;
-#elif defined(linux)
-    int fd;/* Client socket. */
-#endif
-    ClientType type = CLIENT;
-    int curDbIndex = 0;
-    HashMap *keySpace = nullptr;            /* Pointer to currently SELECTed DB. */
-    string name;             /* As set by CLIENT SETNAME. */
-    vector<string> commandBuffer;         /* Buffer we use to accumulate client queries. */
-    int curCommandIndex = 0;
-    vector<ExecutionResult> *reply;            /* List of reply objects to sendToMaster to the client. */
-    string ip;
-    int port;
-
-    long long preInteraction = chrono::duration_cast<chrono::milliseconds>(
-            chrono::system_clock::now().time_since_epoch()).count();
-
-    unordered_set<string> watchedKeys;
-    unordered_set<string> modifiedKeys;
-
-    queue<string> *transactionCommands = nullptr;
-
-    deque<MultiCommand *> *undoCommands = nullptr;
-
-    bool isInTransaction = false;
-    bool watchedKeysHasModified = false;
-
-    int hasExecutedCommandNumInTransaction = 0;
-public:
-    bool hasAuthenticate = false;
-private:
-    static int nextId;
-public:
-#ifdef WIN32
-
-    MondisClient(SOCKET &sock);
-
-#elif defined(linux)
-    MondisClient(int fd);
-
-#endif
-
-    MondisClient(ClientType t) : type(t) {};
-
-    ~MondisClient();
-
-    string readCommand();
-
-    void send(const string &res);
-
-    void updateHeartBeatTime();
-
-    void startTransaction();
-
-    void closeTransaction();
-
-    ExecutionResult commitTransaction(MondisServer *server);
-
-    string read();
 };
 
 

@@ -6,36 +6,6 @@
 #include "MondisServer.h"
 #include <unistd.h>
 
-
-string MondisClient::readCommand() {
-    if (curCommandIndex + 1 < commandBuffer.size()) {
-        return commandBuffer[++curCommandIndex];
-    }
-    string commandStr;
-    char buffer[4096];
-    int ret;
-#ifdef WIN32
-    while ((ret = recv(sock, buffer, sizeof(buffer), 0)) != 0) {
-        commandStr += string(buffer, ret);
-    }
-#elif defined(linux)
-    while ((ret = ::read(fd, buffer, sizeof(buffer))) != 0) {
-        commandStr += string(buffer, ret);
-    }
-#endif
-    commandBuffer.clear();
-    curCommandIndex = 0;
-    int searchStart = 0;
-    int occurrence = 0;
-
-    while ((occurrence=commandStr.find("\r\n\r\n\r\n",searchStart))!=string::npos) {
-        commandBuffer.push_back(commandStr.substr(searchStart,occurrence-searchStart));
-        searchStart = occurrence+6;
-    }
-    commandBuffer.push_back(commandStr.substr(searchStart,commandStr.size()-searchStart));
-    return commandBuffer[curCommandIndex];
-}
-
 void MondisClient::send(const string &res) {
     char buffer[4096];
     int ret;
@@ -138,7 +108,14 @@ string MondisClient::read() {
     char buffer[4096];
     int ret;
 #ifdef WIN32
-    while ((ret = recv(sock, buffer, sizeof(buffer), 0)) != 0) {
+    while (true) {
+        ret = ::recv(sock, buffer, sizeof(buffer), 0);
+        if (ret == -1) {
+            return res;
+        }
+        if (ret == 0) {
+            return "CLOSED";
+        }
         res += string(buffer, ret);
     }
 #elif defined(linux)
@@ -151,12 +128,14 @@ string MondisClient::read() {
 
 #ifdef WIN32
 
-MondisClient::MondisClient(SOCKET &sock) {
+MondisClient::MondisClient(MondisServer *server, SOCKET sock) {
     this->sock = sock;
+    keySpace = server->dbs[curDbIndex];
 }
 
 #elif defined(linux)
-MondisClient::MondisClient(int fd){
+MondisClient::MondisClient(MondisServer* server,int fd){
     this->fd = fd;
+    keySpace = server->dbs[curDbIndex];
 }
 #endif

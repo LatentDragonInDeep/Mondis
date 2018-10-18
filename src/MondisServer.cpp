@@ -512,10 +512,12 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             res.res += c->ip;
             res.res += "\nport:";
             res.res += c->port;
+            res.res += "\nhasAuthenticated:";
+            res.res += util::to_string(c->hasAuthenticate);
             res.res += "\ndbIndex:";
             res.res += c->curDbIndex;
             res.res += "\nisIntransaction:";
-            res.res += c->isInTransaction;
+            res.res += util::to_string(c->isInTransaction);
             res.res += "\n";
             OK_AND_RETURN
         }
@@ -1263,7 +1265,7 @@ void MondisServer::init() {
     //控制台事件循环
     std::thread eventLoop(&MondisServer::startEventLoop, this);
     //检查超时的客户端，从服务器，主服务器并清理
-    std::thread checkAndHandle(&MondisServer::checkAndHandleIdleConnection, this);
+    //std::thread checkAndHandle(&MondisServer::checkAndHandleIdleConnection, this);
     //向客户端发心跳包
     sendHeartBeatToClients = new std::thread([&]() {
         unique_lock<std::mutex> lck(hasClientMtx);

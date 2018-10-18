@@ -193,9 +193,12 @@ private:
     };
 
     void selectAndHandle(fd_set *fds) {
+        timeval timeout;
+        timeout.tv_sec = 0;
+        timeout.tv_usec = 500000;
         while (true) {
-            int ret = select(0, fds, nullptr, nullptr, nullptr);
-            if (ret == 0) {
+            int ret = select(0, fds, nullptr, nullptr, &timeout);
+            if (ret == -1) {
                 continue;
             }
             for (auto &pair:socketToClient) {
@@ -234,7 +237,10 @@ private:
     };
     void selectAndHandle(int epollFd,epoll_event* events) {
         while (true) {
-            int nfds = epoll_wait(epollFd, events, maxClientNum, -1);
+            int nfds = epoll_wait(epollFd, events, maxClientNum, 500);
+            if(nfds == 0) {
+                continue;
+            }
             for(int i=0;i<nfds;i++) {
                 MondisClient* client = fdToClient[events[i].data.fd];
                 handleCommand(client);

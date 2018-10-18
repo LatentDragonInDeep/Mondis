@@ -36,9 +36,9 @@ public class SimpleClient {
                                     String res = builder.toString();
                                     if(res.equals("PING")){
                                         channel.write(ByteBuffer.wrap("PONG".getBytes()));
+                                    }else{
+                                        System.out.println(res);
                                     }
-                                    System.out.println(res);
-
                                     builder.delete(0,builder.length());
                                 }
                             }

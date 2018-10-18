@@ -1265,16 +1265,16 @@ void MondisServer::init() {
     //控制台事件循环
     std::thread eventLoop(&MondisServer::startEventLoop, this);
     //检查超时的客户端，从服务器，主服务器并清理
-    //std::thread checkAndHandle(&MondisServer::checkAndHandleIdleConnection, this);
+    std::thread checkAndHandle(&MondisServer::checkAndHandleIdleConnection, this);
     //向客户端发心跳包
-//    sendHeartBeatToClients = new std::thread([&]() {
-//        while (true) {
-//            for (auto &kv:nameToClients) {
-//                kv.second->send("PING");
-//            }
-//            std::this_thread::sleep_for(chrono::milliseconds(toClientHeartBeatDuration));
-//        }
-//    });
+    sendHeartBeatToClients = new std::thread([&]() {
+        while (true) {
+            for (auto &kv:nameToClients) {
+                kv.second->send("PING");
+            }
+            std::this_thread::sleep_for(chrono::milliseconds(toClientHeartBeatDuration));
+        }
+    });
 #ifdef WIN32
     selectAndHandle(true);
 #elif defined(linux)
@@ -1578,6 +1578,7 @@ bool MondisServer::putToPropagateBuffer(const string &curCommand) {
 }
 
 void MondisServer::checkAndHandleIdleConnection() {
+    vector<MondisClient *> needDeleted;
     while (true) {
         long long current = chrono::duration_cast<chrono::milliseconds>(
                 chrono::system_clock::now().time_since_epoch()).count();
@@ -1586,11 +1587,11 @@ void MondisServer::checkAndHandleIdleConnection() {
             MondisClient *c = kv.second;
             if (c->type == CLIENT) {
                 if (current - c->preInteraction > maxClientIdle) {
-                    closeClient(c);
+                    needDeleted.push_back(c);
                 }
             } else if (c->type == PEER) {
                 if (current - c->preInteraction > maxSlaveIdle) {
-                    closeClient(c);
+                    needDeleted.push_back(c);
                 }
             }
         }
@@ -1599,11 +1600,11 @@ void MondisServer::checkAndHandleIdleConnection() {
             MondisClient *c = kv.second;
             if (c->type == CLIENT) {
                 if (current - c->preInteraction > toClientHeartBeatDuration) {
-                    closeClient(c);
+                    needDeleted.push_back(c);
                 }
             } else if (c->type == PEER) {
                 if (current - c->preInteraction > toSlaveHeartBeatDuration) {
-                    closeClient(c);
+                    needDeleted.push_back(c);
                 }
             }
         }
@@ -1620,6 +1621,10 @@ void MondisServer::checkAndHandleIdleConnection() {
             command->type = MASTER_DEAD;
             execute(command, self);
         }
+        for (auto c :needDeleted) {
+            closeClient(c);
+        }
+        needDeleted.clear();
     }
 }
 

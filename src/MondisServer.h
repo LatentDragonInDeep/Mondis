@@ -163,11 +163,11 @@ private:
     int maxCommandReplicaBufferSize = 1024 * 1024;
     int maxCommandPropagateBufferSize = 1024;
     int maxSlaveNum = 1024;
-    int maxSlaveIdle = 5000;
-    int maxMasterIdle = 5000;
-    int maxClientIdle = 5000;
-    int toSlaveHeartBeatDuration = 1000;
-    int toClientHeartBeatDuration = 1000;
+    int maxSlaveIdle = 10000;
+    int maxMasterIdle = 10000;
+    int maxClientIdle = 10000;
+    int toSlaveHeartBeatDuration = 3000;
+    int toClientHeartBeatDuration = 3000;
 
     pid_t pid;
     std::string configfile;

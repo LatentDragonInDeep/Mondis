@@ -32,10 +32,9 @@ MondisClient::~MondisClient() {
 #endif
 }
 
-int MondisClient::nextId = 1;
-
 void MondisClient::updateHeartBeatTime() {
-    preInteraction = clock();
+    preInteraction = chrono::duration_cast<chrono::milliseconds>(
+            chrono::system_clock::now().time_since_epoch()).count();
 }
 
 void MondisClient::closeTransaction() {

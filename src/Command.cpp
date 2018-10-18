@@ -25,7 +25,6 @@ Command *CommandInterpreter::getCommand(std::string &raw) {
             vt.push_back(next);
             next = parser.nextToken();
         }
-        pre = next;
         for (int i = 0; i <vt.size(); ++i) {
             if (i == 0) {
                 if(vt[i].type!=PLAIN_PARAM) {
@@ -133,6 +132,10 @@ void CommandInterpreter::init() {
     PUT(UNVOTE)
     PUT(MASTER_DEAD)
     PUT(I_AM_NEW_MASTER)
+    PUT(CLIENT_INFO)
+    PUT(CLIENT_LIST)
+    PUT(SLAVE_INFO)
+    PUT(SLAVE_LIST)
 }
 
 void CommandInterpreter::LexicalParser::skip() {

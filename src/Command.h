@@ -169,6 +169,10 @@ enum CommandType {
     MASTER_DEAD,
     I_AM_NEW_MASTER,
     UPDATE_OFFSET,
+    CLIENT_INFO,
+    CLIENT_LIST,
+    SLAVE_INFO,
+    SLAVE_LIST,
 };
 
 enum ExecutionResultType {

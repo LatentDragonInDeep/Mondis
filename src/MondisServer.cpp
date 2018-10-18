@@ -496,6 +496,78 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             res.needSend = false;
             OK_AND_RETURN
         }
+        case CLIENT_INFO: {
+            CHECK_PARAM_NUM(1)
+            CHECK_PARAM_TYPE(0, PLAIN)
+            if (nameToClients.find(PARAM(0)) == nameToClients.end()) {
+                res.res = "client whose name is ";
+                res.res += PARAM(0);
+                res.res += " does not exists";
+                LOGIC_ERROR_AND_RETURN
+            }
+            MondisClient *c = nameToClients[PARAM(0)];
+            res.res += "name:";
+            res.res += PARAM(0);
+            res.res += "\nip:";
+            res.res += c->ip;
+            res.res += "\nport:";
+            res.res += c->port;
+            res.res += "\ndbIndex:";
+            res.res += c->curDbIndex;
+            res.res += "\nisIntransaction:";
+            res.res += c->isInTransaction;
+            res.res += "\n";
+            OK_AND_RETURN
+        }
+        case CLIENT_LIST: {
+            CHECK_PARAM_NUM(0)
+            res.res = "current server has ";
+            res.res += nameToClients.size();
+            res.res += " clients,and the following are the list:\n";
+            for (auto &kv:nameToClients) {
+                res.res += kv.first;
+                res.res += ",\n";
+            }
+            OK_AND_RETURN
+        }
+        case SLAVE_INFO: {
+            if (isSlave) {
+                res.res = "current server is a slave,can not has slaves";
+                LOGIC_ERROR_AND_RETURN
+            }
+            CHECK_PARAM_NUM(1)
+            CHECK_PARAM_TYPE(0, PLAIN)
+            if (idToPeers.find(atoi(PARAM(0).c_str())) == idToPeers.end()) {
+                res.res = "slave whose name is ";
+                res.res += PARAM(0);
+                res.res += " does not exists";
+                LOGIC_ERROR_AND_RETURN
+            }
+            MondisClient *c = idToPeers[atoi(PARAM(0).c_str())];
+            res.res += "id:";
+            res.res += PARAM(0);
+            res.res += "\nip:";
+            res.res += c->ip;
+            res.res += "\nport:";
+            res.res += c->port;
+            res.res += "\ndbIndex:";
+            OK_AND_RETURN
+        }
+        case SLAVE_LIST: {
+            if (isSlave) {
+                res.res = "current server is a slave,can not has slaves";
+                LOGIC_ERROR_AND_RETURN
+            }
+            CHECK_PARAM_NUM(0)
+            res.res = "current server has ";
+            res.res += nameToClients.size();
+            res.res += " slaves,and the following are the list:\n";
+            for (auto &kv:idToPeers) {
+                res.res += kv.first;
+                res.res += ",\n";
+            }
+            OK_AND_RETURN
+        }
     }
     INVALID_AND_RETURN
 }
@@ -1121,18 +1193,6 @@ void MondisServer::applyConf() {
             }
         } else if (kv.first == "maxSlaveNum") {
             maxSlaveNum = atoi(kv.second.c_str());
-        } else if (kv.first == "maxUndoCommandBufferSize") {
-            maxUndoCommandBufferSize = min(maxCommandReplicaBufferSize, atoi(kv.second.c_str()));
-        } else if (kv.first == "maxSlaveIdle") {
-            maxSlaveIdle = atoi(kv.second.c_str());
-        } else if (kv.first == "maxMasterIdle") {
-            maxMasterIdle = atoi(kv.second.c_str());
-        } else if (kv.first == "maxClientIdle") {
-            maxClientIdle = atoi(kv.second.c_str());
-        } else if (kv.first == "toSlaveHeartBeatDuration") {
-            toSlaveHeartBeatDuration = atoi(kv.second.c_str());
-        } else if (kv.first == "toClientHeartBeatDuration") {
-            toClientHeartBeatDuration = atoi(kv.second.c_str());
         } else if (kv.first == "autoMoveCommandToMaster") {
             if (kv.second == "true") {
                 autoMoveCommandToMaster = true;
@@ -1484,6 +1544,10 @@ void MondisServer::initStaticMember() {
     ADD(controlCommands, MASTER_DEAD)
     ADD(controlCommands, I_AM_NEW_MASTER)
     ADD(controlCommands, UPDATE_OFFSET)
+    ADD(controlCommands, CLIENT_INFO)
+    ADD(controlCommands, CLIENT_LIST)
+    ADD(controlCommands, SLAVE_INFO)
+    ADD(controlCommands, SLAVE_LIST)
 }
 
 string MondisServer::readFromMaster(bool isBlocking) {
@@ -1524,7 +1588,8 @@ bool MondisServer::putToPropagateBuffer(const string &curCommand) {
 
 void MondisServer::checkAndHandleIdleConnection() {
     while (true) {
-        clock_t current = clock();
+        long long current = chrono::duration_cast<chrono::milliseconds>(
+                chrono::system_clock::now().time_since_epoch()).count();
 #ifdef WIN32
         for (auto &kv:socketToClient) {
             MondisClient *c = kv.second;
@@ -1670,7 +1735,8 @@ void MondisServer::appendAof(const string &command) {
     if (aof) {
         aofFileOut << command + "\n";
         if (aofSyncStrategy == 1) {
-            clock_t cur = clock();
+            auto cur = chrono::duration_cast<chrono::milliseconds>(
+                    chrono::system_clock::now().time_since_epoch()).count();
             if (cur - preSync >= 1000) {
                 aofFileOut.flush();
                 preSync = cur;

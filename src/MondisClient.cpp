@@ -6,19 +6,6 @@
 #include "MondisServer.h"
 #include <unistd.h>
 
-#ifdef WIN32
-
-MondisClient::MondisClient(SOCKET sock) : sock(sock) {
-    nextId++;
-    ctime = time(nullptr);
-}
-#elif defined(linux)
-MondisClient::MondisClient(int fd) : fd(fd), id(nextId) {
-    nextId++;
-    ctime = time(nullptr);
-}
-
-#endif
 
 string MondisClient::readCommand() {
     if (curCommandIndex + 1 < commandBuffer.size()) {
@@ -161,3 +148,15 @@ string MondisClient::read() {
 #endif
     return res;
 }
+
+#ifdef WIN32
+
+MondisClient::MondisClient(SOCKET &sock) {
+    this->sock = sock;
+}
+
+#elif defined(linux)
+MondisClient::MondisClient(int fd){
+    this->fd = fd;
+}
+#endif

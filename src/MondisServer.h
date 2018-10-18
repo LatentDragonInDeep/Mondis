@@ -96,9 +96,9 @@ private:
     int maxCommandReplicaBufferSize = 1024 * 1024;
     int maxCommandPropagateBufferSize = 1024;
     int maxSlaveNum = 1024;
-    int maxSlaveIdle = 10000;
-    int maxMasterIdle = 10000;
-    int maxClientIdle = 10000;
+    int maxSlaveIdle = 5000;
+    int maxMasterIdle = 5000;
+    int maxClientIdle = 5000;
     int toSlaveHeartBeatDuration = 1000;
     int toClientHeartBeatDuration = 1000;
 
@@ -122,7 +122,8 @@ private:
     unordered_map<string,string> conf;
     string username = "root";
     string password = "admin";
-    clock_t preSync = clock();
+    long long preSync = chrono::duration_cast<chrono::milliseconds>(
+            chrono::system_clock::now().time_since_epoch()).count();
 
     string recoveryFile;
     string recoveryStrategy;
@@ -393,13 +394,11 @@ public:
     vector<string> commandBuffer;         /* Buffer we use to accumulate client queries. */
     int curCommandIndex = 0;
     vector<ExecutionResult> *reply;            /* List of reply objects to sendToMaster to the client. */
-    time_t ctime;           /* Client creation time. */
-    time_t lastinteraction; /* Time of the last interaction, used for timeout */
-
     string ip;
     int port;
 
-    clock_t preInteraction = clock();
+    long long preInteraction = chrono::duration_cast<chrono::milliseconds>(
+            chrono::system_clock::now().time_since_epoch()).count();
 
     unordered_set<string> watchedKeys;
     unordered_set<string> modifiedKeys;
@@ -419,7 +418,7 @@ private:
 public:
 #ifdef WIN32
 
-    MondisClient(SOCKET sock);
+    MondisClient(SOCKET &sock);
 
 #elif defined(linux)
     MondisClient(int fd);

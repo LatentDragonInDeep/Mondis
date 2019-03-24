@@ -17,7 +17,6 @@ using namespace std;
 enum MondisObjectType {
     RAW_STRING = 0,
     RAW_INT,
-    RAW_BIN,
     LIST,
     SET,
     ZSET,
@@ -53,7 +52,6 @@ class MondisObject {
 public:
     MondisObjectType type = MondisObjectType::EMPTY;
     void *objData;
-
     ~MondisObject();
 private:
     bool hasSerialized = false;
@@ -64,16 +62,16 @@ public:
 
     string getTypeStr();
 
-    static MondisObject *getNullObject();;
+    static MondisObject *getNullObject();
 
-    string getJson();;
+    string getJson();
 
     ExecutionResult execute(Command *command);
 
 private:
-    ExecutionResult executeInteger(Command *command);;
+    ExecutionResult executeInteger(Command *command);
 
-    ExecutionResult executeString(Command *command);;
+    ExecutionResult executeString(Command *command);
 public:
     MondisObject *locate(Command *command);
 

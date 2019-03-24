@@ -56,24 +56,24 @@ message MapsTestCases {
 }
 
 message EmptyMap {
-  map<int32, int32> map = 1;
+  strToType<int32, int32> strToType = 1;
 }
 
 message StringtoInt {
-  map<string, int32> map = 1;
+  strToType<string, int32> strToType = 1;
 }
 
 message IntToString {
-  map<int32, string> map = 1;
+  strToType<int32, string> strToType = 1;
 }
 
 message BoolToString {
-  map<bool, string> map = 1;
+  strToType<bool, string> strToType = 1;
 }
 
 message Mixed1 {
   string msg = 1;
-  map<string, float> map = 2;
+  strToType<string, float> strToType = 2;
 }
 
 message Mixed2 {
@@ -83,7 +83,7 @@ message Mixed2 {
     E2 = 2;
     E3 = 3;
   }
-  map<int32, bool> map = 1;
+  strToType<int32, bool> strToType = 1;
   E ee = 2;
 }
 
@@ -91,7 +91,7 @@ message MapOfObjects {
   message M {
     string inner_text = 1;
   }
-  map<string, M> map = 1;
+  strToType<string, M> strToType = 1;
 }
 
 message DummyRequest {}
@@ -103,20 +103,20 @@ service MapsTestService {
 message MapIn {
   string other = 1;
   repeated string things = 2;
-  map<string, string> map_input = 3;
-  map<string, google.protobuf.Any> map_any = 4;
+  strToType<string, string> map_input = 3;
+  strToType<string, google.protobuf.Any> map_any = 4;
 }
 
 message MapOut {
-  map<string, MapM> map1 = 1;
-  map<string, MapOut> map2 = 2;
-  map<int32, string> map3 = 3;
-  map<bool, string> map4 = 5;
+  strToType<string, MapM> map1 = 1;
+  strToType<string, MapOut> map2 = 2;
+  strToType<int32, string> map3 = 3;
+  strToType<bool, string> map4 = 5;
   string bar = 4;
 }
 
 // A message with exactly the same wire representation as MapOut, but using
-// repeated message fields instead of map fields. We use this message to test
+// repeated message fields instead of strToType fields. We use this message to test
 // the wire-format compatibility of the JSON transcoder (e.g., whether it
 // handles missing keys correctly).
 message MapOutWireFormat {

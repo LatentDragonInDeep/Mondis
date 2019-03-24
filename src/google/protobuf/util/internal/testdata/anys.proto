@@ -89,7 +89,7 @@ message Data {
   Data nested_data = 4;
   google.protobuf.Int32Value int_wrapper = 5;
   google.protobuf.Timestamp time = 6;
-  map<string, string> map_data = 7;
+  strToType<string, string> map_data = 7;
   google.protobuf.Struct struct_data = 8;
   repeated Data repeated_data = 9;
   repeated google.protobuf.Any repeated_any = 10;

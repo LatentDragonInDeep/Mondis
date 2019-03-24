@@ -280,7 +280,7 @@ KeyValue *AVLTree::get(Key &key) {
     }
 }
 
-MondisObject *AVLTree::getValue(Key &key) {
+MondisObject *AVLTree::getValue(string &key) {
     KeyValue* kv = get(key);
     if(kv == nullptr) {
         return nullptr;
@@ -288,7 +288,7 @@ MondisObject *AVLTree::getValue(Key &key) {
     return kv->value;
 }
 
-bool AVLTree::containsKey(Key &key) {
+bool AVLTree::containsKey(string &key) {
     return get(key) != nullptr;
 }
 
@@ -310,7 +310,7 @@ ExecutionResult AVLTree::execute(Command *command) {
             CHECK_PARAM_NUM(2);
             CHECK_PARAM_TYPE(0, PLAIN)
             CHECK_PARAM_TYPE(1, STRING)
-            Key *key = new Key((*command)[0].content);
+            KEY(0)
             insert(key, MondisServer::getJSONParser()->parseObject((*command)[1].content));
             OK_AND_RETURN;
         }
@@ -349,7 +349,7 @@ ExecutionResult AVLTree::execute(Command *command) {
     INVALID_AND_RETURN
 }
 
-void AVLTree::insert(Key *key, MondisObject *value) {
+void AVLTree::insert(string &key, MondisObject *value) {
     insert(new KeyValue(key, value));
 }
 

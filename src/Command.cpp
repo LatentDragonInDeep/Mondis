@@ -4,9 +4,147 @@
 
 #include "Command.h"
 
-std::unordered_map<CommandType, std::string> Command::typeToStr;
+std::unordered_map<CommandType, std::string> Command::typeToStr = {
+        {CommandType::BIND,"BIND"},
+        {CommandType::DEL,"DEL"},
+        {CommandType::EXISTS,"EXISTS"},
+        {CommandType::RENAME,"RENAME"},
+        {CommandType::TYPE,"TYPE"},
+        {CommandType::GET,"GET"},
+        {CommandType::GET_RANGE,"GET_RANGE"},
+        {CommandType::SET_RANGE,"SET_RANGE"},
+        {CommandType::REMOVE_RANGE,"REMOVE_RANGE"},
+        {CommandType::STRLEN,"STRLEN"},
+        {CommandType::INCR,"INCR"},
+        {CommandType::DECR,"DECR"},
+        {CommandType::INCR_BY,"INCR_BY"},
+        {CommandType::DECR_BY,"DECR_BY"},
+        {CommandType::INSERT,"INSERT"},
+        {CommandType::PUSH_FRONT,"PUSH_FRONT"},
+        {CommandType::PUSH_BACK,"PUSH_BACK"},
+        {CommandType::POP_FRONT,"POP_FRONT"},
+        {CommandType::POP_BACK,"POP_BACK"},
+        {CommandType::ADD,"ADD"},
+        {CommandType::REMOVE,"REMOVE"},
+        {CommandType::M_SIZE,"M_SIZE"},
+        {CommandType::REMOVE_BY_RANK,"REMOVE_BY_RANK"},
+        {CommandType::REMOVE_BY_SCORE,"REMOVE_BY_SCORE"},
+        {CommandType::REMOVE_RANGE_BY_RANK,"REMOVE_RANGE_BY_RANK"},
+        {CommandType::REMOVE_RANGE_BY_SCORE,"REMOVE_RANGE_BY_SCORE"},
+        {CommandType::COUNT_RANGE,"COUNT_RANGE"},
+        {CommandType::GET_BY_RANK,"GET_BY_RANK"},
+        {CommandType::GET_BY_SCORE,"GET_BY_SCORE"},
+        {CommandType::GET_RANGE_BY_RANK,"GET_RANGE_BY_RANK"},
+        {CommandType::GET_RANGE_BY_SCORE,"GET_RANGE_BY_SCORE"},
+        {CommandType::LOGIN,"LOGIN"},
+        {CommandType::EXIT,"EXIT"},
+        {CommandType::SAVE,"SAVE"},
+        {CommandType::SELECT,"SELECT"},
+        {CommandType::LOCATE,"LOCATE"},
+        {CommandType::TO_STRING,"TO_STRING"},
+        {CommandType::TO_INTEGER,"TO_INTEGER"},
+        {CommandType::CHANGE_SCORE,"CHANGE_SCORE"},
+        {CommandType::COUNT,"COUNT"},
+        {CommandType::SET_CLIENT_NAME,"SET_CLIENT_NAME"},
+        {CommandType::SLAVE_OF,"SLAVE_OF"},
+        {CommandType::SYNC,"SYNC"},
+        {CommandType::DISCONNECT_SLAVE,"DISCONNECT_SLAVE"},
+        {CommandType::DISCONNECT_CLIENT,"DISCONNECT_CLIENT"},
+        {CommandType::PING,"PING"},
+        {CommandType::PONG,"PONG"},
+        {CommandType::MULTI,"MULTI"},
+        {CommandType::EXEC,"EXEC"},
+        {CommandType::DISCARD,"DISCARD"},
+        {CommandType::WATCH,"WATCH"},
+        {CommandType::UNWATCH,"UNWATCH"},
+        {CommandType::SAVE_ALL,"SAVE_ALL"},
+        {CommandType::GET_MASTER,"GET_MASTER"},
+        {CommandType::NEW_PEER,"NEW_PEER"},
+        {CommandType::IS_CLIENT,"IS_CLIENT"},
+        {CommandType::MASTER_INVITE,"MASTER_INVITE"},
+        {CommandType::ASK_FOR_VOTE,"ASK_FOR_VOTE"},
+        {CommandType::VOTE,"VOTE"},
+        {CommandType::UNVOTE,"UNVOTE"},
+        {CommandType::MASTER_DEAD,"MASTER_DEAD"},
+        {CommandType::I_AM_NEW_MASTER,"I_AM_NEW_MASTER"},
+        {CommandType::CLIENT_INFO,"CLIENT_INFO"},
+        {CommandType::CLIENT_LIST,"CLIENT_LIST"},
+        {CommandType::SLAVE_INFO,"SLAVE_INFO"},
+        {CommandType::SLAVE_LIST,"SLAVE_LIST"},
+        {CommandType::UNION,"UNION"},
+        {CommandType::INTERSECT,"INTERSECT"}
+};
 
-std::unordered_map<std::string, CommandType> CommandInterpreter::map;
+
+std::unordered_map<std::string, CommandType> CommandInterpreter::strToType = {
+        {"SET",CommandType:BIND},
+        {"DEL",CommandType::DEL},
+        {"EXISTS,"EXISTS},
+        {"RENAME",CommandType::RENAME},
+        {"TYPE",CommandType::TYPE},
+        {"GET",CommandType::GET},
+        {"GET_RANGE",CommandType::GET_RANGE},
+        {"SET_RANGE",CommandType::SET_RANGE},
+        {"REMOVE_RANGE",CommandType::REMOVE_RANGE},
+        {"STRLEN",CommandType::STRLEN},
+        {"INCR",CommandType::INCR},
+        {"DECR",CommandType::DECR},
+        {"INCR_BY",CommandType::INCR_BY},
+        {"DECR_BY",CommandType::DECR_BY},
+        {"INSERT",CommandType::INSERT},
+        {"PUSH_FRONT",CommandType::PUSH_FRONT},
+        {"PUSH_BACK",CommandType::PUSH_BACK},
+        {"POP_FRONT",CommandType::POP_FRONT},
+        {"POP_BACK",CommandType::POP_BACK},
+        {"ADD",CommandType::ADD},
+        {"REMOVE",CommandType::REMOVE},
+        {"SIZE",CommandType::M_SIZE},
+        {"REMOVE_BY_RANK",CommandType::REMOVE_BY_RANK},
+        {"REMOVE_BY_SCORE",CommandType::REMOVE_BY_SCORE},
+        {"REMOVE_RANGE_BY_RANK",CommandType::REMOVE_RANGE_BY_RANK},
+        {"REMOVE_RANGE_BY_SCORE",CommandType::REMOVE_RANGE_BY_SCORE},
+        {"COUNT_RANGE",CommandType::COUNT_RANGE},
+        {"GET_BY_RANK",CommandType::GET_BY_RANK},
+        {"GET_BY_SCORE",CommandType::GET_BY_SCORE},
+        {"GET_RANGE_BY_RANK",CommandType::GET_RANGE_BY_RANK},
+        {"GET_RANGE_BY_SCORE",CommandType::GET_RANGE_BY_SCORE},
+        {"LOGIN",CommandType::LOGIN},
+        {"EXIT",CommandType::EXIT},
+        {"SAVE",CommandType::SAVE},
+        {"SELECT",CommandType::SELECT},
+        {"LOCATE",CommandType::LOCATE},
+        {"TO_STRING",CommandType::TO_STRING},
+        {"TO_INTEGER",CommandType::TO_INTEGER},
+        {"CHANGE_SCORE",CommandType::CHANGE_SCORE},
+        {"COUNT",CommandType::COUNT},
+        {"SET_CLIENT_NAME",CommandType::SET_CLIENT_NAME},
+        {"SLAVE_OF",CommandType::SLAVE_OF},
+        {"SYNC",CommandType::SYNC},
+        {"DISCONNECT_SLAVE",CommandType::DISCONNECT_SLAVE},
+        {"DISCONNECT_CLIENT",CommandType::DISCONNECT_CLIENT},
+        {"PING",CommandType::PING},
+        {"PONG",CommandType::PONG},
+        {"MULTI",CommandType::MULTI},
+        {"EXEC",CommandType::EXEC},
+        {"DISCARD",CommandType::DISCARD},
+        {"WATCH",CommandType::WATCH},
+        {"UNWATCH",CommandType::UNWATCH},
+        {"SAVE_ALL",CommandType::SAVE_ALL},
+        {"GET_MASTER",CommandType::GET_MASTER},
+        {"NEW_PEER",CommandType::NEW_PEER},
+        {"IS_CLIENT",CommandType::IS_CLIENT},
+        {"ASK_FOR_VOTE",CommandType::ASK_FOR_VOTE},
+        {"VOTE",CommandType::VOTE},
+        {"UNVOTE",CommandType::UNVOTE},
+        {"MASTER_DEAD",CommandType::MASTER_DEAD},
+        {"I_AM_NEW_MASTER",CommandType::I_AM_NEW_MASTER},
+        {"CLIENT_INFO",CommandType::CLIENT_INFO},
+        {"CLIENT_LIST",CommandType::CLIENT_LIST},
+        {"SLAVE_INFO",CommandType::SLAVE_INFO},
+        {"SLAVE_LIST",CommandType::SLAVE_LIST},
+        {"UNION",CommandType::UNION},
+        {"INTERSECT",CommandType::INTERSECT}
+};
 
 CommandInterpreter::CommandInterpreter() {
 }
@@ -32,11 +170,11 @@ Command *CommandInterpreter::getCommand(std::string &raw) {
                     return res;
                 }
                 util::toUpperCase(vt[i].content);
-                if(map.find(vt[i].content)==map.end()) {
+                if(strToType.find(vt[i].content)==strToType.end()) {
                     cur->type = M_ERROR;
                     return res;
                 }
-                cur->type = map[vt[i].content];
+                cur->type = strToType[vt[i].content];
                 continue;
             }
             Command::Param param;
@@ -54,88 +192,6 @@ Command *CommandInterpreter::getCommand(std::string &raw) {
         cur->next = new Command;
         cur = cur->next;
     }
-}
-
-void CommandInterpreter::init() {
-    map["SET"] = CommandType::BIND;
-    PUT(DEL)
-    PUT(EXISTS)
-    PUT(RENAME)
-    PUT(TYPE)
-    PUT(GET)
-    PUT(GET_RANGE)
-    PUT(SET_RANGE)
-    PUT(REMOVE_RANGE)
-    PUT(STRLEN)
-    PUT(INCR)
-    PUT(DECR)
-    PUT(INCR_BY)
-    PUT(DECR_BY)
-    PUT(INSERT)
-    PUT(PUSH_FRONT)
-    PUT(PUSH_BACK)
-    PUT(POP_FRONT)
-    PUT(POP_BACK)
-    PUT(ADD)
-    PUT(REMOVE)
-    map["size"] = M_SIZE;
-    PUT(REMOVE_BY_RANK)
-    PUT(REMOVE_BY_SCORE)
-    PUT(REMOVE_RANGE_BY_RANK)
-    PUT(REMOVE_RANGE_BY_SCORE)
-    PUT(COUNT_RANGE)
-    PUT(GET_BY_RANK)
-    PUT(GET_BY_SCORE)
-    PUT(GET_RANGE_BY_RANK)
-    PUT(GET_RANGE_BY_SCORE)
-    PUT(LOGIN)
-    PUT(EXIT)
-    PUT(SAVE)
-    PUT(READ_FROM)
-    PUT(READ_CHAR)
-    PUT(READ_SHORT)
-    PUT(READ_INT)
-    PUT(READ_LONG)
-    PUT(READ_LONG_LONG)
-    PUT(READ)
-    PUT(WRITE)
-    PUT(BACKWARD)
-    PUT(FORWARD)
-    PUT(SELECT)
-    PUT(LOCATE)
-    PUT(TO_STRING)
-    PUT(TO_INTEGER)
-    PUT(GET_POS)
-    PUT(CHANGE_SCORE)
-    PUT(SET_POS)
-    PUT(COUNT)
-    PUT(SET_CLIENT_NAME)
-    PUT(SLAVE_OF)
-    PUT(SYNC)
-    PUT(SYNC_FINISHED)
-    PUT(DISCONNECT_SLAVE)
-    PUT(DISCONNECT_CLIENT)
-    PUT(PING)
-    PUT(PONG)
-    PUT(MULTI)
-    PUT(EXEC)
-    PUT(DISCARD)
-    PUT(WATCH)
-    PUT(UNWATCH)
-    PUT(SAVE_ALL)
-    PUT(GET_MASTER)
-    PUT(NEW_PEER)
-    PUT(IS_CLIENT)
-    PUT(MASTER_INVITE)
-    PUT(ASK_FOR_VOTE)
-    PUT(VOTE)
-    PUT(UNVOTE)
-    PUT(MASTER_DEAD)
-    PUT(I_AM_NEW_MASTER)
-    PUT(CLIENT_INFO)
-    PUT(CLIENT_LIST)
-    PUT(SLAVE_INFO)
-    PUT(SLAVE_LIST)
 }
 
 void CommandInterpreter::LexicalParser::skip() {
@@ -239,66 +295,9 @@ bool util::toInteger(std::string &data, long long &res) {
 
 std::string ExecutionResult::typeToStr[] = {"OK", "SYNTAX_ERROR", "INTERNAL_ERROR", "LOGIC_ERROR"};
 
-void Command::init() {
-    MAP(BIND)
-    MAP(DEL)
-    MAP(EXISTS)
-    MAP(RENAME)
-    MAP(TYPE)
-    MAP(GET)
-    MAP(GET_RANGE)
-    MAP(SET_RANGE)
-    MAP(REMOVE_RANGE)
-    MAP(STRLEN)
-    MAP(INCR)
-    MAP(DECR)
-    MAP(INCR_BY)
-    MAP(DECR_BY)
-    MAP(INSERT)
-    MAP(PUSH_FRONT)
-    MAP(PUSH_BACK)
-    MAP(POP_FRONT)
-    MAP(POP_BACK)
-    MAP(ADD)
-    MAP(REMOVE)
-    MAP(M_SIZE)
-    MAP(REMOVE_BY_RANK)
-    MAP(REMOVE_BY_SCORE)
-    MAP(REMOVE_RANGE_BY_RANK)
-    MAP(REMOVE_RANGE_BY_SCORE)
-    MAP(COUNT_RANGE)
-    MAP(GET_BY_RANK)
-    MAP(GET_BY_SCORE)
-    MAP(GET_RANGE_BY_RANK)
-    MAP(GET_RANGE_BY_SCORE)
-    MAP(READ_FROM)
-    MAP(READ_CHAR)
-    MAP(READ_SHORT)
-    MAP(READ_INT)
-    MAP(READ_LONG)
-    MAP(READ_LONG_LONG)
-    MAP(BACKWARD)
-    MAP(FORWARD)
-    MAP(SET_POS)
-    MAP(READ)
-    MAP(WRITE)
-    MAP(LOCATE)
-    MAP(SAVE)
-    MAP(EXIT)
-    MAP(LOGIN)
-    MAP(DISCONNECT_SLAVE)
-    MAP(PING)
-    MAP(PONG)
-    MAP(MULTI)
-    MAP(EXEC)
-    MAP(DISCARD)
-    MAP(WATCH)
-    MAP(UNWATCH)
-    MAP(UPDATE_OFFSET)
-    MAP(RANK_TO_SCORE)
-    MAP(SCORE_TO_RANK)
-    MAP(FRONT)
-    MAP(BACK)
-}
-
-std::unordered_map<std::string, ExecutionResultType> ExecutionResult::strToType;
+std::unordered_map<std::string, ExecutionResultType> ExecutionResult::strToType = {
+        {"OK",ExecutionResultType ::OK},
+        {"SYNTAX_ERROR",ExecutionResultType ::SYNTAX_ERROR},
+        {"INTERNAL_ERROR",ExecutionResultType ::INTERNAL_ERROR},
+        {"LOGIC_ERROR",ExecutionResultType ::LOGIC_ERROR}
+};

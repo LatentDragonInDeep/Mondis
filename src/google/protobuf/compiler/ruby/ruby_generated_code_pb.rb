@@ -28,16 +28,16 @@ Google::Protobuf::DescriptorPool.generated_pool.build do
       repeated :repeated_bytes, :bytes, 29
       repeated :repeated_enum, :enum, 30, "A.B.C.TestEnum"
       repeated :repeated_msg, :message, 31, "A.B.C.TestMessage"
-      map :map_int32_string, :int32, :string, 61
-      map :map_int64_string, :int64, :string, 62
-      map :map_uint32_string, :uint32, :string, 63
-      map :map_uint64_string, :uint64, :string, 64
-      map :map_bool_string, :bool, :string, 65
-      map :map_string_string, :string, :string, 66
-      map :map_string_msg, :string, :message, 67, "A.B.C.TestMessage"
-      map :map_string_enum, :string, :enum, 68, "A.B.C.TestEnum"
-      map :map_string_int32, :string, :int32, 69
-      map :map_string_bool, :string, :bool, 70
+      strToType :map_int32_string, :int32, :string, 61
+      strToType :map_int64_string, :int64, :string, 62
+      strToType :map_uint32_string, :uint32, :string, 63
+      strToType :map_uint64_string, :uint64, :string, 64
+      strToType :map_bool_string, :bool, :string, 65
+      strToType :map_string_string, :string, :string, 66
+      strToType :map_string_msg, :string, :message, 67, "A.B.C.TestMessage"
+      strToType :map_string_enum, :string, :enum, 68, "A.B.C.TestEnum"
+      strToType :map_string_int32, :string, :int32, 69
+      strToType :map_string_bool, :string, :bool, 70
       optional :nested_message, :message, 80, "A.B.C.TestMessage.NestedMessage"
       oneof :my_oneof do
         optional :oneof_int32, :int32, 41

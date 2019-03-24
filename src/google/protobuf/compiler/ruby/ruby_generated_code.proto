@@ -41,16 +41,16 @@ message TestMessage {
     TestMessage oneof_msg = 51;
   }
 
-  map<int32, string> map_int32_string = 61;
-  map<int64, string> map_int64_string = 62;
-  map<uint32, string> map_uint32_string = 63;
-  map<uint64, string> map_uint64_string = 64;
-  map<bool, string> map_bool_string = 65;
-  map<string, string> map_string_string = 66;
-  map<string, TestMessage> map_string_msg = 67;
-  map<string, TestEnum> map_string_enum = 68;
-  map<string, int32> map_string_int32 = 69;
-  map<string, bool> map_string_bool = 70;
+  strToType<int32, string> map_int32_string = 61;
+  strToType<int64, string> map_int64_string = 62;
+  strToType<uint32, string> map_uint32_string = 63;
+  strToType<uint64, string> map_uint64_string = 64;
+  strToType<bool, string> map_bool_string = 65;
+  strToType<string, string> map_string_string = 66;
+  strToType<string, TestMessage> map_string_msg = 67;
+  strToType<string, TestEnum> map_string_enum = 68;
+  strToType<string, int32> map_string_int32 = 69;
+  strToType<string, bool> map_string_bool = 70;
 
   message NestedMessage {
     int32 foo = 1;

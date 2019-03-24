@@ -48,7 +48,6 @@ MondisObject::~MondisObject() {
         case MondisObjectType::RAW_INT:
             delete reinterpret_cast<int *>(objData);
             break;
-        case RAW_BIN:
         case LIST:
         case SET:
         case ZSET:
@@ -284,9 +283,8 @@ string MondisObject::getJson() {
             json += "\"";
             break;
         case MondisObjectType::RAW_INT:
-            json += ("\"" + std::to_string(*((long long *) objData)) + "\"");
+            json += std::to_string(*((long long *) objData));
             break;
-        case RAW_BIN:
         case LIST:
         case SET:
         case ZSET:
@@ -307,7 +305,7 @@ MondisObject *MondisObject::getNullObject() {
     return nullObj;
 }
 
-string MondisObject::typeStrs[] = {"RAW_STRING", "RAW_INT", "RAW_BIN", "LIST", "SET", "ZSET", "HASH", "EMPTY"};
+string MondisObject::typeStrs[] = {"RAW_STRING", "RAW_INT", "LIST", "SET", "ZSET", "HASH", "EMPTY"};
 MondisObject *MondisObject::nullObj = new MondisObject;
 
 bool MondisObject::modified() {

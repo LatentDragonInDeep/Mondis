@@ -103,20 +103,14 @@ int HashMap::getCapacity (int capa)
     return init;
 }
 
-bool HashMap::remove (Key &key)
+bool HashMap::remove (string &key)
 {
-    if(isIntset&&!key.isInteger()) {
-        return false;
-    }
-    if(!isIntset) {
-        key.toString();
-    }
-    int index = getIndex(key.hashCode());
+    int index = getIndex(hash(key));
     Content &content = arrayFrom[index];
     if(content.isList) {
         Entry *cur = content.head->next;
         for (; cur != content.tail; cur = cur->next) {
-            if(key.equals(*cur->key)) {
+            if(key == cur->key) {
                 Entry* pre = cur->pre;
                 pre->next = cur->next;
                 cur->next->pre = pre;
@@ -157,14 +151,14 @@ void HashMap::rehash ()
         if(arrayFrom[i].isList) {
             for (Entry *cur = arrayFrom[i].head->next; cur != arrayFrom[i].tail;)
             {
-                int index = cur->key->hashCode()&(capacity-1);
+                int index = hash(cur->key)&(capacity-1);
                 add(index,cur);
             }
         }
         else{
             auto treeIterator = arrayFrom[i].tree->iterator();
             while (treeIterator.next()) {
-                int index = treeIterator->data->key->hashCode()&(capacity-1);
+                int index = hash(treeIterator->data->key)&(capacity-1);
                 add(index,new Entry(treeIterator->data));
                 delete arrayFrom[i].tree;
             }
@@ -228,7 +222,7 @@ MondisObject *HashMap::locate(Command *command) {
     if ((*command)[0].type != Command::ParamType::PLAIN) {
         return nullptr;
     }
-    Key key((*command)[0].content);
+    KEY(0)
     return get(key);
 }
 
@@ -262,34 +256,7 @@ ExecutionResult HashMap::execute(Command *command) {
     INVALID_AND_RETURN
 }
 
-void HashMap::toStringSet() {
-    if (!isIntset) {
-        return;
-    }
-    arrayTo = new Content[capacity];
-    for (int i = 0; i < capacity; ++i) {
-        if (arrayFrom[i].isList) {
-            for (Entry *cur = arrayFrom[i].head->next; cur != arrayFrom[i].tail;) {
-                string k = cur->key;
-                int index = strHash(k) & (capacity - 1);
-                add(index, cur);
-            }
-        } else {
-            auto treeIterator = arrayFrom[i].tree->iterator();
-            while (treeIterator.next()) {
-                string k = treeIterator->data->key;
-                int index = strHash(k) & (capacity - 1);
-                add(index, new Entry(treeIterator->data));
-                delete arrayFrom[i].tree;
-            }
-        }
-    }
-    delete[] arrayFrom;
-    arrayFrom = arrayTo;
-    isIntset = false;
-}
-
-unsigned int HashMap::strHash(string& str) {
+unsigned int HashMap::hash(string &str) {
     int len = str.size();
     const char * key = str.c_str();
     uint32_t seed = 2017;
@@ -332,18 +299,9 @@ unsigned HashMap::size() {
     return _size;
 }
 
-HashMap::HashMap(unsigned int capa, float loadFactor, bool isIntset, bool isValueNull) :
-        loadFactor(loadFactor), capacity(capa), isIntset(isIntset), isValueNull(isValueNull) {
-    arrayFrom = new Content[capacity];
-}
-
 void HashMap::clear() {
     for (int i = 0; i < capacity; ++i) {
         arrayFrom[i].clear();
     }
-}
-
-HashMap::HashMap(const bool isIntset, const bool isValueNull) : HashMap(16, 0.75f, isIntset, isValueNull) {
-
 }
 

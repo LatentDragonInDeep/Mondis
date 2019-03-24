@@ -126,22 +126,22 @@ message AnyData {
   string str = 2;
   repeated string msgs = 3;
   AnyData nested_data = 4;
-  map<string, string> map_data = 7;
+  strToType<string, string> map_data = 7;
   google.protobuf.Struct struct_data = 8;
   repeated AnyData repeated_data = 9;
 }
 
 message StringtoIntMap {
-  map<string, int32> map = 1;
+  strToType<string, int32> strToType = 1;
 }
 
 message IntToStringMap {
-  map<int32, string> map = 1;
+  strToType<int32, string> strToType = 1;
 }
 
 message MixedMap {
   string msg = 1;
-  map<string, float> map = 2;
+  strToType<string, float> strToType = 2;
   int32 int_value = 3;
 }
 
@@ -152,7 +152,7 @@ message MixedMap2 {
     E2 = 2;
     E3 = 3;
   }
-  map<int32, bool> map = 1;
+  strToType<int32, bool> strToType = 1;
   E ee = 2;
   string msg = 4;
 }
@@ -162,7 +162,7 @@ message MessageMap {
     int32 inner_int = 1;
     string inner_text = 2;
   }
-  map<string, M> map = 1;
+  strToType<string, M> strToType = 1;
 }
 
 message DoubleValueMessage {

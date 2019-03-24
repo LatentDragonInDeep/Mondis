@@ -14,14 +14,14 @@ using namespace std;
 
 class KeyValue :public MondisData{
 public:
-    string key = nullptr;
+    string key = "";
     MondisObject* value = nullptr;
 
     KeyValue(string &k, MondisObject *v) : key(k), value(v) {}
     KeyValue(){};
     KeyValue(KeyValue&& other) = default;
     KeyValue(KeyValue& other):key(other.key),value(other.value) {
-        other.key = nullptr;
+        other.key = "";
         other.value = nullptr;
     }
     bool compare(KeyValue& other) {
@@ -37,7 +37,9 @@ public:
 
     void toJson() {
         json = "";
+        json+="\"";
         json += key;
+        json+="\"";
         if (value == nullptr) {
             json += ":";
             json += value->getJson();
@@ -47,7 +49,7 @@ public:
     KeyValue &operator=(KeyValue &other) {
         key = other.key;
         value = other.value;
-        other.key = nullptr;
+        other.key = "";
         other.value = nullptr;
         return *this;
     };
@@ -74,7 +76,7 @@ public:
 
     Entry(string &key, MondisObject *data) : key(key), object(data) {};
     Entry(KeyValue* kv):key(kv->key),object(kv->value){
-        kv->key= nullptr;
+        kv->key= "";
         kv->value = nullptr;
     };
     Entry(){};
@@ -84,7 +86,9 @@ public:
 
     void toJson() {
         json = "";
+        json+="\"";
         json += key;
+        json+="\"";
         if (object != nullptr) {
             json += " : ";
             json += object->getJson();
@@ -92,7 +96,7 @@ public:
     }
     KeyValue* toKeyValue() {
         KeyValue* res = new KeyValue(key,object);
-        key = nullptr;
+        key = "";
         object = nullptr;
         return res;
     }
@@ -316,11 +320,6 @@ private:
 public:
     HashMap();
     HashMap(unsigned int capacity, float loadFactor);
-
-    HashMap(unsigned int capacity, float loadFactor, bool isIntset, bool isValueNull);
-
-    HashMap(const bool isIntset, const bool isValueNull);
-
     ~HashMap();
 
     bool put(string& key, MondisObject *value);
@@ -331,15 +330,12 @@ public:
 
     void clear();
 private:
-    unsigned int strHash(string& str);
+    unsigned int hash(string &str);
     void rehash();
-    void toStringSet();
     void toTree (int index);
 
     unsigned getIndex(unsigned hash);
     void add(int index,Entry* entry);
-
-    int getCapacity (int capa);
     void toJson();
     HashMap::MapIterator iterator();
 

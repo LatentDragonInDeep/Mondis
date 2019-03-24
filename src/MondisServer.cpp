@@ -50,8 +50,8 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             CHECK_PARAM_NUM(2);
             CHECK_PARAM_TYPE(0, PLAIN)
             CHECK_PARAM_TYPE(1, STRING)
-            Key *key = new Key((*command)[0].content);
-            client->keySpace->put(key, parser.parseObject((*command)[1].content));
+            KEY(0)
+            dbs[client->curDbIndex]->put(key, parser.parseObject((*command)[1].content));
 
             OK_AND_RETURN
         }
@@ -60,7 +60,7 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             CHECK_PARAM_TYPE(0, PLAIN)
             KEY(0)
             MondisObject *data;
-            data = client->keySpace->get(key);
+            data = dbs[client->curDbIndex]->get(key);
             if (data == nullptr) {
                 res.res = "the key does not exists";
                 LOGIC_ERROR_AND_RETURN
@@ -72,14 +72,14 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             CHECK_PARAM_NUM(1)
             CHECK_PARAM_TYPE(0, PLAIN)
             KEY(0)
-            client->keySpace->remove(key);
+            dbs[client->curDbIndex]->remove(key);
             OK_AND_RETURN
         }
         case EXISTS: {
             CHECK_PARAM_NUM(1)
             CHECK_PARAM_TYPE(0, PLAIN)
             KEY(0)
-            bool r = client->keySpace->containsKey(key);
+            bool r = dbs[client->curDbIndex]->containsKey(key);
             res.res = util::to_string(r);
             OK_AND_RETURN
         }
@@ -88,7 +88,7 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             CHECK_PARAM_TYPE(0, PLAIN)
             KEY(0)
             MondisObject *data;
-            data = client->keySpace->get(key);
+            data = dbs[client->curDbIndex]->get(key);
             if (data == nullptr) {
                 res.res = "the key does not exists";
                 LOGIC_ERROR_AND_RETURN
@@ -142,7 +142,7 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
                 LOGIC_ERROR_AND_RETURN
             }
             client->curDbIndex = index;
-            client->keySpace = dbs[index];
+            dbs[client->curDbIndex] = dbs[index];
             OK_AND_RETURN
         }
         case RENAME: {
@@ -151,20 +151,20 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             CHECK_PARAM_TYPE(1, PLAIN)
             Key *key1 = new Key(PARAM(0));
             Key *key2 = new Key(PARAM(1));
-            MondisObject *data = client->keySpace->get(*key1);
+            MondisObject *data = dbs[client->curDbIndex]->get(*key1);
             if (data == nullptr) {
                 res.res = "the object whose key is" + PARAM(0) + "does not exists";
                 LOGIC_ERROR_AND_RETURN
             }
-            client->keySpace->put(key1, nullptr);
-            client->keySpace->remove(*key1);
-            client->keySpace->put(key2, data);
+            dbs[client->curDbIndex]->put(key1, nullptr);
+            dbs[client->curDbIndex]->remove(*key1);
+            dbs[client->curDbIndex]->put(key2, data);
             OK_AND_RETURN
 
         }
         case M_SIZE: {
             CHECK_PARAM_NUM(0);
-            res.res = to_string(client->keySpace->size());
+            res.res = to_string(dbs[client->curDbIndex]->size());
             OK_AND_RETURN
         }
         case SET_CLIENT_NAME: {
@@ -320,7 +320,7 @@ ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
             CHECK_PARAM_NUM(1)
             CHECK_PARAM_TYPE(0, PLAIN)
             KEY(0)
-            if (client->keySpace->get(key) == nullptr) {
+            if (dbs[client->curDbIndex]->get(key) == nullptr) {
                 res.res = "the key ";
                 res.res += PARAM(0);
                 res.res += " does not exists";
@@ -626,7 +626,7 @@ MultiCommand *MondisServer::getUndoCommand(CommandStruct &cstruct, MondisClient 
         switch (cstruct.operation->type) {
             case BIND: {
                 TOKEY(cstruct.operation, 0);
-                MondisObject *original = client->keySpace->get(key);
+                MondisObject *original = dbs[client->curDbIndex]->get(key);
                 if (original != nullptr) {
                     undo->type = BIND;
                     undo->addParam(RAW_PARAM(cstruct.operation, 0));
@@ -639,7 +639,7 @@ MultiCommand *MondisServer::getUndoCommand(CommandStruct &cstruct, MondisClient 
             }
             case DEL: {
                 TOKEY(cstruct.operation, 0);
-                MondisObject *original = client->keySpace->get(key);
+                MondisObject *original = dbs[client->curDbIndex]->get(key);
                 if (original == nullptr) {
                     return res;
                 }
@@ -650,7 +650,7 @@ MultiCommand *MondisServer::getUndoCommand(CommandStruct &cstruct, MondisClient 
             }
             case RENAME: {
                 TOKEY(cstruct.operation, 0);
-                MondisObject *original = client->keySpace->get(key);
+                MondisObject *original = dbs[client->curDbIndex]->get(key);
                 if (original == nullptr) {
                     return res;
                 }
@@ -1107,7 +1107,7 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
         res.res = "you haven't login,please login";
         LOGIC_ERROR_AND_RETURN
     }
-    if (isSlave && cstruct.isModify) {
+    if (serverStatus == SLAVE && cstruct.isModify) {
         if (autoMoveCommandToMaster) {
             Command::destroyCommand(command);
             isRedirecting = true;
@@ -1263,15 +1263,12 @@ void MondisServer::applyConf() {
 
 void MondisServer::init() {
     cout << "is Initializing..." << endl;
-    isLoading = true;
+    runStatus = LOADING
     JSONParser::LexicalParser::init();
-    Command::init();
-    CommandInterpreter::init();
-    ExecutionResult::init();
     initStaticMember();
     interpreter = new CommandInterpreter;
     for (int i = 0; i < databaseNum; ++i) {
-        dbs.push_back(new HashMap(16, 0.75f, false, false));
+        dbs.push_back(new HashMap(16, 0.75f));
     }
 #ifdef WIN32
     self = new MondisClient(this, (SOCKET) 0);
@@ -1290,7 +1287,7 @@ void MondisServer::init() {
     if (json) {
         jsonFileOut.open(workDir + "/" + jsonFile, ios::app);
     }
-    isRecovering = true;
+    runStatus = RECOVERING
     cout << "is Recovering..." << endl;
     if (recoveryStrategy == "json") {
         JSONParser temp((workDir + "/" + recoveryFile).c_str());
@@ -1302,13 +1299,12 @@ void MondisServer::init() {
             execute(interpreter->getCommand(command), self);
         }
     }
-    isRecovering = false;
     if (daemonize) {
         runAsDaemon();
     }
     logFileOut.open(workDir + "/" + logFile, ios::app);
     if (slaveOf) {
-        isReplicatingFromMaster = true;
+        runStatus = REPLACTING
         cout << "is Replicating from master..." << endl;
         string sync = "SLAVE_OF ";
         sync += masterIP;
@@ -1326,18 +1322,8 @@ void MondisServer::init() {
     std::thread eventLoop(&MondisServer::startEventLoop, this);
     //检查超时的客户端，从服务器，主服务器并清理
     std::thread checkAndHandle(&MondisServer::checkAndHandleIdleConnection, this);
-    //向客户端发心跳包
-    sendHeartBeatToClients = new std::thread([&]() {
-        while (true) {
-            clientModifyMtx.lock_shared();
-            for (auto &kv:nameToClients) {
-                kv.second->send("PING");
-            }
-            clientModifyMtx.unlock_shared();
-            std::this_thread::sleep_for(chrono::milliseconds(toClientHeartBeatDuration));
-        }
-    });
     selectAndHandle(true);
+    eventHandler = new std::thread(&MondisServer::eventHandler, this);
 }
 
 void MondisServer::acceptSocket() {
@@ -1757,7 +1743,7 @@ void MondisServer::undoExecute(MultiCommand *command, MondisClient *client) {
 }
 
 MondisObject *MondisServer::chainLocate(Command *command, MondisClient *client) {
-    MondisObject *curObj = client->keySpace->locate(command);
+    MondisObject *curObj = dbs[client->curDbIndex]->locate(command);
     Command *curCommand = command->next;
     while (true) {
         if (curCommand == nullptr || curCommand->type != LOCATE) {
@@ -1978,7 +1964,7 @@ void MondisServer::getJson(string *res) {
 unordered_set<CommandType> MondisServer::modifyCommands;
 unordered_set<CommandType> MondisServer::transactionAboutCommands;
 unordered_set<CommandType> MondisServer::clientControlCommands;
-
+MondisServer* MondisServer::server = nullptr;
 unsigned MondisServer::curClientId = 0;
 
 unsigned MondisServer::nextPeerId() {
@@ -2109,5 +2095,47 @@ void MondisServer::selectAndHandle(bool isClient) {
             }
         }
 #endif
+    }
+}
+
+void MondisServer::send(SOCKET &sock, const string &res) {
+    char buffer[4096];
+    int ret;
+    const char *data = res.data();
+    int hasWrite = 0;
+    while (hasWrite < res.size()) {
+        ret = ::send(sock, data + hasWrite, res.size() - hasWrite, 0);
+        hasWrite += ret;
+    }
+}
+
+string MondisServer::read(SOCKET &sock) {
+    string res;
+    char buffer[4096];
+    int ret;
+    while (true) {
+        ret = recv(sock, buffer, sizeof(buffer), 0);
+        if (ret == SOCKET_ERROR) {
+            return res;
+        }
+        res += string(buffer, ret);
+    }
+}
+
+MondisServer *MondisServer::getInstance() {
+    if (server == nullptr){
+        server = new MondisServer;
+    }
+    return server;
+}
+
+void MondisServer::putToEventQueue(Event *event) {
+    bq.put(event);
+}
+
+void MondisServer::eventHandle() {
+    while (true) {
+        Event *event = bq.take();
+        execute(event->command,event->client)
     }
 }

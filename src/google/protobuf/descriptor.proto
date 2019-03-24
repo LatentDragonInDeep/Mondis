@@ -470,11 +470,11 @@ message MessageOptions {
   // this is a formalization for deprecating messages.
   optional bool deprecated = 3 [default=false];
 
-  // Whether the message is an automatically generated map entry type for the
+  // Whether the message is an automatically generated strToType entry type for the
   // maps field.
   //
   // For maps fields:
-  //     map<KeyType, ValueType> map_field = 1;
+  //     strToType<KeyType, ValueType> map_field = 1;
   // The parsed descriptor looks like:
   //     message MapFieldEntry {
   //         option map_entry = true;
@@ -484,7 +484,7 @@ message MessageOptions {
   //     repeated MapFieldEntry map_field = 1;
   //
   // Implementations may choose not to generate the map_entry=true message, but
-  // use a native map in the target language to hold the keys and values.
+  // use a native strToType in the target language to hold the keys and values.
   // The reflection APIs in such implementations still need to work as
   // if the field is a repeated message field.
   //

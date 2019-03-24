@@ -97,9 +97,9 @@ message RepeatedListValueWrapper {
 }
 
 message MapOfStruct {
-  map<string, google.protobuf.Struct> struct_map = 1;
-  map<string, google.protobuf.Value> value_map = 2;
-  map<string, google.protobuf.ListValue> listvalue_map = 3;
+  strToType<string, google.protobuf.Struct> struct_map = 1;
+  strToType<string, google.protobuf.Value> value_map = 2;
+  strToType<string, google.protobuf.ListValue> listvalue_map = 3;
 }
 
 // Hack to test return types with Struct as top-level message. Struct typers

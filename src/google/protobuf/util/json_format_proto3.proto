@@ -95,22 +95,22 @@ message TestOneof {
 }
 
 message TestMap {
-  map<bool, int32> bool_map = 1;
-  map<int32, int32> int32_map = 2;
-  map<int64, int32> int64_map = 3;
-  map<uint32, int32> uint32_map = 4;
-  map<uint64, int32> uint64_map = 5;
-  map<string, int32> string_map = 6;
+  strToType<bool, int32> bool_map = 1;
+  strToType<int32, int32> int32_map = 2;
+  strToType<int64, int32> int64_map = 3;
+  strToType<uint32, int32> uint32_map = 4;
+  strToType<uint64, int32> uint64_map = 5;
+  strToType<string, int32> string_map = 6;
 }
 
 message TestNestedMap {
-  map<bool, int32> bool_map = 1;
-  map<int32, int32> int32_map = 2;
-  map<int64, int32> int64_map = 3;
-  map<uint32, int32> uint32_map = 4;
-  map<uint64, int32> uint64_map = 5;
-  map<string, int32> string_map = 6;
-  map<string, TestNestedMap> map_map = 7;
+  strToType<bool, int32> bool_map = 1;
+  strToType<int32, int32> int32_map = 2;
+  strToType<int64, int32> int64_map = 3;
+  strToType<uint32, int32> uint32_map = 4;
+  strToType<uint64, int32> uint64_map = 5;
+  strToType<string, int32> string_map = 6;
+  strToType<string, TestNestedMap> map_map = 7;
 }
 
 message TestWrapper {
@@ -171,7 +171,7 @@ message TestListValue {
 
 message TestBoolValue {
   bool bool_value = 1;
-  map<bool, int32> bool_map = 2;
+  strToType<bool, int32> bool_map = 2;
 }
 
 message TestCustomJsonName {

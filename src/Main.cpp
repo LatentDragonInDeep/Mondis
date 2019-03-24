@@ -4,7 +4,7 @@
 #include "MondisServer.h"
 
 int main(int argc, char **argv) {
-    MondisServer *server = new MondisServer;
+    MondisServer *server = MondisServer::getInstance();
     string confFile;
     if (argc > 1) {
         confFile = argv[1];

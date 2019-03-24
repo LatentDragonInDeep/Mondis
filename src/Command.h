@@ -13,10 +13,6 @@
 #define LOGIC_ERROR_AND_RETURN res.type = LOGIC_ERROR;\
                                 return res;
 
-#define PUT(TYPE) map[#TYPE] = CommandType::TYPE;
-
-#define MAP(TYPE) typeToStr[TYPE] = #TYPE;
-
 #define CHECK_PARAM_NUM(x) if(command->params.size()!=x) {\
                              res.type = SYNTAX_ERROR;\
                              res.res = "arguments num error";\
@@ -112,6 +108,8 @@ enum CommandType {
     REMOVE,
     M_SIZE,
     COUNT,
+    UNION,
+    INTERSECT,
     REMOVE_BY_RANK,
     REMOVE_BY_SCORE,
     REMOVE_RANGE_BY_RANK,
@@ -123,17 +121,6 @@ enum CommandType {
     GET_BY_SCORE,
     GET_RANGE_BY_RANK,
     GET_RANGE_BY_SCORE,
-    READ_FROM,
-    READ_CHAR,
-    READ_SHORT,
-    READ_INT,
-    READ_LONG,
-    READ_LONG_LONG,
-    BACKWARD,
-    FORWARD,
-    SET_POS,
-    READ,
-    WRITE,
     TO_STRING,
     TO_INTEGER,
     GET_POS,
@@ -202,13 +189,6 @@ public:
         return typeToStr[type];
     }
 
-    static void init() {
-        strToType["OK"] = OK;
-        strToType["SYNTAX_ERROR"] = SYNTAX_ERROR;
-        strToType["INTERNAL_ERROR"] = INTERNAL_ERROR;
-        strToType["LOGIC_ERROR"] = LOGIC_ERROR;
-    }
-
     static ExecutionResult stringToResult(const std::string &data) {
         ExecutionResult value;
         int divider = data.find_first_of(" ");
@@ -253,8 +233,6 @@ public:
         return res;
     }
     static std::unordered_map<CommandType,std::string> typeToStr;
-
-    static void init();
 
     void addParam(const std::string &param, ParamType t) {
         Param p;
@@ -305,9 +283,7 @@ private:
         Token nextToken();
 
     };
-    static std::unordered_map<std::string,CommandType> map;
-public:
-    static void init();
+    static std::unordered_map<std::string,CommandType> strToType;
 public:
     CommandInterpreter();
     Command* getCommand(std::string& raw);

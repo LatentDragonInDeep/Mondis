@@ -35,6 +35,7 @@
 #include "Command.h"
 #include "JSONParser.h"
 #include "SplayTree.h"
+#include "BlockingQueue.h"
 
 class Log{
 private:
@@ -85,7 +86,6 @@ public:
 #endif
     ClientType type = CLIENT;
     int curDbIndex = 0;
-    HashMap *keySpace = nullptr;
     string name;
     string ip;
     int port;
@@ -149,8 +149,28 @@ public:
     }
 };
 
+class Event {
+public:
+    MondisClient* client;
+    string command;
+};
+
+enum ServerStatus {
+    MASTER,
+    SLAVE,
+    PEER,
+};
+
+enum RunStatus {
+    LOADING,
+    RECOVERING,
+    REPLACTING,
+    RUNNING,
+};
+
 class MondisServer {
 private:
+    static MondisServer* server;
     friend class MondisClient;
     int maxClientNum = 1024;
     int maxCommandReplicaBufferSize = 1024 * 1024;
@@ -189,14 +209,12 @@ private:
     string recoveryStrategy;
     string aofFile;
     string jsonFile;
-    bool isLoading = false;
-    bool isRecovering = false;
-    bool isReplicatingFromMaster = false;
-    bool isMaster = false;
-    bool isSlave = false;
+    ServerStatus serverStatus;
+    RunStatus runStatus;
     unordered_map<unsigned, MondisClient *> idToPeers;
     unordered_map<string, MondisClient *> nameToClients;
-
+    BlockingQueue<Event*> bq;
+    void putToEventQueue(Event* event);
     long long replicaOffset = 0;
     deque<string> *replicaCommandBuffer;
     static unordered_set<CommandType> modifyCommands;
@@ -233,29 +251,9 @@ private:
     fd_set peerFds;
     unordered_map<SOCKET, MondisClient *> socketToClient;
 
-    void send(SOCKET &sock, const string &res) {
-        char buffer[4096];
-        int ret;
-        const char *data = res.data();
-        int hasWrite = 0;
-        while (hasWrite < res.size()) {
-            ret = ::send(sock, data + hasWrite, res.size() - hasWrite, 0);
-            hasWrite += ret;
-        }
-    };
+    void send(SOCKET &sock, const string &res);;
 
-    string read(SOCKET &sock) {
-        string res;
-        char buffer[4096];
-        int ret;
-        while (true) {
-            ret = recv(sock, buffer, sizeof(buffer), 0);
-            if (ret == SOCKET_ERROR) {
-                return res;
-            }
-            res += string(buffer, ret);
-        }
-    };
+    string read(SOCKET &sock);;
 #elif defined(linux)
     int clientsEpollFd;
     int peersEpollFd;
@@ -286,11 +284,13 @@ private:
 
     void selectAndHandle(bool isClient);
 public:
+    static MondisServer* getInstance();
     unsigned id;
     CommandInterpreter *interpreter;
 
+private:
     MondisServer();
-
+public:
     ~MondisServer();
 
     int start(string& confFile);
@@ -324,6 +324,8 @@ private:
     void runAsDaemon();
 
     void init();
+
+    void eventHandle();
 
     void save(string &jsonFile, int dbIndex);
 
@@ -359,11 +361,9 @@ private:
 
     void closeClient(MondisClient *c);
 
-    thread *recvFromMaster = nullptr;
     thread *sendHeartBeatToSlaves = nullptr;
-    thread *sendHeartBeatToClients = nullptr;
-    thread *recvFromSlaves = nullptr;
     thread *propagateIO = nullptr;
+    thread *eventHandler = nullptr;
     bool autoMoveCommandToMaster = true;
 
     void saveAll(const string &jsonFile);

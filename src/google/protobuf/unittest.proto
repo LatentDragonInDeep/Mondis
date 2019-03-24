@@ -969,7 +969,7 @@ message TestHugeFieldNumbers {
     optional int32 group_a = 536870009;
   }
 
-  map<string, string> string_string_map = 536870010;
+  strToType<string, string> string_string_map = 536870010;
 
   oneof oneof_field {
     uint32 oneof_uint32 = 536870011;

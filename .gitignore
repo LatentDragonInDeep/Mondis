@@ -33,5 +33,5 @@
 *.out
 *.app
 
-将删除 .idea/
-将删除 cmake-build-debug/
+.idea/
+cmake-build-debug/

@@ -36,24 +36,86 @@ void protobuf_ShutdownFile_mondis_2eproto();
 
 class Message;
 
-enum Message_MsgType {
-  Message_MsgType_DATA = 1,
-  Message_MsgType_COMMAND = 2
+enum ExecResType {
+  OK = 1,
+  SYNTAX_ERROR = 2,
+  INTERNAL_ERROR = 3,
+  LOGIC_ERROR = 4
 };
-bool Message_MsgType_IsValid(int value);
-const Message_MsgType Message_MsgType_MsgType_MIN = Message_MsgType_DATA;
-const Message_MsgType Message_MsgType_MsgType_MAX = Message_MsgType_COMMAND;
-const int Message_MsgType_MsgType_ARRAYSIZE = Message_MsgType_MsgType_MAX + 1;
+bool ExecResType_IsValid(int value);
+const ExecResType ExecResType_MIN = OK;
+const ExecResType ExecResType_MAX = LOGIC_ERROR;
+const int ExecResType_ARRAYSIZE = ExecResType_MAX + 1;
 
-const ::google::protobuf::EnumDescriptor* Message_MsgType_descriptor();
-inline const ::std::string& Message_MsgType_Name(Message_MsgType value) {
+const ::google::protobuf::EnumDescriptor* ExecResType_descriptor();
+inline const ::std::string& ExecResType_Name(ExecResType value) {
   return ::google::protobuf::internal::NameOfEnum(
-    Message_MsgType_descriptor(), value);
+    ExecResType_descriptor(), value);
 }
-inline bool Message_MsgType_Parse(
-    const ::std::string& name, Message_MsgType* value) {
-  return ::google::protobuf::internal::ParseNamedEnum<Message_MsgType>(
-    Message_MsgType_descriptor(), name, value);
+inline bool ExecResType_Parse(
+    const ::std::string& name, ExecResType* value) {
+  return ::google::protobuf::internal::ParseNamedEnum<ExecResType>(
+    ExecResType_descriptor(), name, value);
+}
+enum MsgType {
+  DATA = 1,
+  COMMAND = 2,
+  EXEC_RES = 3
+};
+bool MsgType_IsValid(int value);
+const MsgType MsgType_MIN = DATA;
+const MsgType MsgType_MAX = EXEC_RES;
+const int MsgType_ARRAYSIZE = MsgType_MAX + 1;
+
+const ::google::protobuf::EnumDescriptor* MsgType_descriptor();
+inline const ::std::string& MsgType_Name(MsgType value) {
+  return ::google::protobuf::internal::NameOfEnum(
+    MsgType_descriptor(), value);
+}
+inline bool MsgType_Parse(
+    const ::std::string& name, MsgType* value) {
+  return ::google::protobuf::internal::ParseNamedEnum<MsgType>(
+    MsgType_descriptor(), name, value);
+}
+enum DataType {
+  SYNC_DATA = 1,
+  CONTROL_MSG = 2
+};
+bool DataType_IsValid(int value);
+const DataType DataType_MIN = SYNC_DATA;
+const DataType DataType_MAX = CONTROL_MSG;
+const int DataType_ARRAYSIZE = DataType_MAX + 1;
+
+const ::google::protobuf::EnumDescriptor* DataType_descriptor();
+inline const ::std::string& DataType_Name(DataType value) {
+  return ::google::protobuf::internal::NameOfEnum(
+    DataType_descriptor(), value);
+}
+inline bool DataType_Parse(
+    const ::std::string& name, DataType* value) {
+  return ::google::protobuf::internal::ParseNamedEnum<DataType>(
+    DataType_descriptor(), name, value);
+}
+enum CommandType {
+  CLIENT_COMMAND = 1,
+  MASTER_COMMAND = 2,
+  PEER_COMMAND = 3,
+  SLAVE_FORWARD = 4
+};
+bool CommandType_IsValid(int value);
+const CommandType CommandType_MIN = CLIENT_COMMAND;
+const CommandType CommandType_MAX = SLAVE_FORWARD;
+const int CommandType_ARRAYSIZE = CommandType_MAX + 1;
+
+const ::google::protobuf::EnumDescriptor* CommandType_descriptor();
+inline const ::std::string& CommandType_Name(CommandType value) {
+  return ::google::protobuf::internal::NameOfEnum(
+    CommandType_descriptor(), value);
+}
+inline bool CommandType_Parse(
+    const ::std::string& name, CommandType* value) {
+  return ::google::protobuf::internal::ParseNamedEnum<CommandType>(
+    CommandType_descriptor(), name, value);
 }
 // ===================================================================
 
@@ -109,40 +171,16 @@ class Message : public ::google::protobuf::Message {
 
   // nested types ----------------------------------------------------
 
-  typedef Message_MsgType MsgType;
-  static const MsgType DATA = Message_MsgType_DATA;
-  static const MsgType COMMAND = Message_MsgType_COMMAND;
-  static inline bool MsgType_IsValid(int value) {
-    return Message_MsgType_IsValid(value);
-  }
-  static const MsgType MsgType_MIN =
-    Message_MsgType_MsgType_MIN;
-  static const MsgType MsgType_MAX =
-    Message_MsgType_MsgType_MAX;
-  static const int MsgType_ARRAYSIZE =
-    Message_MsgType_MsgType_ARRAYSIZE;
-  static inline const ::google::protobuf::EnumDescriptor*
-  MsgType_descriptor() {
-    return Message_MsgType_descriptor();
-  }
-  static inline const ::std::string& MsgType_Name(MsgType value) {
-    return Message_MsgType_Name(value);
-  }
-  static inline bool MsgType_Parse(const ::std::string& name,
-      MsgType* value) {
-    return Message_MsgType_Parse(name, value);
-  }
-
   // accessors -------------------------------------------------------
 
-  // required .mondis.Message.MsgType type = 1;
+  // required .mondis.MsgType type = 1;
   inline bool has_type() const;
   inline void clear_type();
   static const int kTypeFieldNumber = 1;
-  inline ::mondis::Message_MsgType type() const;
-  inline void set_type(::mondis::Message_MsgType value);
+  inline ::mondis::MsgType type() const;
+  inline void set_type(::mondis::MsgType value);
 
-  // required string content = 2;
+  // optional string content = 2;
   inline bool has_content() const;
   inline void clear_content();
   static const int kContentFieldNumber = 2;
@@ -154,20 +192,75 @@ class Message : public ::google::protobuf::Message {
   inline ::std::string* release_content();
   inline void set_allocated_content(::std::string* content);
 
+  // optional .mondis.ExecResType res_type = 3;
+  inline bool has_res_type() const;
+  inline void clear_res_type();
+  static const int kResTypeFieldNumber = 3;
+  inline ::mondis::ExecResType res_type() const;
+  inline void set_res_type(::mondis::ExecResType value);
+
+  // optional .mondis.DataType data_type = 4;
+  inline bool has_data_type() const;
+  inline void clear_data_type();
+  static const int kDataTypeFieldNumber = 4;
+  inline ::mondis::DataType data_type() const;
+  inline void set_data_type(::mondis::DataType value);
+
+  // optional .mondis.CommandType command_type = 5;
+  inline bool has_command_type() const;
+  inline void clear_command_type();
+  static const int kCommandTypeFieldNumber = 5;
+  inline ::mondis::CommandType command_type() const;
+  inline void set_command_type(::mondis::CommandType value);
+
+  // optional string client_name = 6;
+  inline bool has_client_name() const;
+  inline void clear_client_name();
+  static const int kClientNameFieldNumber = 6;
+  inline const ::std::string& client_name() const;
+  inline void set_client_name(const ::std::string& value);
+  inline void set_client_name(const char* value);
+  inline void set_client_name(const char* value, size_t size);
+  inline ::std::string* mutable_client_name();
+  inline ::std::string* release_client_name();
+  inline void set_allocated_client_name(::std::string* client_name);
+
+  // optional int32 slave_id = 7;
+  inline bool has_slave_id() const;
+  inline void clear_slave_id();
+  static const int kSlaveIdFieldNumber = 7;
+  inline ::google::protobuf::int32 slave_id() const;
+  inline void set_slave_id(::google::protobuf::int32 value);
+
   // @@protoc_insertion_point(class_scope:mondis.Message)
  private:
   inline void set_has_type();
   inline void clear_has_type();
   inline void set_has_content();
   inline void clear_has_content();
+  inline void set_has_res_type();
+  inline void clear_has_res_type();
+  inline void set_has_data_type();
+  inline void clear_has_data_type();
+  inline void set_has_command_type();
+  inline void clear_has_command_type();
+  inline void set_has_client_name();
+  inline void clear_has_client_name();
+  inline void set_has_slave_id();
+  inline void clear_has_slave_id();
 
   ::google::protobuf::UnknownFieldSet _unknown_fields_;
 
   ::std::string* content_;
   int type_;
+  int res_type_;
+  int data_type_;
+  int command_type_;
+  ::std::string* client_name_;
+  ::google::protobuf::int32 slave_id_;
 
   mutable int _cached_size_;
-  ::google::protobuf::uint32 _has_bits_[(2 + 31) / 32];
+  ::google::protobuf::uint32 _has_bits_[(7 + 31) / 32];
 
   friend void  protobuf_AddDesc_mondis_2eproto();
   friend void protobuf_AssignDesc_mondis_2eproto();
@@ -183,7 +276,7 @@ class Message : public ::google::protobuf::Message {
 
 // Message
 
-// required .mondis.Message.MsgType type = 1;
+// required .mondis.MsgType type = 1;
 inline bool Message::has_type() const {
   return (_has_bits_[0] & 0x00000001u) != 0;
 }
@@ -197,16 +290,16 @@ inline void Message::clear_type() {
   type_ = 1;
   clear_has_type();
 }
-inline ::mondis::Message_MsgType Message::type() const {
-  return static_cast< ::mondis::Message_MsgType >(type_);
+inline ::mondis::MsgType Message::type() const {
+  return static_cast< ::mondis::MsgType >(type_);
 }
-inline void Message::set_type(::mondis::Message_MsgType value) {
-  assert(::mondis::Message_MsgType_IsValid(value));
+inline void Message::set_type(::mondis::MsgType value) {
+  assert(::mondis::MsgType_IsValid(value));
   set_has_type();
   type_ = value;
 }
 
-// required string content = 2;
+// optional string content = 2;
 inline bool Message::has_content() const {
   return (_has_bits_[0] & 0x00000002u) != 0;
 }
@@ -276,6 +369,167 @@ inline void Message::set_allocated_content(::std::string* content) {
   }
 }
 
+// optional .mondis.ExecResType res_type = 3;
+inline bool Message::has_res_type() const {
+  return (_has_bits_[0] & 0x00000004u) != 0;
+}
+inline void Message::set_has_res_type() {
+  _has_bits_[0] |= 0x00000004u;
+}
+inline void Message::clear_has_res_type() {
+  _has_bits_[0] &= ~0x00000004u;
+}
+inline void Message::clear_res_type() {
+  res_type_ = 1;
+  clear_has_res_type();
+}
+inline ::mondis::ExecResType Message::res_type() const {
+  return static_cast< ::mondis::ExecResType >(res_type_);
+}
+inline void Message::set_res_type(::mondis::ExecResType value) {
+  assert(::mondis::ExecResType_IsValid(value));
+  set_has_res_type();
+  res_type_ = value;
+}
+
+// optional .mondis.DataType data_type = 4;
+inline bool Message::has_data_type() const {
+  return (_has_bits_[0] & 0x00000008u) != 0;
+}
+inline void Message::set_has_data_type() {
+  _has_bits_[0] |= 0x00000008u;
+}
+inline void Message::clear_has_data_type() {
+  _has_bits_[0] &= ~0x00000008u;
+}
+inline void Message::clear_data_type() {
+  data_type_ = 1;
+  clear_has_data_type();
+}
+inline ::mondis::DataType Message::data_type() const {
+  return static_cast< ::mondis::DataType >(data_type_);
+}
+inline void Message::set_data_type(::mondis::DataType value) {
+  assert(::mondis::DataType_IsValid(value));
+  set_has_data_type();
+  data_type_ = value;
+}
+
+// optional .mondis.CommandType command_type = 5;
+inline bool Message::has_command_type() const {
+  return (_has_bits_[0] & 0x00000010u) != 0;
+}
+inline void Message::set_has_command_type() {
+  _has_bits_[0] |= 0x00000010u;
+}
+inline void Message::clear_has_command_type() {
+  _has_bits_[0] &= ~0x00000010u;
+}
+inline void Message::clear_command_type() {
+  command_type_ = 1;
+  clear_has_command_type();
+}
+inline ::mondis::CommandType Message::command_type() const {
+  return static_cast< ::mondis::CommandType >(command_type_);
+}
+inline void Message::set_command_type(::mondis::CommandType value) {
+  assert(::mondis::CommandType_IsValid(value));
+  set_has_command_type();
+  command_type_ = value;
+}
+
+// optional string client_name = 6;
+inline bool Message::has_client_name() const {
+  return (_has_bits_[0] & 0x00000020u) != 0;
+}
+inline void Message::set_has_client_name() {
+  _has_bits_[0] |= 0x00000020u;
+}
+inline void Message::clear_has_client_name() {
+  _has_bits_[0] &= ~0x00000020u;
+}
+inline void Message::clear_client_name() {
+  if (client_name_ != &::google::protobuf::internal::kEmptyString) {
+    client_name_->clear();
+  }
+  clear_has_client_name();
+}
+inline const ::std::string& Message::client_name() const {
+  return *client_name_;
+}
+inline void Message::set_client_name(const ::std::string& value) {
+  set_has_client_name();
+  if (client_name_ == &::google::protobuf::internal::kEmptyString) {
+    client_name_ = new ::std::string;
+  }
+  client_name_->assign(value);
+}
+inline void Message::set_client_name(const char* value) {
+  set_has_client_name();
+  if (client_name_ == &::google::protobuf::internal::kEmptyString) {
+    client_name_ = new ::std::string;
+  }
+  client_name_->assign(value);
+}
+inline void Message::set_client_name(const char* value, size_t size) {
+  set_has_client_name();
+  if (client_name_ == &::google::protobuf::internal::kEmptyString) {
+    client_name_ = new ::std::string;
+  }
+  client_name_->assign(reinterpret_cast<const char*>(value), size);
+}
+inline ::std::string* Message::mutable_client_name() {
+  set_has_client_name();
+  if (client_name_ == &::google::protobuf::internal::kEmptyString) {
+    client_name_ = new ::std::string;
+  }
+  return client_name_;
+}
+inline ::std::string* Message::release_client_name() {
+  clear_has_client_name();
+  if (client_name_ == &::google::protobuf::internal::kEmptyString) {
+    return NULL;
+  } else {
+    ::std::string* temp = client_name_;
+    client_name_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+    return temp;
+  }
+}
+inline void Message::set_allocated_client_name(::std::string* client_name) {
+  if (client_name_ != &::google::protobuf::internal::kEmptyString) {
+    delete client_name_;
+  }
+  if (client_name) {
+    set_has_client_name();
+    client_name_ = client_name;
+  } else {
+    clear_has_client_name();
+    client_name_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+  }
+}
+
+// optional int32 slave_id = 7;
+inline bool Message::has_slave_id() const {
+  return (_has_bits_[0] & 0x00000040u) != 0;
+}
+inline void Message::set_has_slave_id() {
+  _has_bits_[0] |= 0x00000040u;
+}
+inline void Message::clear_has_slave_id() {
+  _has_bits_[0] &= ~0x00000040u;
+}
+inline void Message::clear_slave_id() {
+  slave_id_ = 0;
+  clear_has_slave_id();
+}
+inline ::google::protobuf::int32 Message::slave_id() const {
+  return slave_id_;
+}
+inline void Message::set_slave_id(::google::protobuf::int32 value) {
+  set_has_slave_id();
+  slave_id_ = value;
+}
+
 
 // @@protoc_insertion_point(namespace_scope)
 
@@ -286,8 +540,20 @@ namespace google {
 namespace protobuf {
 
 template <>
-inline const EnumDescriptor* GetEnumDescriptor< ::mondis::Message_MsgType>() {
-  return ::mondis::Message_MsgType_descriptor();
+inline const EnumDescriptor* GetEnumDescriptor< ::mondis::ExecResType>() {
+  return ::mondis::ExecResType_descriptor();
+}
+template <>
+inline const EnumDescriptor* GetEnumDescriptor< ::mondis::MsgType>() {
+  return ::mondis::MsgType_descriptor();
+}
+template <>
+inline const EnumDescriptor* GetEnumDescriptor< ::mondis::DataType>() {
+  return ::mondis::DataType_descriptor();
+}
+template <>
+inline const EnumDescriptor* GetEnumDescriptor< ::mondis::CommandType>() {
+  return ::mondis::CommandType_descriptor();
 }
 
 }  // namespace google

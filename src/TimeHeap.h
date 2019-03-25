@@ -10,14 +10,15 @@
 #include <string>
 #include <condition_variable>
 #include <mutex>
+#include <chrono>
 
 using namespace std;
 
 class TTLStruct {
 public:
     string key;
-    time_t ttl;
-    int dbIndex;
+    duration;
+    string client_name;
     bool operator<(TTLStruct& other) {
         return ttl>other.ttl;
     }

@@ -3,12 +3,16 @@
 //
 
 #include "TimeHeap.h"
+#include "mondis.pb.h"
+
 
 void TimeHeap::start() {
     while (true) {
         if (!ttlQueue.empty()) {
             TTLStruct ts = ttlQueue.pop();
-            ts.
+
+        } else{
+            notEmptyCV.wait();
         }
     }
 }

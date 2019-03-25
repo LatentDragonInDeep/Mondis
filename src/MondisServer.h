@@ -36,6 +36,7 @@
 #include "JSONParser.h"
 #include "SplayTree.h"
 #include "BlockingQueue.h"
+#include "mondis.pb.h"
 
 class Log{
 private:
@@ -149,12 +150,6 @@ public:
     }
 };
 
-class Event {
-public:
-    MondisClient* client;
-    string command;
-};
-
 enum ServerStatus {
     MASTER,
     SLAVE,
@@ -213,7 +208,7 @@ private:
     RunStatus runStatus;
     unordered_map<unsigned, MondisClient *> idToPeers;
     unordered_map<string, MondisClient *> nameToClients;
-    BlockingQueue<Event*> bq;
+    BlockingQueue<Message*> bq;
     void putToEventQueue(Event* event);
     long long replicaOffset = 0;
     deque<string> *replicaCommandBuffer;

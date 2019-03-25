@@ -1,0 +1,40 @@
+package mondis;
+
+//命令执行结果
+enum ExecResType {
+    OK = 1;
+    SYNTAX_ERROR = 2;
+    INTERNAL_ERROR = 3;
+    LOGIC_ERROR = 4;
+}
+
+//通信消息类型
+enum MsgType {
+    DATA = 1;
+    COMMAND = 2;
+    EXEC_RES = 3;
+}
+
+//数据类型
+enum DataType {
+    SYNC_DATA = 1;
+    CONTROL_MSG = 2;
+}
+
+//命令类型
+enum CommandType {
+    CLIENT_COMMAND = 1;
+    MASTER_COMMAND = 2;
+    PEER_COMMAND = 3;
+    SLAVE_FORWARD = 4;
+}
+
+message Message {
+    required MsgType type= 1; //消息类型
+    optional string content = 2; //内容
+    optional ExecResType res_type= 3; //执行结果类型
+    optional DataType data_type= 4; //数据类型
+    optional CommandType command_type = 5; //命令来源
+    optional string client_name = 6; //客户端name
+    optional int32 slave_id = 7; //从服务器id
+}

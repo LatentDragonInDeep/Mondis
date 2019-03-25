@@ -100,11 +100,12 @@ enum CommandType {
   CLIENT_COMMAND = 1,
   MASTER_COMMAND = 2,
   PEER_COMMAND = 3,
-  SLAVE_FORWARD = 4
+  SLAVE_FORWARD = 4,
+  TIMER_COMMAND = 5
 };
 bool CommandType_IsValid(int value);
 const CommandType CommandType_MIN = CLIENT_COMMAND;
-const CommandType CommandType_MAX = SLAVE_FORWARD;
+const CommandType CommandType_MAX = TIMER_COMMAND;
 const int CommandType_ARRAYSIZE = CommandType_MAX + 1;
 
 const ::google::protobuf::EnumDescriptor* CommandType_descriptor();
@@ -173,12 +174,12 @@ class Message : public ::google::protobuf::Message {
 
   // accessors -------------------------------------------------------
 
-  // required .mondis.MsgType type = 1;
-  inline bool has_type() const;
-  inline void clear_type();
-  static const int kTypeFieldNumber = 1;
-  inline ::mondis::MsgType type() const;
-  inline void set_type(::mondis::MsgType value);
+  // required .mondis.MsgType msg_type = 1;
+  inline bool has_msg_type() const;
+  inline void clear_msg_type();
+  static const int kMsgTypeFieldNumber = 1;
+  inline ::mondis::MsgType msg_type() const;
+  inline void set_msg_type(::mondis::MsgType value);
 
   // optional string content = 2;
   inline bool has_content() const;
@@ -234,8 +235,8 @@ class Message : public ::google::protobuf::Message {
 
   // @@protoc_insertion_point(class_scope:mondis.Message)
  private:
-  inline void set_has_type();
-  inline void clear_has_type();
+  inline void set_has_msg_type();
+  inline void clear_has_msg_type();
   inline void set_has_content();
   inline void clear_has_content();
   inline void set_has_res_type();
@@ -252,7 +253,7 @@ class Message : public ::google::protobuf::Message {
   ::google::protobuf::UnknownFieldSet _unknown_fields_;
 
   ::std::string* content_;
-  int type_;
+  int msg_type_;
   int res_type_;
   int data_type_;
   int command_type_;
@@ -276,27 +277,27 @@ class Message : public ::google::protobuf::Message {
 
 // Message
 
-// required .mondis.MsgType type = 1;
-inline bool Message::has_type() const {
+// required .mondis.MsgType msg_type = 1;
+inline bool Message::has_msg_type() const {
   return (_has_bits_[0] & 0x00000001u) != 0;
 }
-inline void Message::set_has_type() {
+inline void Message::set_has_msg_type() {
   _has_bits_[0] |= 0x00000001u;
 }
-inline void Message::clear_has_type() {
+inline void Message::clear_has_msg_type() {
   _has_bits_[0] &= ~0x00000001u;
 }
-inline void Message::clear_type() {
-  type_ = 1;
-  clear_has_type();
+inline void Message::clear_msg_type() {
+  msg_type_ = 1;
+  clear_has_msg_type();
 }
-inline ::mondis::MsgType Message::type() const {
-  return static_cast< ::mondis::MsgType >(type_);
+inline ::mondis::MsgType Message::msg_type() const {
+  return static_cast< ::mondis::MsgType >(msg_type_);
 }
-inline void Message::set_type(::mondis::MsgType value) {
+inline void Message::set_msg_type(::mondis::MsgType value) {
   assert(::mondis::MsgType_IsValid(value));
-  set_has_type();
-  type_ = value;
+  set_has_msg_type();
+  msg_type_ = value;
 }
 
 // optional string content = 2;

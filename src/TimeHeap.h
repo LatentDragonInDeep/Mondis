@@ -11,13 +11,15 @@
 #include <condition_variable>
 #include <mutex>
 #include <chrono>
+#include <ratio>
 
 using namespace std;
+using namespace chrono;
 
 class TTLStruct {
 public:
     string key;
-    duration;
+    time_point<system_clock,seconds> ttl;
     string client_name;
     bool operator<(TTLStruct& other) {
         return ttl>other.ttl;

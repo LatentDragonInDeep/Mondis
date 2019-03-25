@@ -27,10 +27,11 @@ enum CommandType {
     MASTER_COMMAND = 2;
     PEER_COMMAND = 3;
     SLAVE_FORWARD = 4;
+    TIMER_COMMAND = 5;
 }
 
 message Message {
-    required MsgType type= 1; //消息类型
+    required MsgType msg_type= 1; //消息类型
     optional string content = 2; //内容
     optional ExecResType res_type= 3; //执行结果类型
     optional DataType data_type= 4; //数据类型

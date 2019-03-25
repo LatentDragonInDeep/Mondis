@@ -39,7 +39,7 @@ void protobuf_AssignDesc_mondis_2eproto() {
   GOOGLE_CHECK(file != NULL);
   Message_descriptor_ = file->message_type(0);
   static const int Message_offsets_[7] = {
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Message, type_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Message, msg_type_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Message, content_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Message, res_type_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Message, data_type_),
@@ -92,19 +92,20 @@ void protobuf_AddDesc_mondis_2eproto() {
   GOOGLE_PROTOBUF_VERIFY_VERSION;
 
   ::google::protobuf::DescriptorPool::InternalAddGeneratedFile(
-    "\n\014mondis.proto\022\006mondis\"\327\001\n\007Message\022\035\n\004ty"
-    "pe\030\001 \002(\0162\017.mondis.MsgType\022\017\n\007content\030\002 \001"
-    "(\t\022%\n\010res_type\030\003 \001(\0162\023.mondis.ExecResTyp"
-    "e\022#\n\tdata_type\030\004 \001(\0162\020.mondis.DataType\022)"
-    "\n\014command_type\030\005 \001(\0162\023.mondis.CommandTyp"
-    "e\022\023\n\013client_name\030\006 \001(\t\022\020\n\010slave_id\030\007 \001(\005"
-    "*L\n\013ExecResType\022\006\n\002OK\020\001\022\020\n\014SYNTAX_ERROR\020"
-    "\002\022\022\n\016INTERNAL_ERROR\020\003\022\017\n\013LOGIC_ERROR\020\004*."
-    "\n\007MsgType\022\010\n\004DATA\020\001\022\013\n\007COMMAND\020\002\022\014\n\010EXEC"
-    "_RES\020\003**\n\010DataType\022\r\n\tSYNC_DATA\020\001\022\017\n\013CON"
-    "TROL_MSG\020\002*Z\n\013CommandType\022\022\n\016CLIENT_COMM"
-    "AND\020\001\022\022\n\016MASTER_COMMAND\020\002\022\020\n\014PEER_COMMAN"
-    "D\020\003\022\021\n\rSLAVE_FORWARD\020\004", 502);
+    "\n\014mondis.proto\022\006mondis\"\333\001\n\007Message\022!\n\010ms"
+    "g_type\030\001 \002(\0162\017.mondis.MsgType\022\017\n\007content"
+    "\030\002 \001(\t\022%\n\010res_type\030\003 \001(\0162\023.mondis.ExecRe"
+    "sType\022#\n\tdata_type\030\004 \001(\0162\020.mondis.DataTy"
+    "pe\022)\n\014command_type\030\005 \001(\0162\023.mondis.Comman"
+    "dType\022\023\n\013client_name\030\006 \001(\t\022\020\n\010slave_id\030\007"
+    " \001(\005*L\n\013ExecResType\022\006\n\002OK\020\001\022\020\n\014SYNTAX_ER"
+    "ROR\020\002\022\022\n\016INTERNAL_ERROR\020\003\022\017\n\013LOGIC_ERROR"
+    "\020\004*.\n\007MsgType\022\010\n\004DATA\020\001\022\013\n\007COMMAND\020\002\022\014\n\010"
+    "EXEC_RES\020\003**\n\010DataType\022\r\n\tSYNC_DATA\020\001\022\017\n"
+    "\013CONTROL_MSG\020\002*m\n\013CommandType\022\022\n\016CLIENT_"
+    "COMMAND\020\001\022\022\n\016MASTER_COMMAND\020\002\022\020\n\014PEER_CO"
+    "MMAND\020\003\022\021\n\rSLAVE_FORWARD\020\004\022\021\n\rTIMER_COMM"
+    "AND\020\005", 525);
   ::google::protobuf::MessageFactory::InternalRegisterGeneratedFile(
     "mondis.proto", &protobuf_RegisterTypes);
   Message::default_instance_ = new Message();
@@ -173,6 +174,7 @@ bool CommandType_IsValid(int value) {
     case 2:
     case 3:
     case 4:
+    case 5:
       return true;
     default:
       return false;
@@ -183,7 +185,7 @@ bool CommandType_IsValid(int value) {
 // ===================================================================
 
 #ifndef _MSC_VER
-const int Message::kTypeFieldNumber;
+const int Message::kMsgTypeFieldNumber;
 const int Message::kContentFieldNumber;
 const int Message::kResTypeFieldNumber;
 const int Message::kDataTypeFieldNumber;
@@ -208,7 +210,7 @@ Message::Message(const Message& from)
 
 void Message::SharedCtor() {
   _cached_size_ = 0;
-  type_ = 1;
+  msg_type_ = 1;
   content_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
   res_type_ = 1;
   data_type_ = 1;
@@ -256,7 +258,7 @@ Message* Message::New() const {
 
 void Message::Clear() {
   if (_has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    type_ = 1;
+    msg_type_ = 1;
     if (has_content()) {
       if (content_ != &::google::protobuf::internal::kEmptyString) {
         content_->clear();
@@ -282,7 +284,7 @@ bool Message::MergePartialFromCodedStream(
   ::google::protobuf::uint32 tag;
   while ((tag = input->ReadTag()) != 0) {
     switch (::google::protobuf::internal::WireFormatLite::GetTagFieldNumber(tag)) {
-      // required .mondis.MsgType type = 1;
+      // required .mondis.MsgType msg_type = 1;
       case 1: {
         if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
             ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
@@ -291,7 +293,7 @@ bool Message::MergePartialFromCodedStream(
                    int, ::google::protobuf::internal::WireFormatLite::TYPE_ENUM>(
                  input, &value)));
           if (::mondis::MsgType_IsValid(value)) {
-            set_type(static_cast< ::mondis::MsgType >(value));
+            set_msg_type(static_cast< ::mondis::MsgType >(value));
           } else {
             mutable_unknown_fields()->AddVarint(1, value);
           }
@@ -433,10 +435,10 @@ bool Message::MergePartialFromCodedStream(
 
 void Message::SerializeWithCachedSizes(
     ::google::protobuf::io::CodedOutputStream* output) const {
-  // required .mondis.MsgType type = 1;
-  if (has_type()) {
+  // required .mondis.MsgType msg_type = 1;
+  if (has_msg_type()) {
     ::google::protobuf::internal::WireFormatLite::WriteEnum(
-      1, this->type(), output);
+      1, this->msg_type(), output);
   }
 
   // optional string content = 2;
@@ -488,10 +490,10 @@ void Message::SerializeWithCachedSizes(
 
 ::google::protobuf::uint8* Message::SerializeWithCachedSizesToArray(
     ::google::protobuf::uint8* target) const {
-  // required .mondis.MsgType type = 1;
-  if (has_type()) {
+  // required .mondis.MsgType msg_type = 1;
+  if (has_msg_type()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteEnumToArray(
-      1, this->type(), target);
+      1, this->msg_type(), target);
   }
 
   // optional string content = 2;
@@ -548,10 +550,10 @@ int Message::ByteSize() const {
   int total_size = 0;
 
   if (_has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    // required .mondis.MsgType type = 1;
-    if (has_type()) {
+    // required .mondis.MsgType msg_type = 1;
+    if (has_msg_type()) {
       total_size += 1 +
-        ::google::protobuf::internal::WireFormatLite::EnumSize(this->type());
+        ::google::protobuf::internal::WireFormatLite::EnumSize(this->msg_type());
     }
 
     // optional string content = 2;
@@ -620,8 +622,8 @@ void Message::MergeFrom(const ::google::protobuf::Message& from) {
 void Message::MergeFrom(const Message& from) {
   GOOGLE_CHECK_NE(&from, this);
   if (from._has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (from.has_type()) {
-      set_type(from.type());
+    if (from.has_msg_type()) {
+      set_msg_type(from.msg_type());
     }
     if (from.has_content()) {
       set_content(from.content());
@@ -665,7 +667,7 @@ bool Message::IsInitialized() const {
 
 void Message::Swap(Message* other) {
   if (other != this) {
-    std::swap(type_, other->type_);
+    std::swap(msg_type_, other->msg_type_);
     std::swap(content_, other->content_);
     std::swap(res_type_, other->res_type_);
     std::swap(data_type_, other->data_type_);

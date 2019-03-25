@@ -14,16 +14,16 @@
                                 return res;
 
 #define CHECK_PARAM_NUM(x) if(command->params.size()!=x) {\
-                             res.type = SYNTAX_ERROR;\
-                             res.res = "arguments num error";\
+                             desc.type = SYNTAX_ERROR;\
+                             desc.desc = "arguments num error";\
                              LOGIC_ERROR_AND_RETURN\
                              }
 
 #define OK_AND_RETURN res.type = OK;\
                        return res;
 
-#define INVALID_AND_RETURN res.res = "Invalid command";\
-                             return res;
+#define INVALID_AND_RETURN desc.desc = "Invalid command";\
+                             return desc;
 
 #define CHECK_INT_LEGAL(DATA, NAME) if(!util::toInteger(DATA,NAME)) {\
                                     res.res = "argument can not be transformed to int";\
@@ -40,12 +40,12 @@
                                       CHECK_INT_LEGAL((*command)[INDEX].content,NAME)
 
 #define CHECK_START if(start<0) {\
-                     res.res = "start under zero!";\
+                     desc.desc = "start under zero!";\
                      LOGIC_ERROR_AND_RETURN\
                      }
 
 #define CHECK_END(size) if(end>(int)size) {\
-                     res.res = "end over flow!";\
+                     desc.desc = "end over flow!";\
                      LOGIC_ERROR_AND_RETURN\
                      }
 
@@ -56,14 +56,14 @@
                              CHECK_END(SIZE)
 
 #define CHECK_PARAM_TYPE(INDEX, TYPE) if((*command)[INDEX].type!=Command::ParamType::TYPE) {\
-                                        res.res = "Invalid param";\
-                                        res.type = SYNTAX_ERROR;\
-                                        return res;\
+                                        desc.desc = "Invalid param";\
+                                        desc.type = SYNTAX_ERROR;\
+                                        return desc;\
                                         }
 
 #define KEY(INDEX) string key = (*command)[INDEX].content;
 
-#define TOKEY(COMMAND, INDEX) Key key((*COMMAND)[INDEX].content);
+#define TOKEY(COMMAND, INDEX) string key = (*COMMAND)[INDEX].content;
 
 #define CHECK_PARAM_LENGTH(INDEX, LENGTH) if((*command)[INDEX].content.size()!=LENGTH) { \
                                             res.res = "argument length error";\
@@ -174,14 +174,14 @@ public:
     static std::string typeToStr[];
     static std::unordered_map<std::string, ExecutionResultType> strToType;
     ExecutionResultType type = OK;
-    std::string res;
+    std::string desc;
     bool needSend = true;
     ExecutionResult():type(LOGIC_ERROR){};
     std::string toString() {
         std::string res;
         res+=typeToStr[type];
         res+=" ";
-        res+=this->res;
+        res+=this->desc;
         return res;
     }
 
@@ -195,7 +195,7 @@ public:
         std::string typeStr = data.substr(0, divider);
         std::string resStr = data.substr(divider + 1);
         value.type = strToType[typeStr];
-        value.res = resStr;
+        value.desc = resStr;
         return value;
     }
 };

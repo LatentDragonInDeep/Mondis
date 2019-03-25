@@ -22,7 +22,7 @@ public class SimpleClient {
                     StringBuilder builder = new StringBuilder();
                     while (true) {
                         try {
-                            selector.select();
+                            selector.selectDb();
                             Iterator<SelectionKey> iterator = selector.selectedKeys().iterator();
                             while (iterator.hasNext()){
                                 SelectionKey key = iterator.next();
@@ -33,11 +33,11 @@ public class SimpleClient {
                                     while ((hasRead = sc.read(buffer))!=0){
                                         builder.append(new String(buffer.array(),0,hasRead));
                                     }
-                                    String res = builder.toString();
-                                    if(res.equals("PING")){
+                                    String desc = builder.toString();
+                                    if(desc.equals("PING")){
                                         channel.write(ByteBuffer.wrap("PONG".getBytes()));
                                     }else{
-                                        System.out.println(res);
+                                        System.out.println(desc);
                                     }
                                     builder.delete(0,builder.length());
                                 }

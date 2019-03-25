@@ -19,7 +19,7 @@ void MondisClient::send(const string &res) {
 #ifdef WIN32
         ret = ::send(sock, data + hasWrite, res.size() - hasWrite, 0);
 #elif defined(linux)
-        ret = ::send(fd,data+hasWrite,res.size()-hasWrite,0);
+        ret = ::send(fd,data+hasWrite,desc.size()-hasWrite,0);
 #endif
         hasWrite += ret;
     }
@@ -60,14 +60,14 @@ void MondisClient::startTransaction() {
 ExecutionResult MondisClient::commitTransaction(MondisServer *server) {
     ExecutionResult res;
     if (!isInTransaction) {
-        res.res = "please start a transaction!";
+        res.desc = "please start a transaction!";
         LOGIC_ERROR_AND_RETURN
     }
     if (watchedKeysHasModified) {
-        res.res = "can not execute the transaction,because the following keys has been modified.\n";
+        res.desc = "can not execute the transaction,because the following keys has been modified.\n";
         for (auto &key:modifiedKeys) {
-            res.res += key;
-            res.res += " ";
+            res.desc += key;
+            res.desc += " ";
         }
         LOGIC_ERROR_AND_RETURN
     }
@@ -85,8 +85,8 @@ ExecutionResult MondisClient::commitTransaction(MondisServer *server) {
                 undoCommands->pop_back();
                 server->undoExecute(un, this);
             }
-            res.res = "error in executing the command ";
-            res.res += next;
+            res.desc = "error in executing the command ";
+            res.desc += next;
             LOGIC_ERROR_AND_RETURN
         }
         if (cstruct.isModify) {

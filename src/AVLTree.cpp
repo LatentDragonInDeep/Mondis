@@ -320,10 +320,10 @@ ExecutionResult AVLTree::execute(Command *command) {
             KEY(0)
             auto *obj = getValue(key);
             if (obj == nullptr) {
-                res.res = "the key " + PARAM(0) + " does not exists";
+                res.desc = "the key " + PARAM(0) + " does not exists";
                 LOGIC_ERROR_AND_RETURN
             }
-            res.res = obj->getJson();
+            res.desc = obj->getJson();
             OK_AND_RETURN;
         }
         case DEL: {
@@ -337,12 +337,12 @@ ExecutionResult AVLTree::execute(Command *command) {
             CHECK_PARAM_NUM(1)
             CHECK_PARAM_TYPE(0, PLAIN)
             KEY(0)
-            res.res = util::to_string(containsKey(key));
+            res.desc = util::to_string(containsKey(key));
             OK_AND_RETURN
         }
         case M_SIZE: {
             CHECK_PARAM_NUM(0)
-            res.res = to_string(size());
+            res.desc = to_string(size());
             OK_AND_RETURN
         }
     }

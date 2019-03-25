@@ -227,7 +227,7 @@ ExecutionResult MondisList::execute(Command *command) {
             CHECK_AND_DEFINE_INT_LEGAL(0, index)
             CHECK_PARAM_TYPE(1, STRING)
             if (index < 0 || index > size()) {
-                res.res = "index out of range";
+                res.desc = "index out of range";
                 LOGIC_ERROR_AND_RETURN
             }
             set(index, MondisServer::getJSONParser()->parseObject((*command)[1].content));
@@ -238,28 +238,28 @@ ExecutionResult MondisList::execute(Command *command) {
             CHECK_PARAM_TYPE(0, PLAIN)
             CHECK_AND_DEFINE_INT_LEGAL(0, index)
             if (index < 1 || index > size()) {
-                res.res = "index out of range";
+                res.desc = "index out of range";
                 LOGIC_ERROR_AND_RETURN
             }
-            res.res = get(index)->getJson();
+            res.desc = get(index)->getJson();
             OK_AND_RETURN
         }
         case FRONT: {
             CHECK_PARAM_NUM(0)
             if (size() == 0) {
-                res.res = "no element exists";
+                res.desc = "no element exists";
                 LOGIC_ERROR_AND_RETURN
             }
-            res.res = get(0)->getJson();
+            res.desc = get(0)->getJson();
             OK_AND_RETURN;
         }
         case BACK: {
             CHECK_PARAM_NUM(0)
             if (size() == 0) {
-                res.res = "no element exists";
+                res.desc = "no element exists";
                 LOGIC_ERROR_AND_RETURN
             }
-            res.res = get(size() - 1)->getJson();
+            res.desc = get(size() - 1)->getJson();
             OK_AND_RETURN;
         }
         case PUSH_FRONT: {
@@ -278,10 +278,10 @@ ExecutionResult MondisList::execute(Command *command) {
             CHECK_PARAM_NUM(0)
             MondisObject *data = popFront();
             if (data == nullptr) {
-                res.res = "list is empty";
+                res.desc = "list is empty";
                 LOGIC_ERROR_AND_RETURN
             }
-            res.res = data->getJson();
+            res.desc = data->getJson();
             delete data;
             OK_AND_RETURN
         }
@@ -289,10 +289,10 @@ ExecutionResult MondisList::execute(Command *command) {
             CHECK_PARAM_NUM(0)
             MondisObject *data = popBack();
             if (data == nullptr) {
-                res.res = "list is empty";
+                res.desc = "list is empty";
                 LOGIC_ERROR_AND_RETURN
             }
-            res.res = data->getJson();
+            res.desc = data->getJson();
             delete data;
             OK_AND_RETURN
         }
@@ -306,11 +306,11 @@ ExecutionResult MondisList::execute(Command *command) {
             CHECK_END(size())
             std::vector<MondisObject *> data;
             getRange(start, end, &data);
-            res.res += "{\n";
+            res.desc += "{\n";
             for (auto obj:data) {
-                res.res += obj->getJson();
+                res.desc += obj->getJson();
             }
-            res.res += "}\n";
+            res.desc += "}\n";
             OK_AND_RETURN
         }
     }

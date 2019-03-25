@@ -244,12 +244,12 @@ ExecutionResult HashMap::execute(Command *command) {
         case EXISTS: {
             CHECK_PARAM_NUM(1)
             KEY(0)
-            res.res = util::to_string(containsKey(key));
+            res.desc = util::to_string(containsKey(key));
             OK_AND_RETURN
         }
         case M_SIZE: {
             CHECK_PARAM_NUM(0)
-            res.res = to_string(size());
+            res.desc = to_string(size());
             OK_AND_RETURN
         }
     }

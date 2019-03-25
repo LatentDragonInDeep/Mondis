@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 project(Mondis)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 AUX_SOURCE_DIRECTORY(src SRC_DIRS)
 IF (WIN32)
     LINK_DIRECTORIES("D:\\mingw64\\x86_64-w64-mingw32\\lib" "C:\\Windows\\System32")

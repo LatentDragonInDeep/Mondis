@@ -15,12 +15,12 @@ class BlockingQueue {
 public:
     T take() {
         if (innerQueue.empty()) {
-            unique_lock lck(mtx);
+            unique_lock<mutex> lck(mtx);
             notEmptyCV.wait(lck);
         }
         return innerQueue.pop();
     };
-    T put(T &t) {
+    T put(T t) {
         innerQueue.push(t);
         notEmptyCV.notify_all();
     };

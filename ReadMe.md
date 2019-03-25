@@ -113,7 +113,7 @@ json字符串，它将会被自动解析成合适的数据结构。
 返回对应key的json表示
 ### exists &lt;key&gt;
 检查是否存在对应的key。
-### rename &lt;oldkey&gt; &lt;newkey&gt;
+### renameKey &lt;oldkey&gt; &lt;newkey&gt;
 修改oldkey为newkey。
 ### type &lt;key&gt;
 返回key对应的value底层编码类型。类型有RAW_STRING,RAW_INT,RAW_BIN,LIST,SET,ZSET,HASH
@@ -123,7 +123,7 @@ json字符串，它将会被自动解析成合适的数据结构。
 返回键空间内键的数量
 
 ## 控制命令
-### select &lt;db&gt;
+### selectDb &lt;db&gt;
 修改当前键空间为编号为db的键空间。
 ### save &lt;filepath&gt;
 将整个当前键空间以json持久化到file里面。save命令的默认实现是开启子进程持久化，因此不需要担心性能问题。
@@ -349,7 +349,7 @@ json持久化文件路径。
 ## workDir=&lt;string&gt;
 工作目录，默认文件均会在此目录下寻找，找不到则自动创建。
 
-## slaveOf=&lt;true|false&gt;
+## beSlaveOf=&lt;true|false&gt;
 启动时是否同步主服务器，默认为false
 
 ## masterIP=&lt;string&gt;

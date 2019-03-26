@@ -68,7 +68,7 @@ public:
 
     SplayIterator iterator();
 
-    ExecutionResult execute(Command *command);
+    ExecRes execute(Command *command);
 
     MondisObject *locate(Command *command);
 

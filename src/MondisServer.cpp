@@ -39,11 +39,19 @@
 #define PARAM_TYPE_STRING Command::ParamType::STRING
 #define PARAM_TYPE_PLAIN Command::ParamType::PLAIN
 
+#define CHECK_COMMAND_FROM_SLAVE if (serverStatus!=ServerStatus::SV_STAT_MASTER||client->type!=ClientType::SLAVE) { \
+INVALID_AND_RETURN\
+}
+
+#define CHECK_COMMAND_FROM_CLIENT if (serverStatus!=ServerStatus::SV_STAT_MASTER||client->type!=ClientType::CLIENT) { \
+INVALID_AND_RETURN \
+}
+
 unordered_set<CommandType> MondisServer::controlCommands;
 
 JSONParser MondisServer::parser;
 
-ExecutionResult MondisServer::execute(Command *command, MondisClient *client) {
+ExecRes MondisServer::execute(Command *command, MondisClient *client) {
     return (this->*commandHandlers[command->type])(command,client);
 }
 
@@ -56,7 +64,7 @@ MultiCommand *MondisServer::getUndoCommand(CommandStruct &cstruct, MondisClient 
         switch (cstruct.operation->type) {
             case BIND: {
                 TOKEY(cstruct.operation, 0);
-                MondisObject *original = dbs[client->curDbIndex]->get(key);
+                MondisObject *original = dbs[client->dBIndex]->get(key);
                 if (original != nullptr) {
                     undo->type = BIND;
                     undo->addParam(RAW_PARAM(cstruct.operation, 0));
@@ -69,7 +77,7 @@ MultiCommand *MondisServer::getUndoCommand(CommandStruct &cstruct, MondisClient 
             }
             case DEL: {
                 TOKEY(cstruct.operation, 0);
-                MondisObject *original = dbs[client->curDbIndex]->get(key);
+                MondisObject *original = dbs[client->dBIndex]->get(key);
                 if (original == nullptr) {
                     return res;
                 }
@@ -80,7 +88,7 @@ MultiCommand *MondisServer::getUndoCommand(CommandStruct &cstruct, MondisClient 
             }
             case RENAME: {
                 TOKEY(cstruct.operation, 0);
-                MondisObject *original = dbs[client->curDbIndex]->get(key);
+                MondisObject *original = dbs[client->dBIndex]->get(key);
                 if (original == nullptr) {
                     return res;
                 }
@@ -91,7 +99,7 @@ MultiCommand *MondisServer::getUndoCommand(CommandStruct &cstruct, MondisClient 
             }
             case SELECT: {
                 undo->type = SELECT;
-                undo->addParam(to_string(client->curDbIndex), PARAM_TYPE_PLAIN);
+                undo->addParam(to_string(client->dBIndex), PARAM_TYPE_PLAIN);
                 ADD_AND_RETURN(res, undo);
             }
         }
@@ -105,7 +113,7 @@ MultiCommand *MondisServer::getUndoCommand(CommandStruct &cstruct, MondisClient 
                         assist->type = GET;
                         assist->addParam(RAW_PARAM(cstruct.operation, 0));
                         undo->addParam(RAW_PARAM(cstruct.operation, 0));
-                        ExecutionResult temp = cstruct.obj->execute(assist.get());
+                        ExecRes temp = cstruct.obj->execute(assist.get());
                         undo->addParam(temp.desc, PARAM_TYPE_STRING);
                         ADD_AND_RETURN(res, undo);
                     }
@@ -115,7 +123,7 @@ MultiCommand *MondisServer::getUndoCommand(CommandStruct &cstruct, MondisClient 
                         if (cstruct.operation->params.size() == 1) {
                             undo->addParam(RAW_PARAM(cstruct.operation, 0));
                             assist->addParam(RAW_PARAM(cstruct.operation, 0));
-                            ExecutionResult temp = cstruct.obj->execute(assist.get());
+                            ExecRes temp = cstruct.obj->execute(assist.get());
                             undo->addParam(temp.desc, PARAM_TYPE_STRING);
                             ADD_AND_RETURN(res, undo)
                         } else if (cstruct.operation->params.size() == 2) {
@@ -123,7 +131,7 @@ MultiCommand *MondisServer::getUndoCommand(CommandStruct &cstruct, MondisClient 
                             undo->addParam(RAW_PARAM(cstruct.operation, 1));
                             assist->addParam(RAW_PARAM(cstruct.operation, 0));
                             assist->addParam(RAW_PARAM(cstruct.operation, 1));
-                            ExecutionResult temp = cstruct.obj->execute(assist.get());
+                            ExecRes temp = cstruct.obj->execute(assist.get());
                             undo->addParam(temp.desc, PARAM_TYPE_STRING);
                             ADD_AND_RETURN(res, undo)
                         }
@@ -135,7 +143,7 @@ MultiCommand *MondisServer::getUndoCommand(CommandStruct &cstruct, MondisClient 
                             assist->type = GET_RANGE;
                             undo->addParam(RAW_PARAM(cstruct.operation, 0));
                             assist->addParam(RAW_PARAM(cstruct.operation, 0));
-                            ExecutionResult temp = cstruct.obj->execute(assist.get());
+                            ExecRes temp = cstruct.obj->execute(assist.get());
                             undo->addParam(temp.desc, PARAM_TYPE_STRING);
                             ADD_AND_RETURN(res, undo);
                         } else if (cstruct.operation->params.size() == 2) {
@@ -144,7 +152,7 @@ MultiCommand *MondisServer::getUndoCommand(CommandStruct &cstruct, MondisClient 
                             undo->addParam(RAW_PARAM(cstruct.operation, 0));
                             assist->addParam(RAW_PARAM(cstruct.operation, 0));
                             assist->addParam(RAW_PARAM(cstruct.operation, 1));
-                            ExecutionResult temp = cstruct.obj->execute(assist.get());
+                            ExecRes temp = cstruct.obj->execute(assist.get());
                             undo->addParam(temp.desc, PARAM_TYPE_STRING);
                             ADD_AND_RETURN(res, undo);
                         }
@@ -193,14 +201,14 @@ MultiCommand *MondisServer::getUndoCommand(CommandStruct &cstruct, MondisClient 
                 switch (cstruct.operation->type) {
                     case POP_FRONT: {
                         assist->type = FRONT;
-                        ExecutionResult temp = cstruct.obj->execute(assist.get());
+                        ExecRes temp = cstruct.obj->execute(assist.get());
                         undo->type = PUSH_FRONT;
                         undo->addParam(temp.desc, PARAM_TYPE_STRING);
                         ADD_AND_RETURN(res, undo)
                     }
                     case POP_BACK: {
                         assist->type = BACK;
-                        ExecutionResult temp = cstruct.obj->execute(assist.get());
+                        ExecRes temp = cstruct.obj->execute(assist.get());
                         undo->type = PUSH_BACK;
                         undo->addParam(temp.desc, PARAM_TYPE_STRING);
                         ADD_AND_RETURN(res, undo)
@@ -216,7 +224,7 @@ MultiCommand *MondisServer::getUndoCommand(CommandStruct &cstruct, MondisClient 
                     case BIND: {
                         assist->type = GET;
                         assist->addParam(RAW_PARAM(cstruct.operation, 0));
-                        ExecutionResult temp = cstruct.obj->execute(assist.get());
+                        ExecRes temp = cstruct.obj->execute(assist.get());
                         undo->type = BIND;
                         undo->addParam(RAW_PARAM(cstruct.operation, 0));
                         if (temp.type = OK) {
@@ -236,7 +244,7 @@ MultiCommand *MondisServer::getUndoCommand(CommandStruct &cstruct, MondisClient 
                     case REMOVE: {
                         assist->type = EXISTS;
                         assist->addParam(RAW_PARAM(cstruct.operation, 0));
-                        ExecutionResult temp = cstruct.obj->execute(assist.get());
+                        ExecRes temp = cstruct.obj->execute(assist.get());
                         if (temp.desc == "true") {
                             undo->type = ADD;
                             undo->addParam(RAW_PARAM(cstruct.operation, 0));
@@ -255,12 +263,12 @@ MultiCommand *MondisServer::getUndoCommand(CommandStruct &cstruct, MondisClient 
                     case REMOVE_BY_RANK: {
                         assist->type = GET_BY_RANK;
                         assist->addParam(RAW_PARAM(cstruct.operation, 0));
-                        ExecutionResult temp1 = cstruct.obj->execute(assist.get());
+                        ExecRes temp1 = cstruct.obj->execute(assist.get());
                         if (temp1.type != OK) {
                             return res;
                         }
                         assist->type = RANK_TO_SCORE;
-                        ExecutionResult temp2 = cstruct.obj->execute(assist.get());
+                        ExecRes temp2 = cstruct.obj->execute(assist.get());
                         undo->type = ADD;
                         undo->addParam(temp2.desc, PARAM_TYPE_PLAIN);
                         undo->addParam(temp1.desc, PARAM_TYPE_STRING);
@@ -269,7 +277,7 @@ MultiCommand *MondisServer::getUndoCommand(CommandStruct &cstruct, MondisClient 
                     case REMOVE_BY_SCORE: {
                         assist->type = GET_BY_SCORE;
                         assist->addParam(RAW_PARAM(cstruct.operation, 0));
-                        ExecutionResult temp1 = cstruct.obj->execute(assist.get());
+                        ExecRes temp1 = cstruct.obj->execute(assist.get());
                         if (temp1.type != OK) {
                             return res;
                         }
@@ -299,13 +307,13 @@ MultiCommand *MondisServer::getUndoCommand(CommandStruct &cstruct, MondisClient 
                         SplayTreeNode *firstNode = tree->getUpperBound(scoreStart, true);
                         assist->type = SCORE_TO_RANK;
                         assist->addParam(to_string(firstNode->score), PARAM_TYPE_PLAIN);
-                        ExecutionResult temp1 = cstruct.obj->execute(assist.get());
+                        ExecRes temp1 = cstruct.obj->execute(assist.get());
                         int rankStart = atoi(temp1.desc.c_str());
                         assist->params.clear();
                         SplayTreeNode *lastNode = tree->getLowerBound(scoreEnd, true);
                         assist->type = SCORE_TO_RANK;
                         assist->addParam(to_string(lastNode->score), PARAM_TYPE_PLAIN);
-                        ExecutionResult temp2 = cstruct.obj->execute(assist.get());
+                        ExecRes temp2 = cstruct.obj->execute(assist.get());
                         int rankEnd = atoi(temp2.desc.c_str());
 
                         for (int i = rankStart; i < rankEnd; ++i) {
@@ -331,7 +339,7 @@ MultiCommand *MondisServer::getUndoCommand(CommandStruct &cstruct, MondisClient 
                     case BIND: {
                         assist->type = GET;
                         assist->addParam(RAW_PARAM(cstruct.operation, 0));
-                        ExecutionResult temp = cstruct.obj->execute(assist.get());
+                        ExecRes temp = cstruct.obj->execute(assist.get());
                         if (temp.type == OK) {
                             undo->type = BIND;
                             undo->addParam(RAW_PARAM(cstruct.operation, 0));
@@ -345,7 +353,7 @@ MultiCommand *MondisServer::getUndoCommand(CommandStruct &cstruct, MondisClient 
                     case DEL: {
                         assist->type = GET;
                         assist->addParam(RAW_PARAM(cstruct.operation, 0));
-                        ExecutionResult temp = cstruct.obj->execute(assist.get());
+                        ExecRes temp = cstruct.obj->execute(assist.get());
                         if (temp.type == OK) {
                             undo->type = BIND;
                             undo->addParam(RAW_PARAM(cstruct.operation, 0));
@@ -434,7 +442,7 @@ void MondisServer::runAsDaemon() {
 #endif
 }
 
-void MondisServer::appendLog(string &commandStr, ExecutionResult &res) {
+void MondisServer::appendLog(string &commandStr, ExecRes &res) {
     Log log(commandStr, res);
     logFileOut << log.toString();
 }
@@ -456,17 +464,17 @@ void MondisServer::startEventLoop() {
         cout << username + "@Mondis>";
         string nextCommand;
         getline(std::cin, nextCommand);
-        ExecutionResult res = execute(nextCommand, self);
+        ExecRes res = execute(nextCommand, self);
         cout << res.toString();
         cout << endl;
     }
 }
 
 //client表示执行命令的客户端，如果为nullptr则为Mondisserver自身
-ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) {
+ExecRes MondisServer::execute(string &commandStr, MondisClient *client) {
     Command *command = interpreter->getCommand(commandStr);
     CommandStruct cstruct = getCommandStruct(command, client);
-    ExecutionResult res;
+    ExecRes res;
     if (cstruct.operation->type == PONG) {
         res = execute(cstruct.operation, client);
         Command::destroyCommand(cstruct.locate);
@@ -497,9 +505,11 @@ ExecutionResult MondisServer::execute(string &commandStr, MondisClient *client) 
         if (autoMoveCommandToMaster) {
             Command::destroyCommand(command);
             isRedirecting = true;
-            sendToMaster(commandStr);
-            string resStr = readFromMaster(true);
-            client->send(resStr);
+            mondis::Message * msg = new mondis::Message;
+            msg->set_msg_type(mondis::MsgType::COMMAND);
+            msg->set_command_type(mondis::CommandType::SLAVE_FORWARD);
+            msg->set_content(commandStr);
+            putToWriteQueue(msg);
             redirectCV.notify_all();
             return res;
         } else {
@@ -564,7 +574,7 @@ void MondisServer::applyConf() {
                 aof = false;
             }
         } else if (kv.first == "databaseID") {
-            util::toInteger(kv.second, self->curDbIndex);
+            util::toInteger(kv.second, self->dBIndex);
         } else if (kv.first == "aofSyncStrategy") {
             aofSyncStrategy = atoi(kv.second.c_str());
         } else if (kv.first == "json") {
@@ -603,9 +613,9 @@ void MondisServer::applyConf() {
             masterPort = atoi(kv.second.c_str());
         } else if(kv.first == "beSlaveOf") {
             if(kv.second == "true") {
-                beSlaveOf = true;
+                isSlaveOf = true;
             } else if(kv.second == "false"){
-                beSlaveOf = false;
+                isSlaveOf = false;
             }
         } else if (kv.first == "maxSlaveNum") {
             maxSlaveNum = atoi(kv.second.c_str());
@@ -627,7 +637,7 @@ void MondisServer::applyConf() {
 
 void MondisServer::init() {
     cout << "is Initializing..." << endl;
-    runStatus = LOADING
+    runStatus = LOADING;
     JSONParser::LexicalParser::init();
     initStaticMember();
     interpreter = new CommandInterpreter;
@@ -667,8 +677,8 @@ void MondisServer::init() {
         runAsDaemon();
     }
     logFileOut.open(workDir + "/" + logFile, ios::app);
-    if (slaveOf) {
-        runStatus = REPLACTING
+    if (isSlaveOf) {
+        runStatus = REPLACTING;
         cout << "is Replicating from master..." << endl;
         string sync = "SLAVE_OF ";
         sync += masterIP;
@@ -686,9 +696,13 @@ void MondisServer::init() {
     std::thread eventLoop(&MondisServer::startEventLoop, this);
     //检查超时的客户端，从服务器，主服务器并清理
     std::thread checkAndHandle(&MondisServer::checkAndHandleIdleConnection, this);
+
     selectAndHandle(true);
+    //读线程
     msgHandler = new std::thread(&MondisServer::msgHandle, this);
-    msgWriter = new std::thread(&MondisServer::writeToClient,this)
+    //写线程
+    msgWriter = new std::thread(&MondisServer::writeToClient,this);
+    runStatus = RunStatus ::RUNNING;
 }
 
 void MondisServer::acceptSocket() {
@@ -778,7 +792,6 @@ MondisServer::~MondisServer() {
     delete sendHeartBeatToSlaves;
     delete msgHandler;
     delete msgWriter;
-    delete self;
 }
 
 void MondisServer::replicaToSlave(MondisClient *client, long long slaveReplicaOffset) {
@@ -810,7 +823,7 @@ void MondisServer::replicaToSlave(MondisClient *client, long long slaveReplicaOf
     peersModifyMtx.lock_shared();
     for (auto &kv:idToPeers) {
         if (kv.second != client) {
-            kv.second->send(newPeer);
+            //TODO
         }
     }
     peersModifyMtx.unlock_shared();
@@ -820,35 +833,12 @@ void MondisServer::replicaToSlave(MondisClient *client, long long slaveReplicaOf
             while (true) {
                 peersModifyMtx.lock_shared();
                 for (auto &kv:idToPeers) {
-                    kv.second->send("PING");
+                    //TODO
                 }
                 peersModifyMtx.unlock_shared();
                 std::this_thread::sleep_for(chrono::milliseconds(toSlaveHeartBeatDuration));
             }
         });
-    }
-    if (recvFromSlaves == nullptr) {
-        recvFromSlaves = new std::thread(&MondisServer::selectAndHandle,this,false);
-    }
-    if (propagateIO == nullptr) {
-        propagateIO = new std::thread(&MondisServer::singleCommandPropagate, this);
-    }
-}
-
-void MondisServer::singleCommandPropagate() {
-    while (true) {
-        const string& cur = takeFromPropagateBuffer();
-        peersModifyMtx.lock_shared();
-        for (auto &kv:idToPeers) {
-            kv.second->send(cur);
-        }
-        peersModifyMtx.unlock_shared();
-    }
-}
-
-void MondisServer::replicaCommandPropagate(vector<string> &commands, MondisClient *client) {
-    for (auto &c:commands) {
-        client->send(c);
     }
 }
 
@@ -873,20 +863,10 @@ void MondisServer::initStaticMember() {
     ADD(modifyCommands, REMOVE_BY_SCORE)
     ADD(modifyCommands, REMOVE_RANGE_BY_RANK)
     ADD(modifyCommands, REMOVE_RANGE_BY_SCORE)
-    ADD(modifyCommands, WRITE)
     ADD(modifyCommands, TO_STRING)
     ADD(modifyCommands, TO_INTEGER)
     ADD(modifyCommands, CHANGE_SCORE)
     ADD(modifyCommands, SELECT)
-    ADD(modifyCommands, SET_POS)
-    ADD(modifyCommands, READ)
-    ADD(modifyCommands, READ_CHAR)
-    ADD(modifyCommands, READ_SHORT)
-    ADD(modifyCommands, READ_INT)
-    ADD(modifyCommands, READ_LONG)
-    ADD(modifyCommands, READ_LONG_LONG)
-    ADD(modifyCommands, FORWARD)
-    ADD(modifyCommands, BACKWARD)
     ADD(transactionAboutCommands, DISCARD)
     ADD(transactionAboutCommands, EXEC)
     ADD(transactionAboutCommands, WATCH)
@@ -926,7 +906,6 @@ void MondisServer::initStaticMember() {
     ADD(controlCommands, SLAVE_OF)
     ADD(controlCommands, SYNC)
     ADD(controlCommands, SET_CLIENT_NAME)
-    ADD(controlCommands, SYNC_FINISHED)
     ADD(controlCommands, DISCONNECT_SLAVE)
     ADD(controlCommands, DISCONNECT_CLIENT)
     ADD(controlCommands, PING)
@@ -948,24 +927,7 @@ void MondisServer::initStaticMember() {
     ADD(controlCommands, CLIENT_LIST)
     ADD(controlCommands, SLAVE_INFO)
     ADD(controlCommands, SLAVE_LIST)
-    ADD(controlCommands, IS_CLIENT)
-}
-
-string MondisServer::readFromMaster(bool isBlocking) {
-    if (isBlocking) {
-        string res;
-#ifdef WIN32
-        while ((res = read(master->sock)) == "");
-#elif defined(linux)
-        while((desc = read(master->fd))=="");
-#endif
-        return res;
-    }
-#ifdef WIN32
-    return read(master->sock);
-#elif defined(linux)
-    return read(master->fd);
-#endif
+    ADD(controlCommands, NEW_CLIENT)
 }
 
 string MondisServer::takeFromPropagateBuffer() {
@@ -1021,14 +983,12 @@ void MondisServer::checkAndHandleIdleConnection() {
         }
 #endif
         allModifyMtx.unlock_shared();
-        if (isSlave && master != nullptr && current - master->preInteraction > maxMasterIdle) {
+        if (serverStatus == ServerStatus ::SLAVE&& master != nullptr && current - master->preInteraction > maxMasterIdle) {
             delete master;
             master = nullptr;
-            delete recvFromMaster;
-            recvFromMaster = nullptr;
             peersModifyMtx.lock_shared();
             for (auto &kv:idToPeers) {
-                kv.second->send("MASTER_DEAD");
+                putCommandMsgToWriteQueue("MASTER_DEAD",kv.second->name,mondis::CommandType::PEER_COMMAND);
             }
             peersModifyMtx.unlock_shared();
             Command *command = new Command;
@@ -1101,7 +1061,7 @@ void MondisServer::undoExecute(MultiCommand *command, MondisClient *client) {
 }
 
 MondisObject *MondisServer::chainLocate(Command *command, MondisClient *client) {
-    MondisObject *curObj = dbs[client->curDbIndex]->locate(command);
+    MondisObject *curObj = dbs[client->dBIndex]->locate(command);
     Command *curCommand = command->next;
     while (true) {
         if (curCommand == nullptr || curCommand->type != LOCATE) {
@@ -1151,11 +1111,11 @@ void MondisServer::appendAof(const string &command) {
     }
 }
 
-ExecutionResult MondisServer::transactionExecute(CommandStruct &cstruct, MondisClient *client) {
-    ExecutionResult res;
+ExecRes MondisServer::transactionExecute(CommandStruct &cstruct, MondisClient *client) {
+    ExecRes res;
     bool canContinue = true;
     if (cstruct.isModify) {
-        canContinue = handleWatchedKey(TO_FULL_KEY_NAME(client->curDbIndex, (*cstruct.operation)[0].content));
+        canContinue = handleWatchedKey(TO_FULL_KEY_NAME(client->dBIndex, (*cstruct.operation)[0].content));
     }
     if (canContinue) {
         if (cstruct.isLocate) {
@@ -1170,7 +1130,7 @@ ExecutionResult MondisServer::transactionExecute(CommandStruct &cstruct, MondisC
         Command::destroyCommand(cstruct.locate);
         Command::destroyCommand(cstruct.operation);
         res.desc = "other transaction is watching the key ";
-        res.desc += TO_FULL_KEY_NAME(client->curDbIndex, (*cstruct.operation)[0].content);
+        res.desc += TO_FULL_KEY_NAME(client->dBIndex, (*cstruct.operation)[0].content);
         res.desc += ",so can undoExecute the command";
         LOGIC_ERROR_AND_RETURN;
     }
@@ -1318,7 +1278,7 @@ void MondisServer::selectAndHandle(bool isClient) {
             peersModifyMtx.unlock_shared();
             fds = &peerFds;
         }
-        int ret = selectDb(0, fds, nullptr, nullptr, &timeout);
+        int ret = select(0, fds, nullptr, nullptr, &timeout);
         if (ret <= 0) {
             continue;
         }
@@ -1330,7 +1290,7 @@ void MondisServer::selectAndHandle(bool isClient) {
                 if (commandStr == "CLOSED" || commandStr == "") {
                     continue;
                 }
-                ExecutionResult res = execute(commandStr, client);
+                ExecRes res = execute(commandStr, client);
                 if (res.needSend) {
                     client->send(res.toString());
                 }
@@ -1351,7 +1311,7 @@ void MondisServer::selectAndHandle(bool isClient) {
                 if (commandStr == "CLOSED" || commandStr == "") {
                     continue;
                 }
-                ExecutionResult desc = execute(commandStr, client);
+                ExecRes desc = execute(commandStr, client);
                 if (desc.needSend) {
                     client->send(desc.toString());
                 }
@@ -1371,9 +1331,9 @@ MondisServer *MondisServer::getInstance() {
 void MondisServer::msgHandle() {
     while (true) {
         mondis::Message *msg = readQueue.take();
-        switch msg->msg_type() {
+        switch (msg->msg_type()) {
             case mondis::MsgType::COMMAND:
-                execute(msg->content(),nameToClients[msg->client_name()]);
+                putExecResMsgToWriteQueue(execute(msg->content(), nameToClients[msg->client_name()]), msg->client_name());
             break;
             case mondis::MsgType::DATA:
                 if (msg->data_type() == mondis::DataType::SYNC_DATA) {
@@ -1382,16 +1342,13 @@ void MondisServer::msgHandle() {
                     }
                     JSONParser temp(msg->content());
                     temp.parseAll(dbs);
-                    if (command != nullptr) {
-                        OK_AND_RETURN;
-                    }
                 } else if (msg->data_type() == mondis::DataType::CONTROL_MSG) {
-                    cout<<msg->content()
+                    cout<<msg->content();
                 }
             break;
             case mondis::MsgType ::EXEC_RES:
-                ExecutionResult res;
-                res.type = (ExecutionResultType)msg->res_type();
+                ExecRes res;
+                res.type = (ExecResType)msg->res_type();
                 res.desc = msg->content();
                 resQueue.push_front(res);
             break;
@@ -1428,7 +1385,7 @@ unordered_map<CommandType,CommandHandler> MondisServer::commandHandlers = {
         {CommandType::UNWATCH,&MondisServer::unwatch},
         {CommandType::GET_MASTER,&MondisServer::getMaster},
         {CommandType::NEW_PEER,&MondisServer::newPeer},
-        {CommandType::IS_CLIENT,&MondisServer::toClient},
+        {CommandType::NEW_CLIENT, &MondisServer::newClient},
         {CommandType::ASK_FOR_VOTE,&MondisServer::askForVote},
         {CommandType::VOTE,&MondisServer::vote},
         {CommandType::UNVOTE,&MondisServer::unvote},
@@ -1441,23 +1398,23 @@ unordered_map<CommandType,CommandHandler> MondisServer::commandHandlers = {
         {CommandType::SLAVE_LIST,&MondisServer::slaveList}
 };
 
-ExecutionResult MondisServer::bindKey(Command *command, MondisClient *client) {
-    ExecutionResult res;
+ExecRes MondisServer::bindKey(Command *command, MondisClient *client) {
+    ExecRes res;
     CHECK_PARAM_NUM(2);
     CHECK_PARAM_TYPE(0, PLAIN)
     CHECK_PARAM_TYPE(1, STRING)
     KEY(0)
-    dbs[client->curDbIndex]->put(key, parser.parseObject((*command)[1].content));
+    dbs[client->dBIndex]->put(key, parser.parseObject((*command)[1].content));
     OK_AND_RETURN
 };
 
-ExecutionResult MondisServer::get(Command *command, MondisClient *client) {
-    ExecutionResult res;
+ExecRes MondisServer::get(Command *command, MondisClient *client) {
+    ExecRes res;
     CHECK_PARAM_NUM(1)
     CHECK_PARAM_TYPE(0, PLAIN)
     KEY(0)
     MondisObject *data;
-    data = dbs[client->curDbIndex]->get(key);
+    data = dbs[client->dBIndex]->get(key);
     if (data == nullptr) {
         res.desc = "the key does not exists";
         LOGIC_ERROR_AND_RETURN
@@ -1466,27 +1423,27 @@ ExecutionResult MondisServer::get(Command *command, MondisClient *client) {
     OK_AND_RETURN
 }
 
-ExecutionResult MondisServer::del(Command *command, MondisClient *client) {
-    ExecutionResult res;
+ExecRes MondisServer::del(Command *command, MondisClient *client) {
+    ExecRes res;
     CHECK_PARAM_NUM(1)
     CHECK_PARAM_TYPE(0, PLAIN)
     KEY(0)
-    dbs[client->curDbIndex]->remove(key);
+    dbs[client->dBIndex]->remove(key);
     OK_AND_RETURN
 }
 
-ExecutionResult MondisServer::exsits(Command *command, MondisClient *client) {
-    ExecutionResult res;
+ExecRes MondisServer::exsits(Command *command, MondisClient *client) {
+    ExecRes res;
     CHECK_PARAM_NUM(1)
     CHECK_PARAM_TYPE(0, PLAIN)
     KEY(0)
-    bool r = dbs[client->curDbIndex]->containsKey(key);
+    bool r = dbs[client->dBIndex]->containsKey(key);
     res.desc = util::to_string(r);
     OK_AND_RETURN
 }
 
-ExecutionResult MondisServer::login(Command *command, MondisClient *client) {
-    ExecutionResult res;
+ExecRes MondisServer::login(Command *command, MondisClient *client) {
+    ExecRes res;
     CHECK_PARAM_NUM(2)
     CHECK_PARAM_TYPE(0, PLAIN)
     CHECK_PARAM_TYPE(1, PLAIN)
@@ -1500,13 +1457,13 @@ ExecutionResult MondisServer::login(Command *command, MondisClient *client) {
     LOGIC_ERROR_AND_RETURN
 }
 
-ExecutionResult MondisServer::type(Command *command, MondisClient *client) {
-    ExecutionResult res;
+ExecRes MondisServer::type(Command *command, MondisClient *client) {
+    ExecRes res;
     CHECK_PARAM_NUM(1)
     CHECK_PARAM_TYPE(0, PLAIN)
     KEY(0)
     MondisObject *data;
-    data = dbs[client->curDbIndex]->get(key);
+    data = dbs[client->dBIndex]->get(key);
     if (data == nullptr) {
         res.desc = "the key does not exists";
         LOGIC_ERROR_AND_RETURN
@@ -1515,8 +1472,8 @@ ExecutionResult MondisServer::type(Command *command, MondisClient *client) {
     OK_AND_RETURN;
 }
 
-ExecutionResult MondisServer::selectDb(Command *command, MondisClient *client) {
-    ExecutionResult res;
+ExecRes MondisServer::selectDb(Command *command, MondisClient *client) {
+    ExecRes res;
     CHECK_PARAM_NUM(1)
     CHECK_PARAM_TYPE(0, PLAIN)
     CHECK_AND_DEFINE_INT_LEGAL(0, index);
@@ -1524,13 +1481,12 @@ ExecutionResult MondisServer::selectDb(Command *command, MondisClient *client) {
         res.desc = "Invalid database id";
         LOGIC_ERROR_AND_RETURN
     }
-    client->curDbIndex = index;
-    dbs[client->curDbIndex] = dbs[index];
+    client->dBIndex = index;
     OK_AND_RETURN
 }
 
-ExecutionResult MondisServer::save(Command *command, MondisClient *client) {
-    ExecutionResult res;
+ExecRes MondisServer::save(Command *command, MondisClient *client) {
+    ExecRes res;
     CHECK_PARAM_NUM(2)
     CHECK_PARAM_TYPE(0, PLAIN)
     CHECK_PARAM_TYPE(1, PLAIN)
@@ -1542,7 +1498,7 @@ ExecutionResult MondisServer::save(Command *command, MondisClient *client) {
     string jsonFile = (*command)[0].content;
 #ifdef WIN32
     ofstream out(jsonFile + "2");
-    out << dbs[client->curDbIndex]->getJson();
+    out << dbs[client->dBIndex]->getJson();
     out.flush();
     remove(jsonFile.c_str());
     out.close();
@@ -1562,8 +1518,8 @@ ExecutionResult MondisServer::save(Command *command, MondisClient *client) {
     OK_AND_RETURN
 }
 
-ExecutionResult MondisServer::saveAll(Command *command, MondisClient *client) {
-    ExecutionResult res;
+ExecRes MondisServer::saveAll(Command *command, MondisClient *client) {
+    ExecRes res;
     CHECK_PARAM_NUM(1)
     CHECK_PARAM_TYPE(0, PLAIN)
     string jsonFile = (*command)[0].content;
@@ -1595,31 +1551,31 @@ ExecutionResult MondisServer::saveAll(Command *command, MondisClient *client) {
      OK_AND_RETURN
 }
 
-ExecutionResult MondisServer::renameKey(Command *command, MondisClient *client) {
-    ExecutionResult res;
+ExecRes MondisServer::renameKey(Command *command, MondisClient *client) {
+    ExecRes res;
     CHECK_PARAM_NUM(2)
     CHECK_PARAM_TYPE(0, PLAIN)
     CHECK_PARAM_TYPE(1, PLAIN)
-    MondisObject *data = dbs[client->curDbIndex]->get(PARAM(0));
+    MondisObject *data = dbs[client->dBIndex]->get(PARAM(0));
     if (data == nullptr) {
         res.desc = "the object whose key is" + PARAM(0) + "does not exists";
         LOGIC_ERROR_AND_RETURN
     }
-    dbs[client->curDbIndex]->put(PARAM(0), nullptr);
-    dbs[client->curDbIndex]->remove(PARAM(0));
-    dbs[client->curDbIndex]->put(PARAM(1), data);
+    dbs[client->dBIndex]->put(PARAM(0), nullptr);
+    dbs[client->dBIndex]->remove(PARAM(0));
+    dbs[client->dBIndex]->put(PARAM(1), data);
     OK_AND_RETURN
 }
 
-ExecutionResult MondisServer::size(Command *command, MondisClient *client) {
-    ExecutionResult res;
+ExecRes MondisServer::size(Command *command, MondisClient *client) {
+    ExecRes res;
     CHECK_PARAM_NUM(0);
-    res.desc = to_string(dbs[client->curDbIndex]->size());
+    res.desc = to_string(dbs[client->dBIndex]->size());
     OK_AND_RETURN
 }
 
-ExecutionResult MondisServer::beSlaveOf(Command *command, MondisClient *client) {
-    ExecutionResult res;
+ExecRes MondisServer::beSlaveOf(Command *command, MondisClient *client) {
+    ExecRes res;
     CHECK_PARAM_NUM(4)
     CHECK_PARAM_TYPE(0, PLAIN)
     CHECK_PARAM_TYPE(1, PLAIN)
@@ -1629,9 +1585,6 @@ ExecutionResult MondisServer::beSlaveOf(Command *command, MondisClient *client) 
     if (res.type == OK) {
         masterIP = PARAM(0);
         masterPort = atoi(PARAM(1).c_str());
-    }
-    if (serverStatus == ServerStatus::SLAVE) {
-        sendToMaster(string("DISCONNECT_SLAVE"));
     }
     CHECK_PARAM_NUM(4);
     CHECK_PARAM_TYPE(0, PLAIN)
@@ -1646,24 +1599,24 @@ ExecutionResult MondisServer::beSlaveOf(Command *command, MondisClient *client) 
         return res;
     }
     master = c;
-    sendToMaster(login);
-    ExecutionResult loginRes = ExecutionResult::stringToResult(readFromMaster(true));
+    nameToClients["master"] = c;
+    c->name = "master";
+    putCommandMsgToWriteQueue(login,c->name,mondis::CommandType::CLIENT_COMMAND);
+    ExecRes loginRes = resQueue.back();
     if (loginRes.type != OK) {
         res.desc = "username or password error";
         LOGIC_ERROR_AND_RETURN
     }
-    sendToMaster(string("SYNC ") + to_string(replicaOffset));
-
+    putCommandMsgToWriteQueue(string("SYNC ") + to_string(replicaOffset),"master");
 }
 
-ExecutionResult MondisServer::sync(Command *command, MondisClient *client) {
-    ExecutionResult res;
+ExecRes MondisServer::sync(Command *command, MondisClient *client) {
+    ExecRes res;
     peersModifyMtx.lock_shared();
     if (idToPeers.size() > maxSlaveNum) {
-        ExecutionResult res;
+        ExecRes res;
         res.type = LOGIC_ERROR;
         res.desc = "can not build connection because has up to max slave number!";
-        client->send(res.toString());
 #ifdef WIN32
         FD_CLR(client->sock, &clientFds);
         allModifyMtx.lock();
@@ -1676,6 +1629,7 @@ ExecutionResult MondisServer::sync(Command *command, MondisClient *client) {
                 allModifyMtx.unlock();
 #endif
         delete client;
+        return res;
     }
     peersModifyMtx.unlock_shared();
     client->type = PEER;
@@ -1690,10 +1644,10 @@ ExecutionResult MondisServer::sync(Command *command, MondisClient *client) {
     CHECK_PARAM_NUM(1)
     CHECK_PARAM_TYPE(0, PLAIN)
     CHECK_AND_DEFINE_INT_LEGAL(1, offset);
-    if (serverStatus == ServerStatus::SLAVE) {
+    if (serverStatus == ServerStatus::SV_STAT_SLAVE) {
         Command *temp = new Command;
         temp->type = GET_MASTER;
-        ExecutionResult realRes = execute(temp, nullptr);
+        ExecRes realRes = execute(temp, nullptr);
         Command::destroyCommand(temp);
         res.desc = "the target server is a slave,if you want continue,please input correct master "
                   "ip and port.the target server's master ip and port is ";
@@ -1709,8 +1663,8 @@ ExecutionResult MondisServer::sync(Command *command, MondisClient *client) {
     OK_AND_RETURN
 }
 
-ExecutionResult MondisServer::disconnectClient(Command *command, MondisClient *client) {
-    ExecutionResult res;
+ExecRes MondisServer::disconnectClient(Command *command, MondisClient *client) {
+    ExecRes res;
     if (client->type != CLIENT) {
         res.desc = "the sender is not a client!";
         LOGIC_ERROR_AND_RETURN
@@ -1719,56 +1673,58 @@ ExecutionResult MondisServer::disconnectClient(Command *command, MondisClient *c
     OK_AND_RETURN
 }
 
-ExecutionResult MondisServer::disconnectSlave(Command *command, MondisClient *client) {
-    ExecutionResult res;
-    if (serverStatus == ServerStatus::SLAVE) {
-        if (client->type != PEER) {
-            res.desc = "the sender is not a slave!";
-            LOGIC_ERROR_AND_RETURN
-        }
-        closeClient(client);
-        OK_AND_RETURN
-    } else {
-        sendToMaster("DISCONNECT_SLAVE");
-        string resStr = readFromMaster(true);
-        res = ExecutionResult::stringToResult(resStr);
-        return res;
+ExecRes MondisServer::disconnectSlave(Command *command, MondisClient *client) {
+    ExecRes res;
+    if (serverStatus!=ServerStatus ::SS_MASTER ||client->type!=ClientType ::CLIENT)  {
+        res.desc = "invalid server or client!";
     }
-}
-
-ExecutionResult MondisServer::ping(Command *command, MondisClient *client) {
-    ExecutionResult res;
-    client->send("PONG");
-    client->updateHeartBeatTime();
-    res.needSend = false;
+    //TODO: check param
+    closeClient(client);
     OK_AND_RETURN
 }
 
-ExecutionResult MondisServer::pong(Command *command, MondisClient *client) {
-    ExecutionResult res;
-    client->updateHeartBeatTime();
+ExecRes MondisServer::ping(Command *command, MondisClient *client) {
+    ExecRes res;
     res.needSend = false;
+    if (serverStatus!=ServerStatus ::SS_MASTER || client->type!=ClientType ::SLAVE) {
+        INVALID_AND_RETURN
+    }
+    putCommandMsgToWriteQueue("PONG",client->name,mondis::CommandType::MASTER_COMMAND);
+    client->updateHeartBeatTime();
     OK_AND_RETURN
 }
 
-ExecutionResult MondisServer::multi(Command *command, MondisClient *client) {
-    ExecutionResult res;
+ExecRes MondisServer::pong(Command *command, MondisClient *client) {
+    ExecRes res;
+    res.needSend = false;
+    if (serverStatus!=ServerStatus::SLAVE||client->type!=ClientType::SS_MASTER) {
+        INVALID_AND_RETURN
+    }
+    client->updateHeartBeatTime();
+    OK_AND_RETURN
+}
+
+ExecRes MondisServer::multi(Command *command, MondisClient *client) {
+    ExecRes res;
+    if (serverStatus!=ServerStatus::SS_MASTER||client->type!=ClientType::CLIENT) {
+        INVALID_AND_RETURN
+    }
     client->startTransaction();
     OK_AND_RETURN
 }
 
-ExecutionResult MondisServer::exec(Command *command, MondisClient *client) {
-    ExecutionResult res;
+ExecRes MondisServer::exec(Command *command, MondisClient *client) {
+    ExecRes res;
     return client->commitTransaction(this);
 }
 
-ExecutionResult MondisServer::discard(Command *command, MondisClient *client) {
-    ExecutionResult res;
+ExecRes MondisServer::discard(Command *command, MondisClient *client) {
+    ExecRes res;
     client->closeTransaction();
 }
 
-ExecutionResult MondisServer::watch(Command *command, MondisClient *client) {
-    ExecutionResult res;
+ExecRes MondisServer::watch(Command *command, MondisClient *client) {
+    ExecRes res;
     if (!client->isInTransaction) {
         res.desc = "please start a transaction!";
         LOGIC_ERROR_AND_RETURN
@@ -1776,21 +1732,21 @@ ExecutionResult MondisServer::watch(Command *command, MondisClient *client) {
     CHECK_PARAM_NUM(1)
     CHECK_PARAM_TYPE(0, PLAIN)
     KEY(0)
-    if (dbs[client->curDbIndex]->get(key) == nullptr) {
+    if (dbs[client->dBIndex]->get(key) == nullptr) {
         res.desc = "the key ";
         res.desc += PARAM(0);
         res.desc += " does not exists";
         LOGIC_ERROR_AND_RETURN
     }
     watchedKeyMtx.lock();
-    keyToWatchedClients[TO_FULL_KEY_NAME(client->curDbIndex, PARAM(0))].insert(client);
-    client->watchedKeys.insert(TO_FULL_KEY_NAME(client->curDbIndex, PARAM(0)));
+    keyToWatchedClients[TO_FULL_KEY_NAME(client->dBIndex, PARAM(0))].insert(client);
+    client->watchedKeys.insert(TO_FULL_KEY_NAME(client->dBIndex, PARAM(0)));
     watchedKeyMtx.unlock();
     OK_AND_RETURN
 }
 
-ExecutionResult MondisServer::unwatch(Command *command, MondisClient *client){
-    ExecutionResult res;
+ExecRes MondisServer::unwatch(Command *command, MondisClient *client){
+    ExecRes res;
     if (!client->isInTransaction) {
         res.desc = "please start a transaction!";
         LOGIC_ERROR_AND_RETURN
@@ -1798,20 +1754,20 @@ ExecutionResult MondisServer::unwatch(Command *command, MondisClient *client){
     CHECK_PARAM_NUM(1)
     CHECK_PARAM_TYPE(0, PLAIN)
     watchedKeyMtx.lock();
-    keyToWatchedClients[TO_FULL_KEY_NAME(client->curDbIndex, PARAM(0))].erase(
+    keyToWatchedClients[TO_FULL_KEY_NAME(client->dBIndex, PARAM(0))].erase(
             keyToWatchedClients[PARAM(0)].find(client));
-    if (keyToWatchedClients[TO_FULL_KEY_NAME(client->curDbIndex, PARAM(0))].size() == 0) {
-        keyToWatchedClients.erase(keyToWatchedClients.find(TO_FULL_KEY_NAME(client->curDbIndex, PARAM(0))));
+    if (keyToWatchedClients[TO_FULL_KEY_NAME(client->dBIndex, PARAM(0))].size() == 0) {
+        keyToWatchedClients.erase(keyToWatchedClients.find(TO_FULL_KEY_NAME(client->dBIndex, PARAM(0))));
     }
-    client->watchedKeys.erase(client->watchedKeys.find(TO_FULL_KEY_NAME(client->curDbIndex, PARAM(0))));
+    client->watchedKeys.erase(client->watchedKeys.find(TO_FULL_KEY_NAME(client->dBIndex, PARAM(0))));
     watchedKeyMtx.unlock();
     OK_AND_RETURN
 }
 
-ExecutionResult MondisServer::getMaster(Command *command, MondisClient *client) {
-    ExecutionResult res;
+ExecRes MondisServer::getMaster(Command *command, MondisClient *client) {
+    ExecRes res;
     CHECK_PARAM_NUM(0)
-    if (serverStatus == ServerStatus::MASTER) {
+    if (serverStatus == ServerStatus::SS_MASTER) {
 #ifdef WIN32
         WSADATA wsaData;
         WSAStartup(MAKEWORD(2, 2), &wsaData);
@@ -1855,13 +1811,18 @@ ExecutionResult MondisServer::getMaster(Command *command, MondisClient *client) 
     }
 }
 
-ExecutionResult MondisServer::toClient(Command *command, MondisClient *client) {
-    ExecutionResult res;
+ExecRes MondisServer::newClient(Command *command, MondisClient *client) {
+    ExecRes res;
+    res.needSend = false;
     clientModifyMtx.lock();
     if (nameToClients.size() > maxClientNum) {
         res.type = LOGIC_ERROR;
         res.desc = "can not build connection because has up to max client number!";
-        client->send(res.toString());
+        mondis::Message *msg = new mondis::Message;
+        msg->set_msg_type(mondis::MsgType::EXEC_RES);
+        msg->set_res_type(mondis::ExecResType::LOGIC_ERROR);
+        msg->set_content(res.toString());
+        client->writeMessage(msg);
 #ifdef WIN32
         FD_CLR(client->sock, &clientFds);
         allModifyMtx.lock();
@@ -1876,34 +1837,16 @@ ExecutionResult MondisServer::toClient(Command *command, MondisClient *client) {
         nameToClients.erase(nameToClients.find(client->name));
         delete client;
     }
+    client->type = ClientType ::CLIENT;
     clientModifyMtx.unlock();
     client->type = CLIENT;
     OK_AND_RETURN
 }
 
-ExecutionResult MondisServer::askForVote(Command *command, MondisClient *client) {
-    ExecutionResult res;
-    while (nullptr == master) {
-        long long maxOffset = 0;
-        peersModifyMtx.lock_shared();
-        for (auto &kv:idToPeers) {
-            kv.second->send("UPDATE_OFFSET");
-            long long cur = atoll(kv.second->read().c_str());
-            if (cur > maxOffset) {
-                maxOffsetClients.clear();
-                maxOffsetClients.insert(kv.second);
-            } else if (cur == maxOffset) {
-                maxOffsetClients.insert(kv.second);
-            }
-        }
-        this_thread::sleep_for(chrono::milliseconds(abs((int) (rand() % maxVoteIdle))));
-        for (auto &kv:idToPeers) {
-            kv.second->send("ASK_FOR_VOTE");
-        }
-        peersModifyMtx.unlock_shared();
-    }
+ExecRes MondisServer::askForVote(Command *command, MondisClient *client) {
+    ExecRes res;
     if (hasVoteFor) {
-        client->send("UNVOTE");
+        putCommandMsgToWriteQueue("UNVOTE",client->name)
     } else if (maxOffsetClients.find(client) != maxOffsetClients.end()) {
         client->send("VOTE");
         hasVoteFor = true;
@@ -1912,8 +1855,8 @@ ExecutionResult MondisServer::askForVote(Command *command, MondisClient *client)
     OK_AND_RETURN
 }
 
-ExecutionResult MondisServer::vote(Command *command, MondisClient *client) {
-    ExecutionResult res;
+ExecRes MondisServer::vote(Command *command, MondisClient *client) {
+    ExecRes res;
     voteNum++;
     peersModifyMtx.lock_shared();
     if (voteNum > idToPeers.size() / 2) {
@@ -1931,14 +1874,14 @@ ExecutionResult MondisServer::vote(Command *command, MondisClient *client) {
     OK_AND_RETURN
 }
 
-ExecutionResult MondisServer::unvote(Command *command, MondisClient *client) {
-    ExecutionResult res;
+ExecRes MondisServer::unvote(Command *command, MondisClient *client) {
+    ExecRes res;
     res.needSend = false;
     OK_AND_RETURN
 }
 
-ExecutionResult MondisServer::masterDead(Command *command, MondisClient *client) {
-    ExecutionResult res;
+ExecRes MondisServer::masterDead(Command *command, MondisClient *client) {
+    ExecRes res;
     isVoting = true;
     delete master;
     master = nullptr;
@@ -1959,8 +1902,8 @@ ExecutionResult MondisServer::masterDead(Command *command, MondisClient *client)
     OK_AND_RETURN;
 }
 
-ExecutionResult MondisServer::iAmNewMaster(Command *command, MondisClient *client) {
-    ExecutionResult res;
+ExecRes MondisServer::iAmNewMaster(Command *command, MondisClient *client) {
+    ExecRes res;
 #ifdef WIN32
     FD_CLR(client->sock, &peerFds);
 #elif defined(linux)
@@ -1989,15 +1932,15 @@ ExecutionResult MondisServer::iAmNewMaster(Command *command, MondisClient *clien
     sendToMaster(sync);
 }
 
-ExecutionResult MondisServer::updateOffset(Command *command, MondisClient *client) {
-    ExecutionResult res;
+ExecRes MondisServer::updateOffset(Command *command, MondisClient *client) {
+    ExecRes res;
     client->send(to_string(replicaOffset));
     res.needSend = false;
     OK_AND_RETURN
 }
 
-ExecutionResult MondisServer::clientInfo(Command *command, MondisClient *client) {
-    ExecutionResult res;
+ExecRes MondisServer::clientInfo(Command *command, MondisClient *client) {
+    ExecRes res;
     CHECK_PARAM_NUM(1)
     CHECK_PARAM_TYPE(0, PLAIN)
     clientModifyMtx.lock_shared();
@@ -2018,15 +1961,15 @@ ExecutionResult MondisServer::clientInfo(Command *command, MondisClient *client)
     res.desc += "\nhasAuthenticated:";
     res.desc += util::to_string(c->hasAuthenticate);
     res.desc += "\ndbIndex:";
-    res.desc += to_string(c->curDbIndex);
+    res.desc += to_string(c->dBIndex);
     res.desc += "\nisIntransaction:";
     res.desc += util::to_string(c->isInTransaction);
     res.desc += "\n";
     OK_AND_RETURN
 }
 
-ExecutionResult MondisServer::clientList(Command *command, MondisClient *client) {
-    ExecutionResult res;
+ExecRes MondisServer::clientList(Command *command, MondisClient *client) {
+    ExecRes res;
     CHECK_PARAM_NUM(0)
     res.desc = "current server has ";
     clientModifyMtx.lock_shared();
@@ -2042,8 +1985,8 @@ ExecutionResult MondisServer::clientList(Command *command, MondisClient *client)
     OK_AND_RETURN
 }
 
-ExecutionResult MondisServer::slaveInfo(Command *command, MondisClient *client) {
-    ExecutionResult res;
+ExecRes MondisServer::slaveInfo(Command *command, MondisClient *client) {
+    ExecRes res;
     CHECK_PARAM_NUM(4)
     CHECK_PARAM_TYPE(0, PLAIN)
     CHECK_PARAM_TYPE(1, PLAIN)
@@ -2061,8 +2004,8 @@ ExecutionResult MondisServer::slaveInfo(Command *command, MondisClient *client) 
     return res;
 }
 
-ExecutionResult MondisServer::slaveList(Command *command, MondisClient *client) {
-    ExecutionResult res;
+ExecRes MondisServer::slaveList(Command *command, MondisClient *client) {
+    ExecRes res;
     if (isSlave) {
         res.desc = "current server is a slave,can not has slaves";
         LOGIC_ERROR_AND_RETURN
@@ -2082,9 +2025,9 @@ ExecutionResult MondisServer::slaveList(Command *command, MondisClient *client) 
     OK_AND_RETURN
 }
 
-ExecutionResult MondisServer::newPeer(Command *command, MondisClient *client) {
-    ExecutionResult res;
-    if (client->type != MASTER) {
+ExecRes MondisServer::newPeer(Command *command, MondisClient *client) {
+    ExecRes res;
+    if (client->type != SS_MASTER) {
         res.desc = "the command is not from master!";
         LOGIC_ERROR_AND_RETURN
     }
@@ -2109,8 +2052,8 @@ ExecutionResult MondisServer::newPeer(Command *command, MondisClient *client) {
     peer->send(c);
 }
 
-ExecutionResult MondisServer::exit(Command *command, MondisClient *client) {
-    ExecutionResult res;
+ExecRes MondisServer::exit(Command *command, MondisClient *client) {
+    ExecRes res;
     CHECK_PARAM_NUM(0)
     system("exit");
 }
@@ -2118,7 +2061,7 @@ ExecutionResult MondisServer::exit(Command *command, MondisClient *client) {
 void MondisServer::writeToClient() {
     while (true) {
         mondis::Message * msg = writeQueue.take();
-        if (serverStatus == ServerStatus::MASTER&&msg->msg_type() == mondis::MsgType::COMMAND) {
+        if (serverStatus == ServerStatus::SV_STAT_MASTER&&msg->msg_type() == mondis::MsgType::COMMAND) {
             for (auto kv:idToPeers) {
                 kv.second->writeMessage(msg);
             }
@@ -2141,11 +2084,12 @@ MondisServer::putCommandMsgToWriteQueue(const string &cmdStr, string &clientName
     putToWriteQueue(msg);
 }
 
-void MondisServer::putExecResMsgToWriteQueue(ExecutionResult& res) {
+void MondisServer::putExecResMsgToWriteQueue(ExecRes &res, string clientName) {
     mondis::Message* msg = new mondis::Message;
     msg->set_msg_type(mondis::MsgType::EXEC_RES);
     msg->set_res_type((mondis::ExecResType)(res.type));
     msg->set_content(res.desc);
+    msg->set_client_name(clientName);
     putToWriteQueue(msg);
 }
 

@@ -218,8 +218,8 @@ MondisObject *MondisList::locate(Command *command) {
     return locate(index)->data;
 }
 
-ExecutionResult MondisList::execute(Command *command) {
-    ExecutionResult res;
+ExecRes MondisList::execute(Command *command) {
+    ExecRes res;
     switch (command->type) {
         case BIND: {
             CHECK_PARAM_NUM(2)

@@ -14,19 +14,19 @@
                                 return res;
 
 #define CHECK_PARAM_NUM(x) if(command->params.size()!=x) {\
-                             desc.type = SYNTAX_ERROR;\
-                             desc.desc = "arguments num error";\
+                             res.type = SYNTAX_ERROR;\
+                             res.desc = "arguments num error";\
                              LOGIC_ERROR_AND_RETURN\
                              }
 
 #define OK_AND_RETURN res.type = OK;\
                        return res;
 
-#define INVALID_AND_RETURN desc.desc = "Invalid command";\
-                             return desc;
+#define INVALID_AND_RETURN res.desc = "Invalid command";\
+                             return res;
 
 #define CHECK_INT_LEGAL(DATA, NAME) if(!util::toInteger(DATA,NAME)) {\
-                                    res.res = "argument can not be transformed to int";\
+                                    res.desc = "argument can not be transformed to int";\
                                     LOGIC_ERROR_AND_RETURN\
                                     }
 
@@ -40,12 +40,12 @@
                                       CHECK_INT_LEGAL((*command)[INDEX].content,NAME)
 
 #define CHECK_START if(start<0) {\
-                     desc.desc = "start under zero!";\
+                     res.desc = "start under zero!";\
                      LOGIC_ERROR_AND_RETURN\
                      }
 
 #define CHECK_END(size) if(end>(int)size) {\
-                     desc.desc = "end over flow!";\
+                     res.desc = "end over flow!";\
                      LOGIC_ERROR_AND_RETURN\
                      }
 
@@ -56,9 +56,9 @@
                              CHECK_END(SIZE)
 
 #define CHECK_PARAM_TYPE(INDEX, TYPE) if((*command)[INDEX].type!=Command::ParamType::TYPE) {\
-                                        desc.desc = "Invalid param";\
-                                        desc.type = SYNTAX_ERROR;\
-                                        return desc;\
+                                        res.desc = "Invalid param";\
+                                        res.type = SYNTAX_ERROR;\
+                                        return res;\
                                         }
 
 #define KEY(INDEX) string key = (*command)[INDEX].content;
@@ -136,7 +136,6 @@ enum CommandType {
     SET_CLIENT_NAME,
     SLAVE_OF,
     SYNC,
-    SYNC_FINISHED,//通知从服务器同步完成
     DISCONNECT_SLAVE,
     DISCONNECT_CLIENT,
     PING,
@@ -148,8 +147,7 @@ enum CommandType {
     UNWATCH,
     GET_MASTER,
     NEW_PEER,
-    IS_CLIENT,
-    MASTER_INVITE,
+    NEW_CLIENT,
     ASK_FOR_VOTE,
     VOTE,
     UNVOTE,
@@ -162,21 +160,21 @@ enum CommandType {
     SLAVE_LIST,
 };
 
-enum ExecutionResultType {
+enum ExecResType {
     OK,
     SYNTAX_ERROR,
     INTERNAL_ERROR,
     LOGIC_ERROR,
 };
 
-class ExecutionResult {
+class ExecRes {
 public:
     static std::string typeToStr[];
-    static std::unordered_map<std::string, ExecutionResultType> strToType;
-    ExecutionResultType type = OK;
+    static std::unordered_map<std::string, ExecResType> strToType;
+    ExecResType type = OK;
     std::string desc;
     bool needSend = true;
-    ExecutionResult():type(LOGIC_ERROR){};
+    ExecRes():type(LOGIC_ERROR){};
     std::string toString() {
         std::string res;
         res+=typeToStr[type];
@@ -189,8 +187,8 @@ public:
         return typeToStr[type];
     }
 
-    static ExecutionResult stringToResult(const std::string &data) {
-        ExecutionResult value;
+    static ExecRes stringToResult(const std::string &data) {
+        ExecRes value;
         int divider = data.find_first_of(" ");
         std::string typeStr = data.substr(0, divider);
         std::string resStr = data.substr(divider + 1);

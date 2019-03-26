@@ -226,8 +226,8 @@ MondisObject *HashMap::locate(Command *command) {
     return get(key);
 }
 
-ExecutionResult HashMap::execute(Command *command) {
-    ExecutionResult res;
+ExecRes HashMap::execute(Command *command) {
+    ExecRes res;
     switch (command->type) {
         case ADD: {
             CHECK_PARAM_NUM(1)

@@ -303,8 +303,8 @@ MondisObject *AVLTree::locate(Command *command) {
     return getValue(key);
 }
 
-ExecutionResult AVLTree::execute(Command *command) {
-    ExecutionResult res;
+ExecRes AVLTree::execute(Command *command) {
+    ExecRes res;
     switch (command->type) {
         case BIND: {
             CHECK_PARAM_NUM(2);

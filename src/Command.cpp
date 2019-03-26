@@ -60,7 +60,7 @@ std::unordered_map<CommandType, std::string> Command::typeToStr = {
         {CommandType::SAVE_ALL,"SAVE_ALL"},
         {CommandType::GET_MASTER,"GET_MASTER"},
         {CommandType::NEW_PEER,"NEW_PEER"},
-        {CommandType::IS_CLIENT,"IS_CLIENT"},
+        {CommandType::NEW_CLIENT,"NEW_CLIENT"},
         {CommandType::MASTER_INVITE,"MASTER_INVITE"},
         {CommandType::ASK_FOR_VOTE,"ASK_FOR_VOTE"},
         {CommandType::VOTE,"VOTE"},
@@ -132,7 +132,7 @@ std::unordered_map<std::string, CommandType> CommandInterpreter::strToType = {
         {"SAVE_ALL",CommandType::SAVE_ALL},
         {"GET_MASTER",CommandType::GET_MASTER},
         {"NEW_PEER",CommandType::NEW_PEER},
-        {"IS_CLIENT",CommandType::IS_CLIENT},
+        {"NEW_CLIENT",CommandType::NEW_CLIENT},
         {"ASK_FOR_VOTE",CommandType::ASK_FOR_VOTE},
         {"VOTE",CommandType::VOTE},
         {"UNVOTE",CommandType::UNVOTE},
@@ -293,11 +293,11 @@ bool util::toInteger(std::string &data, long long &res) {
     return true;
 }
 
-std::string ExecutionResult::typeToStr[] = {"OK", "SYNTAX_ERROR", "INTERNAL_ERROR", "LOGIC_ERROR"};
+std::string ExecRes::typeToStr[] = {"OK", "SYNTAX_ERROR", "INTERNAL_ERROR", "LOGIC_ERROR"};
 
-std::unordered_map<std::string, ExecutionResultType> ExecutionResult::strToType = {
-        {"OK",ExecutionResultType ::OK},
-        {"SYNTAX_ERROR",ExecutionResultType ::SYNTAX_ERROR},
-        {"INTERNAL_ERROR",ExecutionResultType ::INTERNAL_ERROR},
-        {"LOGIC_ERROR",ExecutionResultType ::LOGIC_ERROR}
+std::unordered_map<std::string, ExecResType> ExecRes::strToType = {
+        {"OK",ExecResType ::OK},
+        {"SYNTAX_ERROR",ExecResType ::SYNTAX_ERROR},
+        {"INTERNAL_ERROR",ExecResType ::INTERNAL_ERROR},
+        {"LOGIC_ERROR",ExecResType ::LOGIC_ERROR}
 };

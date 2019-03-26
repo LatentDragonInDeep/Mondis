@@ -556,8 +556,8 @@ SplayTreeNode *SplayTree::getLowerBound(int score, bool canEqual) {
     }
 }
 
-ExecutionResult SplayTree::execute(Command *command) {
-    ExecutionResult res;
+ExecRes SplayTree::execute(Command *command) {
+    ExecRes res;
     switch (command->type) {
         case ADD: {
             CHECK_PARAM_NUM(2);

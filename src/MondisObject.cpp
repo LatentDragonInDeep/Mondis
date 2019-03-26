@@ -17,8 +17,8 @@ string MondisData::getJson() {
 MondisData::~MondisData() {
 }
 
-ExecutionResult MondisData::execute(Command *command) {
-    return ExecutionResult();
+ExecRes MondisData::execute(Command *command) {
+    return ExecRes();
 }
 
 MondisObject *MondisData::locate(Command *command) {
@@ -66,9 +66,9 @@ MondisObject *MondisObject::locate(Command *command) {
     return data->locate(command);
 }
 
-ExecutionResult MondisObject::executeString(Command *command) {
+ExecRes MondisObject::executeString(Command *command) {
     string *data = (string *) objData;
-    ExecutionResult res;
+    ExecRes res;
     switch (command->type) {
         case BIND: {
             CHECK_PARAM_NUM(2)
@@ -213,9 +213,9 @@ ExecutionResult MondisObject::executeString(Command *command) {
     return res;
 }
 
-ExecutionResult MondisObject::executeInteger(Command *command) {
+ExecRes MondisObject::executeInteger(Command *command) {
     long long *data = (long long *) objData;
-    ExecutionResult res;
+    ExecRes res;
     switch (command->type) {
         case INCR:
             CHECK_PARAM_NUM(0)
@@ -253,9 +253,9 @@ ExecutionResult MondisObject::executeInteger(Command *command) {
     INVALID_AND_RETURN
 }
 
-ExecutionResult MondisObject::execute(Command *command) {
+ExecRes MondisObject::execute(Command *command) {
     if (command->type == TYPE) {
-        ExecutionResult res;
+        ExecRes res;
         res.type = OK;
         res.desc = typeStrs[type];
         return res;

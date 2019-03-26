@@ -57,8 +57,8 @@ void MondisClient::startTransaction() {
     undoCommands = new deque<MultiCommand *>;
 }
 
-ExecutionResult MondisClient::commitTransaction(MondisServer *server) {
-    ExecutionResult res;
+ExecRes MondisClient::commitTransaction(MondisServer *server) {
+    ExecRes res;
     if (!isInTransaction) {
         res.desc = "please start a transaction!";
         LOGIC_ERROR_AND_RETURN
@@ -78,7 +78,7 @@ ExecutionResult MondisClient::commitTransaction(MondisServer *server) {
         Command *command = server->interpreter->getCommand(next);
         CommandStruct cstruct = server->getCommandStruct(command, this);
         MultiCommand *undo = server->getUndoCommand(cstruct, this);
-        ExecutionResult res = server->transactionExecute(cstruct, this);
+        ExecRes res = server->transactionExecute(cstruct, this);
         if (res.type != OK) {
             while (hasExecutedCommandNumInTransaction > 0) {
                 MultiCommand *un = undoCommands->back();
@@ -129,12 +129,12 @@ string MondisClient::read() {
 
 MondisClient::MondisClient(MondisServer *server, SOCKET sock) {
     this->sock = sock;
-    keySpace = server->dbs[curDbIndex];
+    keySpace = server->dbs[dBIndex];
 }
 
 #elif defined(linux)
 MondisClient::MondisClient(MondisServer* server,int fd){
     this->fd = fd;
-    keySpace = server->dbs[curDbIndex];
+    keySpace = server->dbs[dBIndex];
 }
 #endif

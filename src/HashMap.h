@@ -166,7 +166,7 @@ public:
     AVLIterator iterator();
     ~AVLTree();
 
-    ExecutionResult execute(Command *command);
+    ExecRes execute(Command *command);
 
     MondisObject *locate(Command *command);
     unsigned size();
@@ -342,7 +342,7 @@ private:
     void checkType(string *key);
 
 public:
-    virtual ExecutionResult execute(Command *command);
+    virtual ExecRes execute(Command *command);
 
     virtual MondisObject *locate(Command *command);
 };

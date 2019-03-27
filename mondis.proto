@@ -1,0 +1,51 @@
+syntax="proto3";
+package mondis;
+//命令执行结果
+enum ExecResType {
+    OK = 0;
+    SYNTAX_ERROR = 1;
+    INTERNAL_ERROR = 2;
+    LOGIC_ERROR = 3;
+}
+
+//通信消息类型
+enum MsgType {
+    DATA = 0;
+    COMMAND = 1;
+    EXEC_RES = 2;
+}
+
+//数据类型
+enum DataType {
+    SYNC_DATA = 0;
+    CONTROL_MSG = 1;
+    HEART_BEAT = 2;
+}
+
+//命令类型
+enum CommandType {
+    CLIENT_COMMAND = 0;
+    MASTER_COMMAND = 1;
+    PEER_COMMAND = 2;
+    SLAVE_FORWARD = 3;
+    TIMER_COMMAND = 4;
+}
+
+//发送给谁
+enum SendToType {
+    ALL_CLIENTS = 0;
+    ALL_PEERS = 1;
+    SPECIFY_CLIENT = 2;
+    SPECIFY_PEER = 3;
+    NO_ONE = 4;
+}
+
+message Message {
+    MsgType msg_type= 1; //消息类型
+    string content = 2; //内容
+    ExecResType res_type= 3; //执行结果类型
+    DataType data_type= 4; //数据类型
+    CommandType command_type = 5; //命令来源
+    SendToType send_to_type = 6; //发给谁
+    uint32 client_id = 7;
+}

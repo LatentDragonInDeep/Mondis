@@ -8,15 +8,19 @@
 
 
 void SplayTree::toJson() {
-    json = "";
+    string res;
     SplayIterator iterator = this->iterator();
-    json += "[";
-    json += "\n";
+    res += "{";
+    res += "\n";
     while (iterator.next()) {
-        json += iterator->data->getJson();
-        json += ",\n";
+        string score = "\"" + to_string(iterator->score) + "\"";
+        res += score;
+        res += ",\n";
+        res += iterator->data->getJson();
+        res += ",\n";
     }
-    json += "]\n";
+    res += "}\n";
+    return res;
 }
 
 
@@ -552,8 +556,8 @@ SplayTreeNode *SplayTree::getLowerBound(int score, bool canEqual) {
     }
 }
 
-ExecutionResult SplayTree::execute(Command *command) {
-    ExecutionResult res;
+ExecRes SplayTree::execute(Command *command) {
+    ExecRes res;
     switch (command->type) {
         case ADD: {
             CHECK_PARAM_NUM(2);
@@ -569,11 +573,11 @@ ExecutionResult SplayTree::execute(Command *command) {
             CHECK_PARAM_TYPE(0, PLAIN)
             CHECK_AND_DEFINE_INT_LEGAL(0, rank)
             if (rank < 1) {
-                res.res = "rank out of range";
+                res.desc = "rank out of range";
                 LOGIC_ERROR_AND_RETURN
             }
             if (rank > size()) {
-                res.res = "rank out of range";
+                res.desc = "rank out of range";
                 LOGIC_ERROR_AND_RETURN
             }
             removeByRank(rank);
@@ -601,7 +605,7 @@ ExecutionResult SplayTree::execute(Command *command) {
                 OK_AND_RETURN
             } else {
                 res.type = SYNTAX_ERROR;
-                res.res = "arguments num error";
+                res.desc = "arguments num error";
                 return res;
             }
         }
@@ -620,7 +624,7 @@ ExecutionResult SplayTree::execute(Command *command) {
                 OK_AND_RETURN
             } else {
                 res.type = SYNTAX_ERROR;
-                res.res = "arguments num error";
+                res.desc = "arguments num error";
                 return res;
             }
         }
@@ -629,14 +633,14 @@ ExecutionResult SplayTree::execute(Command *command) {
             CHECK_PARAM_TYPE(0, PLAIN)
             CHECK_AND_DEFINE_INT_LEGAL(0, rank)
             if (rank < 1) {
-                res.res = "rank out of range";
+                res.desc = "rank out of range";
                 LOGIC_ERROR_AND_RETURN
             }
             if (rank > size()) {
-                res.res = "rank out of range";
+                res.desc = "rank out of range";
                 LOGIC_ERROR_AND_RETURN
             }
-            res.res = getByRank(rank)->getJson();
+            res.desc = getByRank(rank)->getJson();
             OK_AND_RETURN
         }
         case GET_BY_SCORE: {
@@ -645,10 +649,10 @@ ExecutionResult SplayTree::execute(Command *command) {
             CHECK_AND_DEFINE_INT_LEGAL(0, score)
             MondisObject *data = getByScore(score);
             if(data== nullptr) {
-                res.res = string("there is no object whose score is ") + to_string(score);
+                res.desc = string("there is no object whose score is ") + to_string(score);
                 LOGIC_ERROR_AND_RETURN
             }
-            res.res = data->getJson();
+            res.desc = data->getJson();
             OK_AND_RETURN
         }
         case GET_RANGE_BY_RANK: {
@@ -657,12 +661,12 @@ ExecutionResult SplayTree::execute(Command *command) {
                 CHECK_START_AND_DEFINE(0)
                 vector<MondisObject *> v;
                 getRangeByRank(start, size() + 1, &v);
-                res.res += "[\n";
+                res.desc += "[\n";
                 for (MondisObject *every:v) {
-                    res.res += every->getJson();
-                    res.res += ",\n";
+                    res.desc += every->getJson();
+                    res.desc += ",\n";
                 }
-                res.res += "]\n";
+                res.desc += "]\n";
                 OK_AND_RETURN
             } else if (command->params.size() == 2) {
                 CHECK_PARAM_TYPE(0, PLAIN)
@@ -671,16 +675,16 @@ ExecutionResult SplayTree::execute(Command *command) {
                 CHECK_END_AND_DEFINE(1, size())
                 vector<MondisObject *> v;
                 getRangeByRank(start, end, &v);
-                res.res += "[\n";
+                res.desc += "[\n";
                 for (MondisObject *every:v) {
-                    res.res += every->getJson();
-                    res.res += ",\n";
+                    res.desc += every->getJson();
+                    res.desc += ",\n";
                 }
-                res.res += "]\n";
+                res.desc += "]\n";
                 OK_AND_RETURN
             } else {
                 res.type = SYNTAX_ERROR;
-                res.res = "arguments num error";
+                res.desc = "arguments num error";
                 return res;
             }
         }
@@ -690,12 +694,12 @@ ExecutionResult SplayTree::execute(Command *command) {
                 CHECK_START_AND_DEFINE(0)
                 vector<MondisObject *> v;
                 getRangeByScore(start, numeric_limits<int>::max(), &v);
-                res.res += "[\n";
+                res.desc += "[\n";
                 for (MondisObject *every:v) {
-                    res.res += every->getJson();
-                    res.res += ",\n";
+                    res.desc += every->getJson();
+                    res.desc += ",\n";
                 }
-                res.res += "]\n";
+                res.desc += "]\n";
                 OK_AND_RETURN
             } else if (command->params.size() == 2) {
                 CHECK_PARAM_TYPE(0, PLAIN)
@@ -704,16 +708,16 @@ ExecutionResult SplayTree::execute(Command *command) {
                 CHECK_END_AND_DEFINE(1, size())
                 vector<MondisObject *> v;
                 getRangeByScore(start, end, &v);
-                res.res += "[\n";
+                res.desc += "[\n";
                 for (MondisObject *every:v) {
-                    res.res += every->getJson();
-                    res.res += ",\n";
+                    res.desc += every->getJson();
+                    res.desc += ",\n";
                 }
-                res.res += "]\n";
+                res.desc += "]\n";
                 OK_AND_RETURN
             } else {
                 res.type = SYNTAX_ERROR;
-                res.res = "arguments num error";
+                res.desc = "arguments num error";
                 return res;
             }
         }
@@ -721,12 +725,12 @@ ExecutionResult SplayTree::execute(Command *command) {
             CHECK_PARAM_NUM(1)
             CHECK_PARAM_TYPE(0, PLAIN)
             CHECK_AND_DEFINE_INT_LEGAL(0, score)
-            res.res = util::to_string(contains(score));
+            res.desc = util::to_string(contains(score));
             OK_AND_RETURN
         }
         case M_SIZE: {
             CHECK_PARAM_NUM(0)
-            res.res = to_string(size());
+            res.desc = to_string(size());
             OK_AND_RETURN
         }
         case COUNT: {
@@ -735,7 +739,7 @@ ExecutionResult SplayTree::execute(Command *command) {
             CHECK_PARAM_TYPE(1, PLAIN)
             CHECK_AND_DEFINE_INT_LEGAL(0, start)
             CHECK_AND_DEFINE_INT_LEGAL(1, end)
-            res.res = to_string(count(start, end));
+            res.desc = to_string(count(start, end));
             OK_AND_RETURN
         }
         case CHANGE_SCORE: {
@@ -746,12 +750,12 @@ ExecutionResult SplayTree::execute(Command *command) {
             CHECK_AND_DEFINE_INT_LEGAL(1, newScore)
             SplayTreeNode *oldNode = getNodeByScore(oldScore);
             if (oldNode == nullptr) {
-                res.res = string("element whose score is ") + PARAM(0) + " does not exists";
+                res.desc = string("element whose score is ") + PARAM(0) + " does not exists";
                 LOGIC_ERROR_AND_RETURN
             }
             SplayTreeNode *newNode = getNodeByScore(newScore);
             if (newNode != nullptr) {
-                res.res = string("element whose score is ") + PARAM(1) + " has existed";
+                res.desc = string("element whose score is ") + PARAM(1) + " has existed";
                 LOGIC_ERROR_AND_RETURN
             }
             MondisObject *data = oldNode->data;
@@ -765,18 +769,18 @@ ExecutionResult SplayTree::execute(Command *command) {
             CHECK_PARAM_TYPE(0, PLAIN)
             CHECK_AND_DEFINE_INT_LEGAL(0, rank)
             if (rank < 1 || rank > size()) {
-                res.res = "rank is out of range!";
+                res.desc = "rank is out of range!";
                 LOGIC_ERROR_AND_RETURN
             }
             SplayTreeNode *node = getNodeByRank(rank);
-            res.res = to_string(node->score);
+            res.desc = to_string(node->score);
             OK_AND_RETURN
         }
         case SCORE_TO_RANK: {
             CHECK_PARAM_NUM(1)
             CHECK_PARAM_TYPE(0, PLAIN)
             CHECK_AND_DEFINE_INT_LEGAL(0, score)
-            res.res = to_string(count(numeric_limits<int>::min(), score) + 1);
+            res.desc = to_string(count(numeric_limits<int>::min(), score) + 1);
             OK_AND_RETURN
         }
     }
@@ -810,22 +814,6 @@ MondisObject *SplayTree::locate(Command *command) {
     }
 
     return nullptr;
-}
-
-string SplayTree::toJsonWithScore() {
-    string res;
-    SplayIterator iterator = this->iterator();
-    res += "{";
-    res += "\n";
-    while (iterator.next()) {
-        string score = "\"" + to_string(iterator->score) + "\"";
-        res += score;
-        res += ",\n";
-        res += iterator->data->getJson();
-        res += ",\n";
-    }
-    res += "}\n";
-    return res;
 }
 
 SplayTreeNode *SplayTree::getNodeByRank(int rank) {

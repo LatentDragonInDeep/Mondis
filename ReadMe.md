@@ -8,6 +8,18 @@ Mondis是一个key-value数据库，它很像redis，但是支持许多redis不�
 mondis支持数据结构的任意嵌套，mondis键的取值只能是字符串，但是值的取值可以是string,list,set,zset,hash的任意一种。
 mondis嵌套意味着list,zset的元素与hash类型键值对的值可以是另一个list,set,zset或者hash，就像json
 那样。注意，set类型的元素只能是string，这是因为set底层采用hash表进行实现，而list,zset与hash没有默认的哈希函数。
+## json支持
+mondis查询类似于redis查询，但是不同的是mondis查询返回的格式是json。这使得mondis更方便使用。而且mondis
+支持json持久化与恢复。
+## 自动转化数据结构
+mondis可以把json格式的value自动转化为对应的数据结构。例如，""this is a test""将会被解析成一个RAW_STRING，内容是
+this is a test。注意这里出现了两对引号，这样做的原因是外面的一对引号表明这是一个string参数，内部的一对引号是
+json字符串表示法的引号。""12345""将会被解析成RAW_INT编码的12345。如果想要使用RAW_BIN编码，可以在
+二进制字符串的最开始加上LatentDragon这十二个字符。例如，""LatentDragonxxx""将会被解析成RAW_BIN编码的
+xxxx,开头的LatentDragon将被忽略。注意所有以LatentDragon开头的字符串都将被解析成RAW_BIN，也就是说我们无法
+保存普通的以LatentDragon开头的RAW_STRING。这个缺陷无伤大雅，而且会在后续版本中修复。"{}"将会被解析成没有键值对的hash。
+"[]"将会被解析成没有元素的list,"["LIST"]"同样是list,"["SET"]"则是空的set,"["ZSET"]"则是空的zset。
+ "[{}]"则会被解析成有一个hash元素的list。自动转化的数据结构支持任意形式和深度的嵌套，就像在第一条中所说的那样。
 ## mondis多态命令
 在redis里面，我们在操作的时候必须指定底层数据的类型，比如list命令全部以l开头，zset命令全部以z开头，hash命令全部以hash开头，
 但是在mondis里面，这些统统不需要。mondis命令具有多态性，相同的命令在不同数据结构上的效果是不同的，只需要执行命令而无需关心底层数据结构是
@@ -16,9 +28,6 @@ mondis嵌套意味着list,zset的元素与hash类型键值对的值可以是另�
 由于mondis支持任意嵌套，有时候我们要操作一个嵌套层数很深的数据对象，此时就需要用到定位命令。
 定位命令是locate，它可以具有不定数量的参数。它的作用就是定位到当前要操作的数据对象上，然后执行操作命令。
 多个locate命令之间需要以|分隔，看上去就像linux的管道命令。
-## json支持
-mondis查询类似于redis查询，但是不同的是mondis查询返回的格式是json。这使得mondis更方便使用。而且mondis
-支持json持久化与恢复。
 ## 二进制支持
 mondis添加了对于二进制数据的支持，类似于java的bytebuffer，并且完美支持bytebuffer的所有操作。
 ## mondis持久化
@@ -40,9 +49,11 @@ mondis slave节点可以自动将收到的写命令转发到master节点执行�
 并返回一个错误。
 ## mondis底层实现相对于redis的改进
 ### list
-在mondis里面，list还是用链表实现。不同的是mondis保存了对象指针与索引的双向映射，这样虽然多占用了一些空间，不过可以方便的定位到所需元素。
+在mondis里面，list还是用链表实现。不同的是mondis保存了对象指针与索引的双向映射，这样虽然多占用了一些空间，
+不过支持元素的随机访问。list同时支持redis里面的list所有操作。这些操作的均摊时间复杂度均为常数。
 ### set
-mondis的set采用的是value为空的hash表进行实现，听起来似乎与redis没什么不同，但是mondis的hashmap采用avl树解决哈希冲突，减小了哈希表操作的常数因子。
+mondis的set采用的是value为空的hash表进行实现，听起来似乎与redis没什么不同，但是mondis的hashmap采用avl树解决哈希冲突，
+减小了哈希表操作的常数因子。
 ### zset
 redis的zset采用跳表+哈希表实现，编码异常复杂，空间占用也没很大优势。
 mondis的zset采用伸展树实现，在时间与空间复杂度上进行了很好的权衡，而且伸展树方便的支持区间操作。
@@ -77,10 +88,9 @@ push_bakc,pop_front和pop_back。list里面的元素可以是任意类型。序�
 ## zset
 即有序集合，在存取元素时需要指定一个int的score，内部元素根据score从小到大有序。但是score不能指定int类型的极值。
 zset里面的元素可以是任意类型，支持set的所有操作，同时支持根据rank的区间访问，区间删除和根据score的区间访问，区间删除，
-还有更改一个元素的score。序列化结果是一个json数组，元素是内部元素，顺序按score从大到小排列。但是第一个元素是一个"ZSET"字符串，表明这是一个ZSET序列化的
-结果，用于反序列化时参考。zset的序列化分为带score与不带score的两种，带score的序列化为把四个字节的score作为一个元素以string形式添加到对应元素
-序列化结果的前面，不带score的序列化不包括score。默认序列化方式为不带score，当执行get命令获取zset时采用的就是这种。
-但是在json持久化时必须采用带score的版本。
+还有更改一个元素的score。序列化结果是一个json数组，元素是内部元素，顺序按score从大到小排列。但是第一个元素是一个"ZSET"字符串，
+表明这是一个ZSET序列化的结果，用于反序列化时参考。zset的序列化把四个字节的score作为一个元素以string形式添加到对应元素序列化结果
+的前面。
 ## hash
 即键值对的集合，key只能是RAW_STRING编码的string，值可以是任意类型。支持add,remove,size和exists操作。
 序列化结果是一个json对象，键值对即hash的键值对。
@@ -96,21 +106,14 @@ locate命令即定位命令，用来定位要操作的数据对象。数据对�
 ## 键空间命令
 ### set &lt;key&gt; [content]
 set命令即添加一条键值对。第一个参数是键，第二个是值。如果键值对已存在，则值将会被覆盖。第二个参数应当是标准的
-json字符串，它将会被自动解析成合适的数据结构。例如，""this is a test""将会被解析成一个RAW_STRING，内容是
-this is a test。注意这里出现了两对引号，这样做的原因是外面的一对引号表明这是一个string参数，内部的一对引号是
-json字符串表示法的引号。""12345""将会被解析成RAW_INT编码的12345。如果想要使用RAW_BIN编码，可以在
-二进制字符串的最开始加上LatentDragon这十二个字符。例如，""LatentDragonxxx""将会被解析成RAW_BIN编码的
-xxxx,开头的LatentDragon将被忽略。注意所有以LatentDragon开头的字符串都将被解析成RAW_BIN，也就是说我们无法
-保存普通的以LatentDragon开头的RAW_STRING。这个缺陷无伤大雅，而且会在后续版本中修复。"{}"将会被解析成没有键值对的hash。
-"[]"将会被解析成没有元素的list,"["LIST"]"同样是list,"["SET"]"则是空的set,"["ZSET"]"则是空的zset。
-"[{}]"则会被解析成有一个hash元素的list。
+json字符串，它将会被自动解析成合适的数据结构。
 ### del &lt;key&gt;
 删除对应的key。
 ### get &lt;key&gt;
 返回对应key的json表示
 ### exists &lt;key&gt;
 检查是否存在对应的key。
-### rename &lt;oldkey&gt; &lt;newkey&gt;
+### renameKey &lt;oldkey&gt; &lt;newkey&gt;
 修改oldkey为newkey。
 ### type &lt;key&gt;
 返回key对应的value底层编码类型。类型有RAW_STRING,RAW_INT,RAW_BIN,LIST,SET,ZSET,HASH
@@ -120,7 +123,7 @@ xxxx,开头的LatentDragon将被忽略。注意所有以LatentDragon开头的字
 返回键空间内键的数量
 
 ## 控制命令
-### select &lt;db&gt;
+### selectDb &lt;db&gt;
 修改当前键空间为编号为db的键空间。
 ### save &lt;filepath&gt;
 将整个当前键空间以json持久化到file里面。save命令的默认实现是开启子进程持久化，因此不需要担心性能问题。
@@ -138,9 +141,9 @@ mondis不提供bgsave。
 ### undo
 撤销所执行的上一条写命令。
 ### multi
-开启一个事务。同时最多只能存在一个事务。
+为当前客户端开启一个事务。同时最多只能存在一个事务。
 ### exec
-执行当前的事务
+执行当前的事务并且退出事务
 ### discard
 抛弃当前未执行事务的所有命令并关闭事务。
 ### watch &lt;key&gt;
@@ -152,7 +155,7 @@ mondis不提供bgsave。
 
 ## string命令
 string命令分为两大类，有些只能在RAW_INT上执行，有些可以在RAW_STRING上执行。下面分别介绍
-##RAW_STRING命令
+## RAW_STRING命令
 ### get &lt;position&gt; 
 返回position处的字符。
 ### set &lt;position&gt; [char]
@@ -346,7 +349,7 @@ json持久化文件路径。
 ## workDir=&lt;string&gt;
 工作目录，默认文件均会在此目录下寻找，找不到则自动创建。
 
-## slaveOf=&lt;true|false&gt;
+## beSlaveOf=&lt;true|false&gt;
 启动时是否同步主服务器，默认为false
 
 ## masterIP=&lt;string&gt;
@@ -376,28 +379,6 @@ json持久化文件路径。
 
 ## maxCommandPropagateBufferSize=&lt;integer&gt;
 命令传播缓冲区大小，缓存主服务器已经执行完毕，需要传播给从服务器的写命令。默认为1024
-
-## maxUndoCommandBufferSize=&lt;integer&gt;
-undo命令缓冲区大小,可以理解为最多能undo几条命令,大小不能超过命令缓冲区大小。只有在事务中或者开启了
-canUndoNotInTransaction选项才发挥作用。默认为1024
-
-## maxSlaveIdle=&lt;integer&gt;
-最大从服务器空转时间，如果从上一次收到心跳包经过空转时间还没有收到心跳包，就认为从服务器出问题了，自动断开连接
-并从集群中删除此从服务器。当且仅当当前服务器是主服务器时有效，单位毫秒,默认为10000。
-
-## toSlaveHeartBeatDuration=&lt;integer&gt;
-主服务器向从服务器心跳包发送间隔，单位毫秒，默认为1000。
-
-## maxMasterIdle=&lt;integer&gt;
-最大主服务器空转时间，如果从上一次收到心跳包经过空转时间还没有收到心跳包，就认为主服务器出问题了，自动断开连接
-并由此从服务器发起leader选举。当且仅当当前服务器是从服务器时有效，单位毫秒,默认为10000。
-
-## toClientHeartBeatDuration=&lt;integer&gt;
-客户端心跳包发送间隔,单位毫秒,默认为1000。
-
-## maxClientIdle=&lt;integer&gt;
-最大客户端空转时间，如果从上一次收到心跳包经过空转时间还没有收到心跳包，就认为客户端出问题了，自动断开连接。
-单位毫秒,默认为10000。
 
 ## autoMoveCommandToMaster=&lt;true|false&gt;
 当前服务器为从服务器时，是否自动将客户端的写命令转发到主服务器，如果为false将丢弃这条命令并返回一个错误。默认为true。

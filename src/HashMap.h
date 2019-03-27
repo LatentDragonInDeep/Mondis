@@ -12,160 +12,34 @@
 
 using namespace std;
 
-
-class Key :public MondisData{
-public:
-    string str;
-    int intValue;
-    bool flag = true;
-    bool compare(Key& other) {
-        if(flag!=other.flag) {
-            return false;
-        }
-        if(flag) {
-            return str.compare(other.str) > 0;
-        }
-        return intValue>other.intValue;
-    }
-    Key(string& k) {
-        if (util::toInteger(k, intValue)) {
-            flag = false;
-        } else{
-            str = k;
-        }
-    };
-
-    explicit Key(int k) : intValue(k), flag(false) {};
-
-    bool isInteger() {
-        return !flag;
-    }
-    void toString() {
-        if(flag) {
-            return;
-        }
-        str = to_string(intValue);
-        flag = true;
-    }
-
-    bool toInteger() {
-        bool res = util::toInteger(str, intValue);
-        if(res) {
-            flag = false;
-            return true;
-        }
-        return false;
-    }
-    bool equals(Key& other) {
-        if(flag!=other.flag) {
-            return false;
-        }
-        if(flag) {
-            return str == other.str;
-        }
-        return intValue == other.intValue;
-    }
-
-    unsigned int hashCode() {
-        if(flag) {
-            return strHash(str);
-        }
-        else  {
-            return intHash(intValue);
-        }
-    }
-
-private:
-    unsigned int intHash(int key) {
-        key += ~(key << 15);
-        key ^=  (key >> 10);
-        key +=  (key << 3);
-        key ^=  (key >> 6);
-        key += ~(key << 11);
-        key ^=  (key >> 16);
-        return key;
-    }
-
-    unsigned int strHash(string& str) {
-        int len = str.size();
-        const char * key = str.c_str();
-        uint32_t seed = 2017;
-        const uint32_t m = 0x5bd1e995;
-        const int r = 24;
-
-        uint32_t h = seed ^len;
-
-        const unsigned char *data = (const unsigned char *)key;
-
-        while(len >= 4) {
-            uint32_t k = *(uint32_t*)data;
-
-            k *= m;
-            k ^= k >> r;
-            k *= m;
-
-            h *= m;
-            h ^= k;
-
-            data += 4;
-            len -= 4;
-        }
-
-        switch(len) {
-            case 3: h ^= data[2] << 16;
-            case 2: h ^= data[1] << 8;
-            case 1: h ^= data[0]; h *= m;
-        };
-
-
-        h ^= h >> 13;
-        h *= m;
-        h ^= h >> 15;
-
-        return (unsigned int)h;
-    }
-
-    void toJson() {
-        json = "";
-        if(flag) {
-            json += "\"";
-            json += str;
-            json += "\"";
-        } else{
-            json += "\"";
-            json += to_string(intValue);
-            json += "\"";
-        }
-    }
-};
-
 class KeyValue :public MondisData{
 public:
-    Key* key = nullptr;
+    string key = "";
     MondisObject* value = nullptr;
 
-    KeyValue(Key *k, MondisObject *v) : key(k), value(v) {}
+    KeyValue(string &k, MondisObject *v) : key(k), value(v) {}
     KeyValue(){};
     KeyValue(KeyValue&& other) = default;
     KeyValue(KeyValue& other):key(other.key),value(other.value) {
-        other.key = nullptr;
+        other.key = "";
         other.value = nullptr;
     }
     bool compare(KeyValue& other) {
-        return key->compare(*other.key);
+        return key.compare(other.key);
     }
 
     bool equals(KeyValue& other) {
-        return key->equals(*other.key);
+        return key == other.key;
     }
     ~KeyValue() {
-        delete key;
         delete value;
     }
 
     void toJson() {
         json = "";
-        json += key->getJson();
+        json+="\"";
+        json += key;
+        json+="\"";
         if (value == nullptr) {
             json += ":";
             json += value->getJson();
@@ -175,7 +49,7 @@ public:
     KeyValue &operator=(KeyValue &other) {
         key = other.key;
         value = other.value;
-        other.key = nullptr;
+        other.key = "";
         other.value = nullptr;
         return *this;
     };
@@ -188,32 +62,33 @@ public:
 
 class Entry:public MondisData{
 public:
-    Key* key = nullptr;
+    string key;
     MondisObject* object = nullptr;
     Entry* pre = nullptr;
     Entry* next = nullptr;
     bool compare(Entry& other) {
-        return key->compare(*other.key);
+        return key.compare(other.key);
     }
 
     bool equals(Entry& other) {
-        return key->equals(*other.key);
+        return key == other.key;
     }
 
-    Entry(Key *key, MondisObject *data) : key(key), object(data) {};
+    Entry(string &key, MondisObject *data) : key(key), object(data) {};
     Entry(KeyValue* kv):key(kv->key),object(kv->value){
-        kv->key= nullptr;
+        kv->key= "";
         kv->value = nullptr;
     };
     Entry(){};
     ~Entry (){
-        delete key;
         delete object;
     }
 
     void toJson() {
         json = "";
-        json += key->getJson();
+        json+="\"";
+        json += key;
+        json+="\"";
         if (object != nullptr) {
             json += " : ";
             json += object->getJson();
@@ -221,7 +96,7 @@ public:
     }
     KeyValue* toKeyValue() {
         KeyValue* res = new KeyValue(key,object);
-        key = nullptr;
+        key = "";
         object = nullptr;
         return res;
     }
@@ -282,16 +157,16 @@ public:
 
     void insert(KeyValue *kv);
 
-    void insert(Key *key, MondisObject *value);
+    void insert(string &key, MondisObject *value);
 
-    void remove(Key &key);
-    KeyValue* get(Key& key);
-    MondisObject* getValue(Key& key);
-    bool containsKey(Key& key);
+    void remove(string &key);
+    KeyValue* get(string& key);
+    MondisObject* getValue(string& key);
+    bool containsKey(string& key);
     AVLIterator iterator();
     ~AVLTree();
 
-    ExecutionResult execute(Command *command);
+    ExecRes execute(Command *command);
 
     MondisObject *locate(Command *command);
     unsigned size();
@@ -445,36 +320,29 @@ private:
 public:
     HashMap();
     HashMap(unsigned int capacity, float loadFactor);
-
-    HashMap(unsigned int capacity, float loadFactor, bool isIntset, bool isValueNull);
-
-    HashMap(const bool isIntset, const bool isValueNull);
-
     ~HashMap();
 
-    bool put(Key *key, MondisObject *value);
-    MondisObject* get (Key &key);
-    bool containsKey (Key &key);
-    bool remove (Key &key);
+    bool put(string& key, MondisObject *value);
+    MondisObject* get (string &key);
+    bool containsKey (string &key);
+    bool remove (string &key);
     unsigned size();
 
     void clear();
 private:
+    unsigned int hash(string &str);
     void rehash();
-    void toStringSet();
     void toTree (int index);
 
     unsigned getIndex(unsigned hash);
     void add(int index,Entry* entry);
-
-    int getCapacity (int capa);
     void toJson();
     HashMap::MapIterator iterator();
 
-    void checkType(Key *key);
+    void checkType(string *key);
 
 public:
-    virtual ExecutionResult execute(Command *command);
+    virtual ExecRes execute(Command *command);
 
     virtual MondisObject *locate(Command *command);
 };

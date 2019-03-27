@@ -16,6 +16,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <thread>
+#include <shared_mutex>
 
 #ifdef WIN32
 
@@ -34,14 +35,17 @@
 #include "Command.h"
 #include "JSONParser.h"
 #include "SplayTree.h"
+#include "BlockingQueue.h"
+#include "mondis.pb.h"
 
+using namespace std;
 class Log{
 private:
     string currentTime;
     string &command;
-    ExecutionResult& res;
+    ExecRes& res;
 public:
-    Log(string &command, ExecutionResult &res) : command(command), res(res) {
+    Log(string &command, ExecRes &res) : command(command), res(res) {
         time_t t = time(0);
         char ch[64];
         strftime(ch, sizeof(ch), "%Y-%m-%d %H-%M-%S", localtime(&t));
@@ -56,7 +60,7 @@ public:
         res += this->res.getTypeStr();
         if (this->res.type != OK) {
             res += '\t';
-            res += this->res.res;
+            res += this->res.desc;
         }
         res += '\n';
 
@@ -72,6 +76,7 @@ enum ClientType {
     PEER,
     CLIENT,
     SERVER_SELF,
+    SLAVE,
 };
 
 class MondisClient {
@@ -80,21 +85,14 @@ public:
 #ifdef WIN32
     SOCKET sock;
 #elif defined(linux)
-    int fd;/* Client socket. */
+    1int fd;/* Client socket. */
 #endif
     ClientType type = CLIENT;
-    int curDbIndex = 0;
-    HashMap *keySpace = nullptr;            /* Pointer to currently SELECTed DB. */
-    string name;             /* As set by CLIENT SETNAME. */
-    vector<string> commandBuffer;         /* Buffer we use to accumulate client queries. */
-    int curCommandIndex = 0;
-    vector<ExecutionResult> *reply;            /* List of reply objects to sendToMaster to the client. */
+    int dBIndex = 0;
     string ip;
     int port;
-
     long long preInteraction = chrono::duration_cast<chrono::milliseconds>(
             chrono::system_clock::now().time_since_epoch()).count();
-
     unordered_set<string> watchedKeys;
     unordered_set<string> modifiedKeys;
 
@@ -106,11 +104,7 @@ public:
     bool watchedKeysHasModified = false;
 
     int hasExecutedCommandNumInTransaction = 0;
-public:
-    bool hasAuthenticate = false;
-private:
-    static int nextId;
-public:
+    bool hasAuthenticate = true;
 #ifdef WIN32
 
     MondisClient(MondisServer *server, SOCKET sock);
@@ -122,16 +116,20 @@ public:
 
     ~MondisClient();
 
-    void send(const string &res);
-
     void updateHeartBeatTime();
 
     void startTransaction();
 
     void closeTransaction();
 
-    ExecutionResult commitTransaction(MondisServer *server);
+    ExecRes commitTransaction(MondisServer *server);
 
+    mondis::Message* nextMessage();
+
+    void writeMessage(mondis::Message* msg);
+
+private:
+    void write(string& msg);
     string read();
 };
 
@@ -142,23 +140,25 @@ public:
     MondisObject *obj = nullptr;
     bool isModify = false;
     bool isLocate = false;
-
-    CommandStruct() {};
-
-    CommandStruct(CommandStruct &other) {
-        locate = other.locate;
-        operation = other.operation;
-        obj = other.obj;
-        other.locate = nullptr;
-        other.operation = nullptr;
-        other.obj = nullptr;
-        isModify = other.isModify;
-        isLocate = other.isLocate;
-    }
 };
+
+enum ServerStatus {
+    SV_STAT_MASTER,
+    SV_STAT_SLAVE,
+};
+
+enum RunStatus {
+    LOADING,
+    RECOVERING,
+    REPLACTING,
+    RUNNING,
+};
+
+typedef ExecRes (MondisServer::*CommandHandler)(Command*,MondisClient*);
 
 class MondisServer {
 private:
+    static MondisServer* server;
     friend class MondisClient;
     int maxClientNum = 1024;
     int maxCommandReplicaBufferSize = 1024 * 1024;
@@ -169,7 +169,8 @@ private:
     int maxClientIdle = 10000;
     int toSlaveHeartBeatDuration = 3000;
     int toClientHeartBeatDuration = 3000;
-
+    deque<string> * replicaCommandBuffer = new deque<string>();
+    bool isSlaveOf = false;
     pid_t pid;
     std::string configfile;
     int port = 6379;
@@ -197,24 +198,35 @@ private:
     string recoveryStrategy;
     string aofFile;
     string jsonFile;
-    bool isLoading = false;
-    bool isRecovering = false;
-    bool isReplicatingFromMaster = false;
-    bool isMaster = false;
-    bool isSlave = false;
+    ServerStatus serverStatus;
+    RunStatus runStatus;
     unordered_map<unsigned, MondisClient *> idToPeers;
-    unordered_map<string, MondisClient *> nameToClients;
-
+    unordered_map<unsigned, MondisClient *> idToClients;
+    unordered_map<unsigned,MondisClient*> idToPeersAndClients;
+    BlockingQueue<mondis::Message*> readQueue;
+    BlockingQueue<mondis::Message*> writeQueue;
+    void writeToClient();
+public:
+    void putToReadQueue(mondis::Message *msg);
+    void putToWriteQueue(mondis::Message* msg);
+    void putCommandMsgToWriteQueue(const string &cmdStr, unsigned int clientId, mondis::CommandType commandType,
+                                       mondis::SendToType sendToType);
+    void putExecResMsgToWriteQueue(const ExecRes &res, unsigned int clientId, mondis::SendToType sendToType);
+private:
     long long replicaOffset = 0;
-    deque<string> *replicaCommandBuffer;
     static unordered_set<CommandType> modifyCommands;
     static unordered_set<CommandType> transactionAboutCommands;
-
+    static unordered_map<CommandType,CommandHandler> commandHandlers;
     static void initStaticMember();
 
     bool isPropagating = false;
     condition_variable redirectCV;
     mutex redirectMtx;
+
+    shared_mutex allModifyMtx;
+    shared_mutex clientModifyMtx;
+    shared_mutex peersModifyMtx;
+    shared_mutex watchedKeyMtx;
 
     bool isRedirecting = false;
 
@@ -224,41 +236,14 @@ private:
     string masterPassword;
     string masterIP;
     int masterPort;
-    
-    bool slaveOf=false;
     bool hasVoteFor = false;
-
     unordered_set<MondisClient *> maxOffsetClients;
-
     MondisClient *master = nullptr;
 #ifdef WIN32
     fd_set clientFds;
     fd_set peerFds;
     unordered_map<SOCKET, MondisClient *> socketToClient;
 
-    void send(SOCKET &sock, const string &res) {
-        char buffer[4096];
-        int ret;
-        const char *data = res.data();
-        int hasWrite = 0;
-        while (hasWrite < res.size()) {
-            ret = ::send(sock, data + hasWrite, res.size() - hasWrite, 0);
-            hasWrite += ret;
-        }
-    };
-
-    string read(SOCKET &sock) {
-        string res;
-        char buffer[4096];
-        int ret;
-        while (true) {
-            ret = recv(sock, buffer, sizeof(buffer), 0);
-            if (ret == SOCKET_ERROR) {
-                return res;
-            }
-            res += string(buffer, ret);
-        }
-    };
 #elif defined(linux)
     int clientsEpollFd;
     int peersEpollFd;
@@ -266,39 +251,22 @@ private:
     epoll_event* peerEvents;
     struct epoll_event listenEvent;
     unordered_map<int,MondisClient*> fdToClient;
-    void send(int fd, const string& data) {
-        char buffer[4096];
-        int ret;
-        const char *toWrite = data.data();
-        int hasWrite = 0;
-        while (hasWrite<data.size()) {
-            ret = write(fd,toWrite+hasWrite,data.size()-hasWrite);
-            hasWrite+=ret;
-        }
-    };
-    string read(int fd) {
-        string res;
-        char buffer[4096];
-        int ret;
-        while ((ret = ::read(fd, buffer, sizeof(buffer))) != 0) {
-            res += string(buffer, ret);
-        }
-        return res;
-    };
 #endif
 
     void selectAndHandle(bool isClient);
 public:
+    static MondisServer* getInstance();
     unsigned id;
     CommandInterpreter *interpreter;
 
+private:
     MondisServer();
-
+public:
     ~MondisServer();
 
     int start(string& confFile);
 
-    ExecutionResult execute(Command *command, MondisClient *client);
+    ExecRes execute(Command *command, MondisClient *client);
 
     static JSONParser *getJSONParser();
 
@@ -308,7 +276,7 @@ public:
 
     void incrReplicaOffset();
 
-    void appendLog(string &commandStr, ExecutionResult &res);
+    void appendLog(const string &commandStr, ExecRes &res);
 
     void appendAof(const string &command);
 
@@ -320,7 +288,7 @@ public:
 
     void undoExecute(MultiCommand *command, MondisClient *client);
 
-    ExecutionResult transactionExecute(CommandStruct &cstruct, MondisClient *client);
+    ExecRes transactionExecute(CommandStruct &cstruct, MondisClient *client);
 
     CommandStruct getCommandStruct(Command *command, MondisClient *client);
 private:
@@ -328,20 +296,16 @@ private:
 
     void init();
 
-    void save(string &jsonFile, int dbIndex);
+    void msgHandle();
 
     void startEventLoop();
     void applyConf();
 
     void parseConfFile(string& confFile);
 
-    ExecutionResult execute(string &commandStr, MondisClient *client);
+    ExecRes execute(const string &commandStr, MondisClient *client);
 
     void acceptSocket();
-
-    void sendToMaster(const string &res);
-
-    string readFromMaster(bool isBlocking);
 
     void replicaToSlave(MondisClient *client, long long slaveReplicaOffset);
 
@@ -362,11 +326,10 @@ private:
 
     void closeClient(MondisClient *c);
 
-    thread *recvFromMaster = nullptr;
     thread *sendHeartBeatToSlaves = nullptr;
-    thread *sendHeartBeatToClients = nullptr;
-    thread *recvFromSlaves = nullptr;
     thread *propagateIO = nullptr;
+    thread *msgHandler = nullptr;
+    thread *msgWriter = nullptr;
     bool autoMoveCommandToMaster = true;
 
     void saveAll(const string &jsonFile);
@@ -376,27 +339,60 @@ private:
     static unordered_set<CommandType> controlCommands;
     static unordered_set<CommandType> clientControlCommands;
 
-    ExecutionResult beSlaveOf(Command *command, MondisClient *client, string &masterUsername, string &masterPassword);
-
     MondisClient *buildConnection(const string &ip, int port);
 
     void getJson(string *res);
 
     static unsigned curClientId;
 
-    unsigned nextPeerId();
+    unsigned nextClientId();
 
     static string nextDefaultClientName();
 
     unsigned voteNum = 0;
 
-    thread *forVote = nullptr;
-
-    void askForVote();
-
     const unsigned maxVoteIdle = 10000;
 
     bool isVoting = false;
+
+    deque<ExecRes> resQueue;
+    ExecRes bindKey(Command *, MondisClient *);
+    ExecRes get(Command*,MondisClient*);
+    ExecRes del(Command*,MondisClient*);
+    ExecRes exsits(Command*,MondisClient*);
+    ExecRes login(Command*,MondisClient*);
+    ExecRes type(Command*,MondisClient*);
+    ExecRes selectDb(Command *, MondisClient *);
+    ExecRes save(Command*,MondisClient*);
+    ExecRes saveAll(Command*,MondisClient*);
+    ExecRes renameKey(Command *, MondisClient *);
+    ExecRes size(Command*,MondisClient*);
+    ExecRes beSlaveOf(Command *, MondisClient *);
+    ExecRes sync(Command*,MondisClient*);
+    ExecRes disconnectClient(Command*,MondisClient*);
+    ExecRes disconnectSlave(Command*,MondisClient*);
+    ExecRes ping(Command*,MondisClient*);
+    ExecRes pong(Command*,MondisClient*);
+    ExecRes multi(Command*,MondisClient*);
+    ExecRes exec(Command*,MondisClient*);
+    ExecRes discard(Command*,MondisClient*);
+    ExecRes watch(Command*,MondisClient*);
+    ExecRes unwatch(Command*,MondisClient*);
+    ExecRes getMasterInfo(Command *, MondisClient *);
+    ExecRes newClient(Command *command, MondisClient *client);
+    ExecRes askForVote(Command*,MondisClient*);
+    ExecRes vote(Command*,MondisClient*);
+    ExecRes unvote(Command*,MondisClient*);
+    ExecRes masterDead(Command*,MondisClient*);
+    ExecRes iAmNewMaster(Command*,MondisClient*);
+    ExecRes updateOffset(Command*,MondisClient*);
+    ExecRes clientInfo(Command*,MondisClient*);
+    ExecRes clientList(Command*,MondisClient*);
+    ExecRes slaveInfo(Command*,MondisClient*);
+    ExecRes slaveList(Command*,MondisClient*);
+    ExecRes newPeer(Command*,MondisClient*);
+    ExecRes exit(Command*,MondisClient*);
+
 };
 
 

@@ -13,24 +13,20 @@
 #define LOGIC_ERROR_AND_RETURN res.type = LOGIC_ERROR;\
                                 return res;
 
-#define PUT(TYPE) map[#TYPE] = CommandType::TYPE;
-
-#define MAP(TYPE) typeToStr[TYPE] = #TYPE;
-
 #define CHECK_PARAM_NUM(x) if(command->params.size()!=x) {\
                              res.type = SYNTAX_ERROR;\
-                             res.res = "arguments num error";\
+                             res.desc = "arguments num error";\
                              LOGIC_ERROR_AND_RETURN\
                              }
 
 #define OK_AND_RETURN res.type = OK;\
                        return res;
 
-#define INVALID_AND_RETURN res.res = "Invalid command";\
+#define INVALID_AND_RETURN res.desc = "Invalid command";\
                              return res;
 
 #define CHECK_INT_LEGAL(DATA, NAME) if(!util::toInteger(DATA,NAME)) {\
-                                    res.res = "argument can not be transformed to int";\
+                                    res.desc = "argument can not be transformed to int";\
                                     LOGIC_ERROR_AND_RETURN\
                                     }
 
@@ -44,12 +40,12 @@
                                       CHECK_INT_LEGAL((*command)[INDEX].content,NAME)
 
 #define CHECK_START if(start<0) {\
-                     res.res = "start under zero!";\
+                     res.desc = "start under zero!";\
                      LOGIC_ERROR_AND_RETURN\
                      }
 
 #define CHECK_END(size) if(end>(int)size) {\
-                     res.res = "end over flow!";\
+                     res.desc = "end over flow!";\
                      LOGIC_ERROR_AND_RETURN\
                      }
 
@@ -60,14 +56,14 @@
                              CHECK_END(SIZE)
 
 #define CHECK_PARAM_TYPE(INDEX, TYPE) if((*command)[INDEX].type!=Command::ParamType::TYPE) {\
-                                        res.res = "Invalid param";\
+                                        res.desc = "Invalid param";\
                                         res.type = SYNTAX_ERROR;\
                                         return res;\
                                         }
 
-#define KEY(INDEX) Key key((*command)[INDEX].content);
+#define KEY(INDEX) string key = (*command)[INDEX].content;
 
-#define TOKEY(COMMAND, INDEX) Key key((*COMMAND)[INDEX].content);
+#define TOKEY(COMMAND, INDEX) string key = (*COMMAND)[INDEX].content;
 
 #define CHECK_PARAM_LENGTH(INDEX, LENGTH) if((*command)[INDEX].content.size()!=LENGTH) { \
                                             res.res = "argument length error";\
@@ -101,7 +97,7 @@ enum CommandType {
     DECR,
     INCR_BY,
     DECR_BY,
-    INSERT, \
+    INSERT,
     FRONT,
     BACK,
     PUSH_FRONT,
@@ -112,6 +108,8 @@ enum CommandType {
     REMOVE,
     M_SIZE,
     COUNT,
+    UNION,
+    INTERSECT,
     REMOVE_BY_RANK,
     REMOVE_BY_SCORE,
     REMOVE_RANGE_BY_RANK,
@@ -123,17 +121,6 @@ enum CommandType {
     GET_BY_SCORE,
     GET_RANGE_BY_RANK,
     GET_RANGE_BY_SCORE,
-    READ_FROM,
-    READ_CHAR,
-    READ_SHORT,
-    READ_INT,
-    READ_LONG,
-    READ_LONG_LONG,
-    BACKWARD,
-    FORWARD,
-    SET_POS,
-    READ,
-    WRITE,
     TO_STRING,
     TO_INTEGER,
     GET_POS,
@@ -149,52 +136,47 @@ enum CommandType {
     SET_CLIENT_NAME,
     SLAVE_OF,
     SYNC,
-    SYNC_FINISHED,//通知从服务器同步完成
     DISCONNECT_SLAVE,
     DISCONNECT_CLIENT,
-    PING,
-    PONG,
     MULTI,
     EXEC,
     DISCARD,
     WATCH,
     UNWATCH,
-    GET_MASTER,
+    MASTER_INFO,
     NEW_PEER,
-    IS_CLIENT,
-    MASTER_INVITE,
+    NEW_CLIENT,
     ASK_FOR_VOTE,
     VOTE,
     UNVOTE,
     MASTER_DEAD,
     I_AM_NEW_MASTER,
-    UPDATE_OFFSET,
     CLIENT_INFO,
     CLIENT_LIST,
     SLAVE_INFO,
     SLAVE_LIST,
 };
 
-enum ExecutionResultType {
+enum ExecResType {
     OK,
     SYNTAX_ERROR,
     INTERNAL_ERROR,
     LOGIC_ERROR,
 };
 
-class ExecutionResult {
+class ExecRes {
 public:
     static std::string typeToStr[];
-    static std::unordered_map<std::string, ExecutionResultType> strToType;
-    ExecutionResultType type;
-    std::string res;
+    static std::unordered_map<std::string, ExecResType> strToType;
+    ExecResType type = OK;
+    std::string desc;
     bool needSend = true;
-    ExecutionResult():type(LOGIC_ERROR){};
+    ExecRes():type(LOGIC_ERROR){};
     std::string toString() {
         std::string res;
         res+=typeToStr[type];
         res+=" ";
-        res+=this->res;
+        res+=this->desc;
         return res;
     }
 
@@ -202,20 +184,13 @@ public:
         return typeToStr[type];
     }
 
-    static void init() {
-        strToType["OK"] = OK;
-        strToType["SYNTAX_ERROR"] = SYNTAX_ERROR;
-        strToType["INTERNAL_ERROR"] = INTERNAL_ERROR;
-        strToType["LOGIC_ERROR"] = LOGIC_ERROR;
-    }
-
-    static ExecutionResult stringToResult(const std::string &data) {
-        ExecutionResult value;
+    static ExecRes stringToResult(const std::string &data) {
+        ExecRes value;
         int divider = data.find_first_of(" ");
         std::string typeStr = data.substr(0, divider);
         std::string resStr = data.substr(divider + 1);
         value.type = strToType[typeStr];
-        value.res = resStr;
+        value.desc = resStr;
         return value;
     }
 };
@@ -253,8 +228,6 @@ public:
         return res;
     }
     static std::unordered_map<CommandType,std::string> typeToStr;
-
-    static void init();
 
     void addParam(const std::string &param, ParamType t) {
         Param p;
@@ -305,9 +278,7 @@ private:
         Token nextToken();
 
     };
-    static std::unordered_map<std::string,CommandType> map;
-public:
-    static void init();
+    static std::unordered_map<std::string,CommandType> strToType;
 public:
     CommandInterpreter();
     Command* getCommand(std::string& raw);

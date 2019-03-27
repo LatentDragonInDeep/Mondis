@@ -44,13 +44,11 @@ void JSONParser::parse(HashMap *keySpace) {
 KeyValue JSONParser::parseEntry(LexicalParser &lp) {
     Token next = lp.nextToken();
     KeyValue res;
-    res.key = nullptr;
     if (next.type != STRING) {
         lp.back();
         return res;
     }
-    Key *key = new Key(current.content);
-    res.key = key;
+    res.key = current.content;
     matchToken(lp,COLON);
     res.value = parseObject(lp);
     Token n = lp.nextToken();
@@ -84,17 +82,6 @@ MondisObject *JSONParser::parseObject(LexicalParser &lp) {
     }
     else if(next.type == STRING) {
         MondisObject *res = new MondisObject;
-        if (next.content.size() > 12) {
-            if (next.content.substr(0, 12) == "LatentDragon") {
-                res->type = RAW_BIN;
-                MondisBinary *binary = MondisBinary::allocate(next.content.size() - 12);
-                binary->write(next.content.size() - 12, next.content.data() + 12);
-                binary->setPosition(0);
-                res->objData = (void *) binary;
-                return res;
-            }
-        }
-
         long long *data = new long long;
         bool to = util::toInteger(next.content, *data);
         if (!to) {
@@ -123,7 +110,7 @@ MondisObject *JSONParser::parseJSONObject(LexicalParser &lp, bool isNeedNext, bo
     KeyValue cur;
     while (true) {
         cur = parseEntry(lp);
-        if (cur.key == nullptr) {
+        if (cur.key == "") {
             break;
         }
         tree->insert(new KeyValue(cur.key, cur.value));
@@ -160,7 +147,7 @@ MondisObject *JSONParser::parseJSONArray(LexicalParser &lp, bool isNeedNext) {
                 return res;
             } else if (first->getJson() == "\"SET\"") {
                 res->type = SET;
-                HashMap *data = new HashMap(true, true);
+                HashMap *data = new HashMap();
                 res->objData = data;
                 MondisObject *cur = nullptr;
                 while (true) {
@@ -170,8 +157,7 @@ MondisObject *JSONParser::parseJSONArray(LexicalParser &lp, bool isNeedNext) {
                             throw "unexpected element";
                         }
                         string json = cur->getJson();
-                        Key *key = new Key(json);
-                        data->put(key, nullptr);
+                        data->put(json, nullptr);
                     } else {
                         break;
                     }
@@ -227,10 +213,6 @@ JSONParser::JSONParser(const char *filePath) {
     lexicalParser = LexicalParser(filePath);
 }
 
-JSONParser::JSONParser(std::string &&s) {
-    lexicalParser = LexicalParser(s);
-}
-
 void JSONParser::parseAll(std::vector<HashMap *> &dbs) {
     Token next = lexicalParser.nextToken();
     if (next.type != LEFT_ANGLE_BRACKET) {
@@ -239,10 +221,10 @@ void JSONParser::parseAll(std::vector<HashMap *> &dbs) {
     KeyValue cur;
     while (true) {
         cur = parseEntry(lexicalParser);
-        if (cur.key == nullptr) {
+        if (cur.key == "") {
             break;
         }
-        int dbIndex = cur.key->intValue;
+        int dbIndex = atoi(cur.key.c_str())
         AVLTree *tree = (AVLTree *) cur.value->objData;
         AVLTree::AVLIterator iter = tree->iterator();
         while (iter.next()) {
@@ -268,24 +250,22 @@ Token *Token::comma = new Token(COMMA);
 Token *Token::terminator = new Token(TERMINATOR);
 Token *Token::colon = new Token(COLON);
 
-std::unordered_map<char, Token *> JSONParser::LexicalParser::directRecognize;
-
-void JSONParser::LexicalParser::init() {
-    directRecognize['['] = Token::getToken(LEFT_SQUARE_BRACKET);
-    directRecognize[']'] = Token::getToken(RIGHT_SQUARE_BRACKET);
-    directRecognize['{'] = Token::getToken(LEFT_ANGLE_BRACKET);
-    directRecognize['}'] = Token::getToken(RIGHT_ANGLE_BRACKET);
-    directRecognize[','] = Token::getToken(COMMA);
-    directRecognize[':'] = Token::getToken(COLON);
-}
+std::unordered_map<char, Token *> JSONParser::LexicalParser::directRecognize = {
+        {'[', Token::getToken(LEFT_SQUARE_BRACKET)},
+    {']', Token::getToken(RIGHT_SQUARE_BRACKET)},
+    {'{', Token::getToken(LEFT_ANGLE_BRACKET)},
+    {'}', Token::getToken(RIGHT_ANGLE_BRACKET)},
+    {',', Token::getToken(COMMA)},
+    {':', Token::getToken(COLON)}
+};
 
 void JSONParser::LexicalParser::skip() {
     if (curIndex >= source.size()) {
         isEnd = true;
         return;
     }
-    while (source[curIndex] == ' ' || source[curIndex] == '\n' || source[curIndex] == '\r' ||
-           source[curIndex] == '\t') {
+    while (source[curIndex,= ' ' || source[curIndex,= '\n' || source[curIndex,= '\r' ||
+           source[curIndex,= '\t') {
         curIndex++;
         if (curIndex >= source.size()) {
             isEnd = true;
@@ -326,16 +306,16 @@ Token JSONParser::LexicalParser::nextToken() {
     }
     int start;
     int end;
-    if (directRecognize.find(source[curIndex]) != directRecognize.end()) {
-        res = *directRecognize[source[curIndex]];
+    if ({.find(source[curIndex]) != {.end()) {
+        res = *{[source[curIndex]];
         curIndex++;
         return res;
     }
-    if (source[curIndex] == '"') {
+    if (source[curIndex,= '"') {
         start = curIndex;
         while (true) {
             curIndex++;
-            if (source[curIndex] == '"') {
+            if (source[curIndex,= '"') {
                 if (source[curIndex - 1] != '\\') {
                     end = curIndex;
                     res.type = STRING;
@@ -349,7 +329,7 @@ Token JSONParser::LexicalParser::nextToken() {
         }
     }
 
-}
+};
 
 bool JSONParser::LexicalParser::back() {
     if (hasBacked) {
@@ -358,21 +338,17 @@ bool JSONParser::LexicalParser::back() {
     curIndex = preIndex;
     hasBacked = true;
     return true;
-}
+};
 
 void JSONParser::LexicalParser::reset() {
     source = "";
     curIndex = 0;
     isEnd = false;
-}
+};
 
 void JSONParser::LexicalParser::setSource(std::string newSrc) {
     source = newSrc;
-}
-
-JSONParser::LexicalParser::LexicalParser(std::string &&s) {
-    source = s;
-}
+};
 
 void util::eraseBackSlash(std::string &data) {
     auto iter = data.begin();
@@ -383,4 +359,7 @@ void util::eraseBackSlash(std::string &data) {
             }
         }
     }
+};
+JSONParser::LexicalParser::LexicalParser(const std::string& s):source(s){
 }
+

@@ -280,7 +280,7 @@ KeyValue *AVLTree::get(Key &key) {
     }
 }
 
-MondisObject *AVLTree::getValue(Key &key) {
+MondisObject *AVLTree::getValue(string &key) {
     KeyValue* kv = get(key);
     if(kv == nullptr) {
         return nullptr;
@@ -288,7 +288,7 @@ MondisObject *AVLTree::getValue(Key &key) {
     return kv->value;
 }
 
-bool AVLTree::containsKey(Key &key) {
+bool AVLTree::containsKey(string &key) {
     return get(key) != nullptr;
 }
 
@@ -303,14 +303,14 @@ MondisObject *AVLTree::locate(Command *command) {
     return getValue(key);
 }
 
-ExecutionResult AVLTree::execute(Command *command) {
-    ExecutionResult res;
+ExecRes AVLTree::execute(Command *command) {
+    ExecRes res;
     switch (command->type) {
         case BIND: {
             CHECK_PARAM_NUM(2);
             CHECK_PARAM_TYPE(0, PLAIN)
             CHECK_PARAM_TYPE(1, STRING)
-            Key *key = new Key((*command)[0].content);
+            KEY(0)
             insert(key, MondisServer::getJSONParser()->parseObject((*command)[1].content));
             OK_AND_RETURN;
         }
@@ -320,10 +320,10 @@ ExecutionResult AVLTree::execute(Command *command) {
             KEY(0)
             auto *obj = getValue(key);
             if (obj == nullptr) {
-                res.res = "the key " + PARAM(0) + " does not exists";
+                res.desc = "the key " + PARAM(0) + " does not exists";
                 LOGIC_ERROR_AND_RETURN
             }
-            res.res = obj->getJson();
+            res.desc = obj->getJson();
             OK_AND_RETURN;
         }
         case DEL: {
@@ -337,19 +337,19 @@ ExecutionResult AVLTree::execute(Command *command) {
             CHECK_PARAM_NUM(1)
             CHECK_PARAM_TYPE(0, PLAIN)
             KEY(0)
-            res.res = util::to_string(containsKey(key));
+            res.desc = util::to_string(containsKey(key));
             OK_AND_RETURN
         }
         case M_SIZE: {
             CHECK_PARAM_NUM(0)
-            res.res = to_string(size());
+            res.desc = to_string(size());
             OK_AND_RETURN
         }
     }
     INVALID_AND_RETURN
 }
 
-void AVLTree::insert(Key *key, MondisObject *value) {
+void AVLTree::insert(string &key, MondisObject *value) {
     insert(new KeyValue(key, value));
 }
 

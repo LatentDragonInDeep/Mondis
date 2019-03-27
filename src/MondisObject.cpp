@@ -17,8 +17,8 @@ string MondisData::getJson() {
 MondisData::~MondisData() {
 }
 
-ExecutionResult MondisData::execute(Command *command) {
-    return ExecutionResult();
+ExecRes MondisData::execute(Command *command) {
+    return ExecRes();
 }
 
 MondisObject *MondisData::locate(Command *command) {
@@ -48,7 +48,6 @@ MondisObject::~MondisObject() {
         case MondisObjectType::RAW_INT:
             delete reinterpret_cast<int *>(objData);
             break;
-        case RAW_BIN:
         case LIST:
         case SET:
         case ZSET:
@@ -67,9 +66,9 @@ MondisObject *MondisObject::locate(Command *command) {
     return data->locate(command);
 }
 
-ExecutionResult MondisObject::executeString(Command *command) {
+ExecRes MondisObject::executeString(Command *command) {
     string *data = (string *) objData;
-    ExecutionResult res;
+    ExecRes res;
     switch (command->type) {
         case BIND: {
             CHECK_PARAM_NUM(2)
@@ -77,7 +76,7 @@ ExecutionResult MondisObject::executeString(Command *command) {
             CHECK_PARAM_TYPE(1, STRING)
             CHECK_AND_DEFINE_INT_LEGAL(0, index)
             if ((*command)[1].content.size() != 1) {
-                res.res = "error data";
+                res.desc = "error data";
             }
             (*data)[index] = (*command)[1].content[0];
             modified();
@@ -87,9 +86,9 @@ ExecutionResult MondisObject::executeString(Command *command) {
             CHECK_PARAM_NUM(1)
             CHECK_AND_DEFINE_INT_LEGAL(0, index)
             if ((*command)[1].content.size() != 1) {
-                res.res = "error data";
+                res.desc = "error data";
             }
-            res.res = data->substr(index, 1);
+            res.desc = data->substr(index, 1);
             OK_AND_RETURN
         }
         case SET_RANGE: {
@@ -98,7 +97,7 @@ ExecutionResult MondisObject::executeString(Command *command) {
                 CHECK_PARAM_TYPE(1, STRING)
                 CHECK_START_AND_DEFINE(0)
                 if ((*command)[2].content.size() < data->size() - start) {
-                    res.res = "data length too short!";
+                    res.desc = "data length too short!";
                     return res;
                 }
                 for (int i = start; i < data->size(); ++i) {
@@ -110,7 +109,7 @@ ExecutionResult MondisObject::executeString(Command *command) {
                 CHECK_START_AND_DEFINE(0)
                 CHECK_END_AND_DEFINE(1, data->size())
                 if ((*command)[2].content.size() < end - start) {
-                    res.res = "data length too short!";
+                    res.desc = "data length too short!";
                     return res;
                 }
                 for (int i = start; i < end; ++i) {
@@ -119,29 +118,29 @@ ExecutionResult MondisObject::executeString(Command *command) {
                 modified();
                 OK_AND_RETURN
             } else {
-                res.res = "arguments num error!";
+                res.desc = "arguments num error!";
                 LOGIC_ERROR_AND_RETURN
             }
         }
         case GET_RANGE: {
             if (command->params.size() == 1) {
                 CHECK_START_AND_DEFINE(0)
-                res.res = data->substr(start, data->size() - start);
+                res.desc = data->substr(start, data->size() - start);
                 OK_AND_RETURN
             }
             if (command->params.size() == 2) {
                 CHECK_START_AND_DEFINE(0)
                 CHECK_END_AND_DEFINE(1, data->size())
-                res.res = data->substr(start, end - start);
+                res.desc = data->substr(start, end - start);
                 OK_AND_RETURN
             } else {
-                res.res = "arguments num error!";
+                res.desc = "arguments num error!";
                 LOGIC_ERROR_AND_RETURN
             }
         }
         case STRLEN: {
             CHECK_PARAM_NUM(0)
-            res.res = std::to_string(data->size());
+            res.desc = std::to_string(data->size());
 
             OK_AND_RETURN
         }
@@ -151,7 +150,7 @@ ExecutionResult MondisObject::executeString(Command *command) {
             CHECK_PARAM_TYPE(1, STRING)
             CHECK_AND_DEFINE_INT_LEGAL(0, index);
             if (index < 0 || index > data->size()) {
-                res.res = "index out of range";
+                res.desc = "index out of range";
                 LOGIC_ERROR_AND_RETURN
             }
             data->insert(index, PARAM(1));
@@ -166,7 +165,7 @@ ExecutionResult MondisObject::executeString(Command *command) {
                 objData = newData;
                 OK_AND_RETURN
             }
-            res.res = "can not transform to integer";
+            res.desc = "can not transform to integer";
             LOGIC_ERROR_AND_RETURN
         }
         case REMOVE_RANGE: {
@@ -174,11 +173,11 @@ ExecutionResult MondisObject::executeString(Command *command) {
                 CHECK_PARAM_TYPE(0, PLAIN)
                 CHECK_AND_DEFINE_INT_LEGAL(0, start);
                 if (start < 0) {
-                    res.res = "start under zero!";
+                    res.desc = "start under zero!";
                     LOGIC_ERROR_AND_RETURN
                 }
                 if (start > data->size()) {
-                    res.res = "start over the size of data!";
+                    res.desc = "start over the size of data!";
                     LOGIC_ERROR_AND_RETURN
                 }
                 data->erase(data->begin() + start, data->end());
@@ -190,15 +189,15 @@ ExecutionResult MondisObject::executeString(Command *command) {
             CHECK_AND_DEFINE_INT_LEGAL(0, start);
             CHECK_AND_DEFINE_INT_LEGAL(1, end);
             if (start < 0) {
-                res.res = "start under zero!";
+                res.desc = "start under zero!";
                 LOGIC_ERROR_AND_RETURN
             }
             if (start > data->size()) {
-                res.res = "start over the size of data!";
+                res.desc = "start over the size of data!";
                 LOGIC_ERROR_AND_RETURN
             }
             if (end < start) {
-                res.res = "the end is smaller than start!";
+                res.desc = "the end is smaller than start!";
                 LOGIC_ERROR_AND_RETURN
             }
             if (end > data->size()) {
@@ -209,14 +208,14 @@ ExecutionResult MondisObject::executeString(Command *command) {
             OK_AND_RETURN
         }
     }
-    res.res = "Invalid command";
+    res.desc = "Invalid command";
 
     return res;
 }
 
-ExecutionResult MondisObject::executeInteger(Command *command) {
+ExecRes MondisObject::executeInteger(Command *command) {
     long long *data = (long long *) objData;
-    ExecutionResult res;
+    ExecRes res;
     switch (command->type) {
         case INCR:
             CHECK_PARAM_NUM(0)
@@ -254,11 +253,11 @@ ExecutionResult MondisObject::executeInteger(Command *command) {
     INVALID_AND_RETURN
 }
 
-ExecutionResult MondisObject::execute(Command *command) {
+ExecRes MondisObject::execute(Command *command) {
     if (command->type == TYPE) {
-        ExecutionResult res;
+        ExecRes res;
         res.type = OK;
-        res.res = typeStrs[type];
+        res.desc = typeStrs[type];
         return res;
     }
     if (type == RAW_STRING) {
@@ -284,9 +283,8 @@ string MondisObject::getJson() {
             json += "\"";
             break;
         case MondisObjectType::RAW_INT:
-            json += ("\"" + std::to_string(*((long long *) objData)) + "\"");
+            json += std::to_string(*((long long *) objData));
             break;
-        case RAW_BIN:
         case LIST:
         case SET:
         case ZSET:
@@ -307,7 +305,7 @@ MondisObject *MondisObject::getNullObject() {
     return nullObj;
 }
 
-string MondisObject::typeStrs[] = {"RAW_STRING", "RAW_INT", "RAW_BIN", "LIST", "SET", "ZSET", "HASH", "EMPTY"};
+string MondisObject::typeStrs[] = {"RAW_STRING", "RAW_INT", "LIST", "SET", "ZSET", "HASH", "EMPTY"};
 MondisObject *MondisObject::nullObj = new MondisObject;
 
 bool MondisObject::modified() {

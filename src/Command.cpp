@@ -45,13 +45,10 @@ std::unordered_map<CommandType, std::string> Command::typeToStr = {
         {CommandType::TO_INTEGER,"TO_INTEGER"},
         {CommandType::CHANGE_SCORE,"CHANGE_SCORE"},
         {CommandType::COUNT,"COUNT"},
-        {CommandType::SET_CLIENT_NAME,"SET_CLIENT_NAME"},
         {CommandType::SLAVE_OF,"SLAVE_OF"},
         {CommandType::SYNC,"SYNC"},
         {CommandType::DISCONNECT_SLAVE,"DISCONNECT_SLAVE"},
         {CommandType::DISCONNECT_CLIENT,"DISCONNECT_CLIENT"},
-        {CommandType::PING,"PING"},
-        {CommandType::PONG,"PONG"},
         {CommandType::MULTI,"MULTI"},
         {CommandType::EXEC,"EXEC"},
         {CommandType::DISCARD,"DISCARD"},
@@ -71,15 +68,13 @@ std::unordered_map<CommandType, std::string> Command::typeToStr = {
         {CommandType::CLIENT_LIST,"CLIENT_LIST"},
         {CommandType::SLAVE_INFO,"SLAVE_INFO"},
         {CommandType::SLAVE_LIST,"SLAVE_LIST"},
-        {CommandType::UNION,"UNION"},
-        {CommandType::INTERSECT,"INTERSECT"}
 };
 
 
 std::unordered_map<std::string, CommandType> CommandInterpreter::strToType = {
         {"SET",CommandType:BIND},
         {"DEL",CommandType::DEL},
-        {"EXISTS,"EXISTS},
+        {"EXISTS",CommandType::EXISTS},
         {"RENAME",CommandType::RENAME},
         {"TYPE",CommandType::TYPE},
         {"GET",CommandType::GET},
@@ -117,13 +112,10 @@ std::unordered_map<std::string, CommandType> CommandInterpreter::strToType = {
         {"TO_INTEGER",CommandType::TO_INTEGER},
         {"CHANGE_SCORE",CommandType::CHANGE_SCORE},
         {"COUNT",CommandType::COUNT},
-        {"SET_CLIENT_NAME",CommandType::SET_CLIENT_NAME},
         {"SLAVE_OF",CommandType::SLAVE_OF},
         {"SYNC",CommandType::SYNC},
         {"DISCONNECT_SLAVE",CommandType::DISCONNECT_SLAVE},
         {"DISCONNECT_CLIENT",CommandType::DISCONNECT_CLIENT},
-        {"PING",CommandType::PING},
-        {"PONG",CommandType::PONG},
         {"MULTI",CommandType::MULTI},
         {"EXEC",CommandType::EXEC},
         {"DISCARD",CommandType::DISCARD},
@@ -142,8 +134,6 @@ std::unordered_map<std::string, CommandType> CommandInterpreter::strToType = {
         {"CLIENT_LIST",CommandType::CLIENT_LIST},
         {"SLAVE_INFO",CommandType::SLAVE_INFO},
         {"SLAVE_LIST",CommandType::SLAVE_LIST},
-        {"UNION",CommandType::UNION},
-        {"INTERSECT",CommandType::INTERSECT}
 };
 
 CommandInterpreter::CommandInterpreter() {

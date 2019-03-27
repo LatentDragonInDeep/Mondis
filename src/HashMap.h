@@ -333,7 +333,7 @@ private:
     unsigned int hash(string &str);
     void rehash();
     void toTree (int index);
-
+    int getCapacity(int);
     unsigned getIndex(unsigned hash);
     void add(int index,Entry* entry);
     void toJson();

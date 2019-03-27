@@ -5,55 +5,54 @@
 #include <unistd.h>
 #include "JSONParser.h"
 #include "HashMap.h"
-#include "MondisBinary.h"
 #include "MondisList.h"
 #include "SplayTree.h"
 
 
 JSONParser::JSONParser(std::string &source) {
 
-    lexicalParser = LexicalParser(source);
+    lexicalParser = new LexicalParser(source);
 }
 
 
 void JSONParser::parse(HashMap *keySpace) {
-    Token next = lexicalParser.nextToken();
+    Token next = lexicalParser->nextToken();
     if (next.type != LEFT_ANGLE_BRACKET) {
         return;
     }
     KeyValue cur;
     while(true) {
         cur = parseEntry(lexicalParser);
-        if(cur.key == nullptr) {
+        if(cur.key == "") {
             break;
         }
         keySpace->put(cur.key,cur.value);
     }
-    Token end = lexicalParser.nextToken();
+    Token end = lexicalParser->nextToken();
     if (end.type != RIGHT_ANGLE_BRACKET) {
         keySpace->clear();
         throw new std::invalid_argument("unexpected token!");
     }
-    Token ter = lexicalParser.nextToken();
+    Token ter = lexicalParser->nextToken();
     if (ter.type != TERMINATOR) {
         keySpace->clear();
         throw new std::invalid_argument("unexpected token!");
     }
 }
 
-KeyValue JSONParser::parseEntry(LexicalParser &lp) {
-    Token next = lp.nextToken();
+KeyValue JSONParser::parseEntry(LexicalParser *lp) {
+    Token next = lp->nextToken();
     KeyValue res;
     if (next.type != STRING) {
-        lp.back();
+        lp->back();
         return res;
     }
     res.key = current.content;
     matchToken(lp,COLON);
     res.value = parseObject(lp);
-    Token n = lp.nextToken();
+    Token n = lp->nextToken();
     if (n.type == RIGHT_ANGLE_BRACKET) {
-        lp.back();
+        lp->back();
     } else if (n.type != COMMA) {
         throw std::invalid_argument("unexpected token!");
     }
@@ -62,19 +61,19 @@ KeyValue JSONParser::parseEntry(LexicalParser &lp) {
 }
 
 KeyValue JSONParser::parseEntry(string &content) {
-    lexicalParser.reset();
-    lexicalParser.setSource(content);
+    lexicalParser->reset();
+    lexicalParser->setSource(content);
     return parseEntry(lexicalParser);
 }
 
 MondisObject *JSONParser::parseObject(string &content) {
-    lexicalParser.reset();
-    lexicalParser.setSource(content);
+    lexicalParser->reset();
+    lexicalParser->setSource(content);
     return parseObject(lexicalParser);
 }
 
-MondisObject *JSONParser::parseObject(LexicalParser &lp) {
-    Token next = lp.nextToken();
+MondisObject *JSONParser::parseObject(LexicalParser *lp) {
+    Token next = lp->nextToken();
     if(next.type == LEFT_ANGLE_BRACKET) {
         return parseJSONObject(lp, false, false);
     } else if (next.type == LEFT_SQUARE_BRACKET) {
@@ -94,14 +93,14 @@ MondisObject *JSONParser::parseObject(LexicalParser &lp) {
         res->objData = (void *) data;
         return res;
     } else {
-        lp.back();
+        lp->back();
         return nullptr;
     }
 }
 
-MondisObject *JSONParser::parseJSONObject(LexicalParser &lp, bool isNeedNext, bool isInteger) {
+MondisObject *JSONParser::parseJSONObject(LexicalParser *lp, bool isNeedNext, bool isInteger) {
     if(isNeedNext) {
-        Token next = lp.nextToken();
+        Token next = lp->nextToken();
         matchToken(lp,LEFT_ANGLE_BRACKET);
     }
     MondisObject* res = new MondisObject;
@@ -120,7 +119,7 @@ MondisObject *JSONParser::parseJSONObject(LexicalParser &lp, bool isNeedNext, bo
     return res;
 }
 
-MondisObject *JSONParser::parseJSONArray(LexicalParser &lp, bool isNeedNext) {
+MondisObject *JSONParser::parseJSONArray(LexicalParser *lp, bool isNeedNext) {
     if(isNeedNext) {
         matchToken(lp, LEFT_SQUARE_BRACKET);
     }
@@ -202,19 +201,19 @@ MondisObject *JSONParser::parseJSONArray(LexicalParser &lp, bool isNeedNext) {
 
 JSONParser::JSONParser() {}
 
-void JSONParser::matchToken(JSONParser::LexicalParser &lp, ParserTokenType type) {
-    Token next = lp.nextToken();
+void JSONParser::matchToken(LexicalParser *lp, ParserTokenType type) {
+    Token next = lp->nextToken();
     if (next.type != type) {
         throw new std::invalid_argument("unexpected token!");
     }
 }
 
 JSONParser::JSONParser(const char *filePath) {
-    lexicalParser = LexicalParser(filePath);
+    lexicalParser = new LexicalParser(filePath);
 }
 
 void JSONParser::parseAll(std::vector<HashMap *> &dbs) {
-    Token next = lexicalParser.nextToken();
+    Token next = lexicalParser->nextToken();
     if (next.type != LEFT_ANGLE_BRACKET) {
         return;
     }
@@ -224,22 +223,26 @@ void JSONParser::parseAll(std::vector<HashMap *> &dbs) {
         if (cur.key == "") {
             break;
         }
-        int dbIndex = atoi(cur.key.c_str())
+        int dbIndex = atoi(cur.key.c_str());
         AVLTree *tree = (AVLTree *) cur.value->objData;
         AVLTree::AVLIterator iter = tree->iterator();
         while (iter.next()) {
             dbs[dbIndex]->put(iter->data->key, iter->data->value);
-            tree->remove(*iter->data->key);
+            tree->remove(iter->data->key);
         }
     }
-    Token end = lexicalParser.nextToken();
+    Token end = lexicalParser->nextToken();
     if (end.type != RIGHT_ANGLE_BRACKET) {
         throw new std::invalid_argument("unexpected token!");
     }
-    Token ter = lexicalParser.nextToken();
+    Token ter = lexicalParser->nextToken();
     if (ter.type != TERMINATOR) {
         throw new std::invalid_argument("unexpected token!");
     }
+}
+
+JSONParser::JSONParser(const std::string &s){
+    lexicalParser = new LexicalParser(s);
 }
 
 Token *Token::leftSquareBracket = new Token(LEFT_SQUARE_BRACKET);
@@ -264,8 +267,8 @@ void JSONParser::LexicalParser::skip() {
         isEnd = true;
         return;
     }
-    while (source[curIndex,= ' ' || source[curIndex,= '\n' || source[curIndex,= '\r' ||
-           source[curIndex,= '\t') {
+    while (source[curIndex]==' ' || source[curIndex]== '\n' || source[curIndex]== '\r' ||
+           source[curIndex]== '\t') {
         curIndex++;
         if (curIndex >= source.size()) {
             isEnd = true;
@@ -306,16 +309,16 @@ Token JSONParser::LexicalParser::nextToken() {
     }
     int start;
     int end;
-    if ({.find(source[curIndex]) != {.end()) {
-        res = *{[source[curIndex]];
+    if (directRecognize.find(source[curIndex]) != directRecognize.end()) {
+        res = *directRecognize[source[curIndex]];
         curIndex++;
         return res;
     }
-    if (source[curIndex,= '"') {
+    if (source[curIndex]== '"') {
         start = curIndex;
         while (true) {
             curIndex++;
-            if (source[curIndex,= '"') {
+            if (source[curIndex]== '"') {
                 if (source[curIndex - 1] != '\\') {
                     end = curIndex;
                     res.type = STRING;

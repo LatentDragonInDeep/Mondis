@@ -27,8 +27,6 @@
 #include "Command.h"
 #include "MondisServer.h"
 
-#define ADD(SET, TYPE) SET.insert(TYPE);
-
 #define ERROR_EXIT(MESSAGE) cout<<MESSAGE;\
                             exit(1);
 
@@ -46,8 +44,6 @@ INVALID_AND_RETURN\
 #define CHECK_COMMAND_FROM_CLIENT if (serverStatus!=ServerStatus::SV_STAT_MASTER||client->type!=ClientType::CLIENT) { \
 INVALID_AND_RETURN \
 }
-
-unordered_set<CommandType> MondisServer::controlCommands;
 
 JSONParser MondisServer::parser;
 
@@ -836,89 +832,6 @@ void MondisServer::replicaToSlave(MondisClient *client, long long slaveReplicaOf
     }
 }
 
-void MondisServer::initStaticMember() {
-    ADD(modifyCommands, BIND)
-    ADD(modifyCommands, DEL)
-    ADD(modifyCommands, RENAME)
-    ADD(modifyCommands, SET_RANGE)
-    ADD(modifyCommands, REMOVE_RANGE)
-    ADD(modifyCommands, INCR)
-    ADD(modifyCommands, DECR)
-    ADD(modifyCommands, INCR_BY)
-    ADD(modifyCommands, DECR_BY)
-    ADD(modifyCommands, INSERT)
-    ADD(modifyCommands, PUSH_FRONT)
-    ADD(modifyCommands, PUSH_BACK)
-    ADD(modifyCommands, POP_FRONT)
-    ADD(modifyCommands, POP_BACK)
-    ADD(modifyCommands, ADD)
-    ADD(modifyCommands, REMOVE)
-    ADD(modifyCommands, REMOVE_BY_RANK)
-    ADD(modifyCommands, REMOVE_BY_SCORE)
-    ADD(modifyCommands, REMOVE_RANGE_BY_RANK)
-    ADD(modifyCommands, REMOVE_RANGE_BY_SCORE)
-    ADD(modifyCommands, TO_STRING)
-    ADD(modifyCommands, TO_INTEGER)
-    ADD(modifyCommands, CHANGE_SCORE)
-    ADD(modifyCommands, SELECT)
-    ADD(transactionAboutCommands, DISCARD)
-    ADD(transactionAboutCommands, EXEC)
-    ADD(transactionAboutCommands, WATCH)
-    ADD(transactionAboutCommands, UNWATCH)
-    ADD(clientControlCommands, BIND)
-    ADD(clientControlCommands, GET)
-    ADD(clientControlCommands, LOGIN)
-    ADD(clientControlCommands, EXISTS)
-    ADD(clientControlCommands, RENAME)
-    ADD(clientControlCommands, TYPE)
-    ADD(clientControlCommands, SAVE)
-    ADD(clientControlCommands, SAVE_ALL)
-    ADD(clientControlCommands, EXIT)
-    ADD(clientControlCommands, SELECT)
-    ADD(clientControlCommands, DEL)
-    ADD(clientControlCommands, SLAVE_OF)
-    ADD(clientControlCommands, SET_CLIENT_NAME)
-    ADD(clientControlCommands, MULTI)
-    ADD(clientControlCommands, EXEC)
-    ADD(clientControlCommands, DISCARD)
-    ADD(clientControlCommands, WATCH)
-    ADD(clientControlCommands, UNWATCH)
-    ADD(clientControlCommands, MASTER_INFO)
-    ADD(controlCommands, BIND)
-    ADD(controlCommands, GET)
-    ADD(controlCommands, LOGIN)
-    ADD(controlCommands, EXISTS)
-    ADD(controlCommands, RENAME)
-    ADD(controlCommands, TYPE)
-    ADD(controlCommands, SAVE)
-    ADD(controlCommands, SAVE_ALL)
-    ADD(controlCommands, EXIT)
-    ADD(controlCommands, SELECT)
-    ADD(controlCommands, DEL)
-    ADD(controlCommands, SLAVE_OF)
-    ADD(controlCommands, SYNC)
-    ADD(controlCommands, SET_CLIENT_NAME)
-    ADD(controlCommands, DISCONNECT_SLAVE)
-    ADD(controlCommands, DISCONNECT_CLIENT)
-    ADD(controlCommands, MULTI)
-    ADD(controlCommands, EXEC)
-    ADD(controlCommands, DISCARD)
-    ADD(controlCommands, WATCH)
-    ADD(controlCommands, UNWATCH)
-    ADD(controlCommands, MASTER_INFO)
-    ADD(controlCommands, NEW_PEER)
-    ADD(controlCommands, VOTE)
-    ADD(controlCommands, UNVOTE)
-    ADD(controlCommands, ASK_FOR_VOTE)
-    ADD(controlCommands, MASTER_DEAD)
-    ADD(controlCommands, I_AM_NEW_MASTER)
-    ADD(controlCommands, CLIENT_INFO)
-    ADD(controlCommands, CLIENT_LIST)
-    ADD(controlCommands, SLAVE_INFO)
-    ADD(controlCommands, SLAVE_LIST)
-    ADD(controlCommands, NEW_CLIENT)
-}
-
 string MondisServer::takeFromPropagateBuffer() {
     if(commandPropagateBuffer->empty()) {
         unique_lock lck(notEmptyMtx);
@@ -1195,9 +1108,96 @@ void MondisServer::getJson(string *res) {
 }
 
 
-unordered_set<CommandType> MondisServer::modifyCommands;
-unordered_set<CommandType> MondisServer::transactionAboutCommands;
-unordered_set<CommandType> MondisServer::clientControlCommands;
+unordered_set<CommandType> MondisServer::modifyCommands = {
+        CommandType:: BIND,
+        CommandType:: DEL,
+        CommandType:: RENAME,
+        CommandType:: SET_RANGE,
+        CommandType:: REMOVE_RANGE,
+        CommandType:: INCR,
+        CommandType:: DECR,
+        CommandType:: INCR_BY,
+        CommandType:: DECR_BY,
+        CommandType:: INSERT,
+        CommandType:: PUSH_FRONT,
+        CommandType:: PUSH_BACK,
+        CommandType:: POP_FRONT,
+        CommandType:: POP_BACK,
+        CommandType:: ADD,
+        CommandType:: REMOVE,
+        CommandType:: REMOVE_BY_RANK,
+        CommandType:: REMOVE_BY_SCORE,
+        CommandType:: REMOVE_RANGE_BY_RANK,
+        CommandType:: REMOVE_RANGE_BY_SCORE,
+        CommandType:: TO_STRING,
+        CommandType:: TO_INTEGER,
+        CommandType:: CHANGE_SCORE,
+        CommandType:: SELECT
+};
+unordered_set<CommandType> MondisServer::transactionAboutCommands = {
+        CommandType ::MULTI,
+        CommandType ::EXEC,
+        CommandType ::DISCARD,
+        CommandType ::WATCH,
+        CommandType ::UNWATCH
+};
+unordered_set<CommandType> MondisServer::clientControlCommands = {
+        CommandType:: BIND,
+        CommandType:: GET,
+        CommandType:: LOGIN,
+        CommandType:: EXISTS,
+        CommandType:: RENAME,
+        CommandType:: TYPE,
+        CommandType:: SAVE,
+        CommandType:: SAVE_ALL,
+        CommandType:: EXIT,
+        CommandType:: SELECT,
+        CommandType:: DEL,
+        CommandType:: SLAVE_OF,
+        CommandType:: SET_CLIENT_NAME,
+        CommandType:: MULTI,
+        CommandType:: EXEC,
+        CommandType:: DISCARD,
+        CommandType:: WATCH,
+        CommandType:: UNWATCH,
+        CommandType:: MASTER_INFO
+};
+
+unordered_set<CommandType> MondisServer::controlCommands = {
+        CommandType:: BIND,
+        CommandType:: GET,
+        CommandType:: LOGIN,
+        CommandType:: EXISTS,
+        CommandType:: RENAME,
+        CommandType:: TYPE,
+        CommandType:: SAVE,
+        CommandType:: SAVE_ALL,
+        CommandType:: EXIT,
+        CommandType:: SELECT,
+        CommandType:: DEL,
+        CommandType:: SLAVE_OF,
+        CommandType:: SYNC,
+        CommandType:: SET_CLIENT_NAME,
+        CommandType:: DISCONNECT_SLAVE,
+        CommandType:: DISCONNECT_CLIENT,
+        CommandType:: MULTI,
+        CommandType:: EXEC,
+        CommandType:: DISCARD,
+        CommandType:: WATCH,
+        CommandType:: UNWATCH,
+        CommandType:: MASTER_INFO,
+        CommandType:: NEW_PEER,
+        CommandType:: VOTE,
+        CommandType:: UNVOTE,
+        CommandType:: ASK_FOR_VOTE,
+        CommandType:: MASTER_DEAD,
+        CommandType:: I_AM_NEW_MASTER,
+        CommandType:: CLIENT_INFO,
+        CommandType:: CLIENT_LIST,
+        CommandType:: SLAVE_INFO,
+        CommandType:: SLAVE_LIST,
+        CommandType:: NEW_CLIENT,
+};
 MondisServer* MondisServer::server = nullptr;
 
 unsigned MondisServer::nextClientId() {

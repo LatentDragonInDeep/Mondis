@@ -121,9 +121,8 @@ public:
     };
     Token current;
     JSONParser();
-
     JSONParser(const char *filePath);
-
+    JSONParser(std::string&);
     JSONParser(const std::string&);
     void parse(HashMap* keySpace);
 
@@ -133,17 +132,17 @@ public:
 
     KeyValue parseEntry(std::string &content);
 private:
-    LexicalParser lexicalParser;
+    LexicalParser* lexicalParser;
 
-    MondisObject *parseObject(LexicalParser &lp);
+    MondisObject *parseObject(LexicalParser *lp);
 
-    MondisObject *parseJSONObject(LexicalParser &lp, bool isNeedNext, bool isInteger);
+    MondisObject *parseJSONObject(LexicalParser *lp, bool isNeedNext, bool isInteger);
 
-    MondisObject *parseJSONArray(LexicalParser &lp, bool isNeedNext);
+    MondisObject *parseJSONArray(LexicalParser *lp, bool isNeedNext);
 
-    KeyValue parseEntry(LexicalParser &lp);
+    KeyValue parseEntry(LexicalParser *lp);
 
-    void matchToken(LexicalParser &lp, ParserTokenType type);
+    void matchToken(LexicalParser *lp, ParserTokenType type);
 };
 
 

@@ -6,17 +6,14 @@
 
 HashMap::HashMap ():HashMap(16,0.75f) {}
 
-HashMap::HashMap (unsigned int capacity, float loadFactor): HashMap(capacity,loadFactor, false, false) {}
-
-bool HashMap::put(Key *key, MondisObject *value)
+bool HashMap::put(string& key, MondisObject *value)
 {
-    checkType(key);
-    int index = getIndex(key->hashCode());
+    int index = getIndex(hash(key));
     Content &content = arrayFrom[index];
     if(content.isList) {
         Entry *cur = content.head->next;
         for (; cur != content.tail; cur = cur->next) {
-            if (key->equals(*cur->key)) {
+            if (key == cur->key) {
                 delete cur->object;
                 cur->object = value;
                 modified();
@@ -55,20 +52,14 @@ bool HashMap::put(Key *key, MondisObject *value)
     }
 }
 
-MondisObject *HashMap::get (Key &key)
+MondisObject *HashMap::get (string &key)
 {
-    if(isIntset&&!key.isInteger()) {
-        return nullptr;
-    }
-    if(!isIntset) {
-        key.toString();
-    }
-    int index = getIndex(key.hashCode());
+    int index = getIndex(hash(key));
     Content &content = arrayFrom[index];
     if(content.isList) {
         Entry *cur = content.head->next;
         for (; cur != content.tail; cur = cur->next) {
-            if(key.equals(*cur->key))
+            if(key == cur->key)
             {
                 return cur->object;
             }
@@ -83,7 +74,7 @@ MondisObject *HashMap::get (Key &key)
     return kv->value;
 }
 
-bool HashMap::containsKey (Key &key)
+bool HashMap::containsKey (string &key)
 {
     return get(key) != nullptr;
 }

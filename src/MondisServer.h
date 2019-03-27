@@ -85,7 +85,7 @@ public:
 #ifdef WIN32
     SOCKET sock;
 #elif defined(linux)
-    1int fd;/* Client socket. */
+    int fd;/* Client socket. */
 #endif
     ClientType type = CLIENT;
     int dBIndex = 0;
@@ -129,8 +129,6 @@ public:
     void writeMessage(mondis::Message* msg);
 
 private:
-    void write(string& msg);
-    string read();
 };
 
 class CommandStruct {

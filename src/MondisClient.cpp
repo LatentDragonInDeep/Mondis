@@ -10,22 +10,6 @@
 #include <netinet/in.h>
 #endif
 
-void MondisClient::send(const string &res) {
-    char buffer[4096];
-    int ret;
-    const char *data = res.data();
-    int hasWrite = 0;
-    while (hasWrite < res.size()) {
-#ifdef WIN32
-        ret = ::send(sock, data + hasWrite, res.size() - hasWrite, 0);
-#elif defined(linux)
-        ret = ::send(fd,data+hasWrite,desc.size()-hasWrite,0);
-#endif
-        hasWrite += ret;
-    }
-
-}
-
 MondisClient::~MondisClient() {
 #ifdef WIN32
     closesocket(sock);
@@ -105,39 +89,29 @@ ExecRes MondisClient::commitTransaction(MondisServer *server) {
     OK_AND_RETURN
 }
 
-string MondisClient::read() {
-    string res;
-    char buffer[4096];
-    int ret;
-    while (true) {
-#ifdef WIN32
-        ret = ::recv(sock, buffer, sizeof(buffer), 0);
-#elif defined(linux)
-        ret = ::recv(fd,buffer, sizeof(buffer),0);
-#endif
-        if (ret == -1) {
-            return res;
-        }
-        if (ret == 0) {
-            return "CLOSED";
-        }
-        res += string(buffer, ret);
-    }
-}
-
 #ifdef WIN32
 
 MondisClient::MondisClient(MondisServer *server, SOCKET sock) {
     this->sock = sock;
 }
 
-void MondisClient::writeMessage(mondis::Message *msg) {
-    msg->
-}
-
 #elif defined(linux)
 MondisClient::MondisClient(MondisServer* server,int fd){
     this->fd = fd;
-    keySpace = server->dbs[dBIndex];
 }
 #endif
+void MondisClient::writeMessage(mondis::Message *msg) {
+#if defined(linux)
+    msg->SerializePartialToFileDescriptor(fd);
+#elif defined(WIN32)
+#endif
+}
+
+mondis::Message *MondisClient::nextMessage() {
+#if defined(linux)
+    mondis::Message* msg = new mondis::Message;
+    msg->ParseFromFileDescriptor(fd);
+    return msg;
+#elif defined(WIN32)
+#endif
+}

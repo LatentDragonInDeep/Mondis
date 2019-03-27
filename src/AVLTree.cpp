@@ -53,9 +53,9 @@ void AVLTree::realInsert(KeyValue *kv) {
     }
 }
 
-void AVLTree::remove(Key &key) {
+void AVLTree::remove(string &key) {
     KeyValue temp;
-    temp.key = &key;
+    temp.key = key;
     realRemove(temp, root);
     temp.key = nullptr;
 }
@@ -259,18 +259,15 @@ void AVLTree::insert(KeyValue *kv) {
     realInsert(kv);
 }
 
-KeyValue *AVLTree::get(Key &key) {
-    if(key.isInteger()) {
-        key.toString();
-    }
+KeyValue *AVLTree::get(string &key) {
     AVLTreeNode* cur = root;
     while (true) {
         if(cur == nullptr) {
             return nullptr;
         }
-        if(key.equals(*cur->data->key)) {
+        if(key == cur->data->key) {
             return cur->data;
-        } else if(key.compare(*cur->data->key)) {
+        } else if(key.compare(cur->data->key)) {
             cur = cur->right;
             continue;
         } else{

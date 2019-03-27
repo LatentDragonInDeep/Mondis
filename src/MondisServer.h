@@ -72,7 +72,7 @@ public:
 class MondisServer;
 
 enum ClientType {
-    SS_MASTER,
+    MASTER,
     PEER,
     CLIENT,
     SERVER_SELF,
@@ -85,11 +85,10 @@ public:
 #ifdef WIN32
     SOCKET sock;
 #elif defined(linux)
-    int fd;/* Client socket. */
+    1int fd;/* Client socket. */
 #endif
     ClientType type = CLIENT;
     int dBIndex = 0;
-    string name;
     string ip;
     int port;
     long long preInteraction = chrono::duration_cast<chrono::milliseconds>(
@@ -128,6 +127,10 @@ public:
     mondis::Message* nextMessage();
 
     void writeMessage(mondis::Message* msg);
+
+private:
+    void write(string& msg);
+    string read();
 };
 
 class CommandStruct {
@@ -198,15 +201,17 @@ private:
     ServerStatus serverStatus;
     RunStatus runStatus;
     unordered_map<unsigned, MondisClient *> idToPeers;
-    unordered_map<string, MondisClient *> nameToClients;
+    unordered_map<unsigned, MondisClient *> idToClients;
+    unordered_map<unsigned,MondisClient*> idToPeersAndClients;
     BlockingQueue<mondis::Message*> readQueue;
     BlockingQueue<mondis::Message*> writeQueue;
     void writeToClient();
 public:
     void putToReadQueue(mondis::Message *msg);
     void putToWriteQueue(mondis::Message* msg);
-    void putCommandMsgToWriteQueue(const string &cmdStr, string &clientName, mondis::CommandType commandType);
-    void putExecResMsgToWriteQueue(ExecRes &res, string clientName);
+    void putCommandMsgToWriteQueue(const string &cmdStr, unsigned int clientId, mondis::CommandType commandType,
+                                       mondis::SendToType sendToType);
+    void putExecResMsgToWriteQueue(const ExecRes &res, unsigned int clientId, mondis::SendToType sendToType);
 private:
     long long replicaOffset = 0;
     static unordered_set<CommandType> modifyCommands;
@@ -271,7 +276,7 @@ public:
 
     void incrReplicaOffset();
 
-    void appendLog(string &commandStr, ExecRes &res);
+    void appendLog(const string &commandStr, ExecRes &res);
 
     void appendAof(const string &command);
 
@@ -298,7 +303,7 @@ private:
 
     void parseConfFile(string& confFile);
 
-    ExecRes execute(string &commandStr, MondisClient *client);
+    ExecRes execute(const string &commandStr, MondisClient *client);
 
     void acceptSocket();
 
@@ -340,13 +345,11 @@ private:
 
     static unsigned curClientId;
 
-    unsigned nextPeerId();
+    unsigned nextClientId();
 
     static string nextDefaultClientName();
 
     unsigned voteNum = 0;
-
-    thread *forVote = nullptr;
 
     const unsigned maxVoteIdle = 10000;
 
@@ -375,7 +378,7 @@ private:
     ExecRes discard(Command*,MondisClient*);
     ExecRes watch(Command*,MondisClient*);
     ExecRes unwatch(Command*,MondisClient*);
-    ExecRes getMaster(Command*,MondisClient*);
+    ExecRes getMasterInfo(Command *, MondisClient *);
     ExecRes newClient(Command *command, MondisClient *client);
     ExecRes askForVote(Command*,MondisClient*);
     ExecRes vote(Command*,MondisClient*);

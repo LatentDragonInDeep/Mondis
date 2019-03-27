@@ -213,10 +213,6 @@ JSONParser::JSONParser(const char *filePath) {
     lexicalParser = LexicalParser(filePath);
 }
 
-JSONParser::JSONParser(std::string &&s) {
-    lexicalParser = LexicalParser(s);
-}
-
 void JSONParser::parseAll(std::vector<HashMap *> &dbs) {
     Token next = lexicalParser.nextToken();
     if (next.type != LEFT_ANGLE_BRACKET) {
@@ -333,7 +329,7 @@ Token JSONParser::LexicalParser::nextToken() {
         }
     }
 
-}
+};
 
 bool JSONParser::LexicalParser::back() {
     if (hasBacked) {
@@ -342,21 +338,17 @@ bool JSONParser::LexicalParser::back() {
     curIndex = preIndex;
     hasBacked = true;
     return true;
-}
+};
 
 void JSONParser::LexicalParser::reset() {
     source = "";
     curIndex = 0;
     isEnd = false;
-}
+};
 
 void JSONParser::LexicalParser::setSource(std::string newSrc) {
     source = newSrc;
-}
-
-JSONParser::LexicalParser::LexicalParser(std::string &&s) {
-    source = s;
-}
+};
 
 void util::eraseBackSlash(std::string &data) {
     auto iter = data.begin();
@@ -367,4 +359,7 @@ void util::eraseBackSlash(std::string &data) {
             }
         }
     }
+};
+JSONParser::LexicalParser::LexicalParser(const std::string& s):source(s){
 }
+

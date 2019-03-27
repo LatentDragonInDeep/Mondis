@@ -129,7 +129,10 @@ string MondisClient::read() {
 
 MondisClient::MondisClient(MondisServer *server, SOCKET sock) {
     this->sock = sock;
-    keySpace = server->dbs[dBIndex];
+}
+
+void MondisClient::writeMessage(mondis::Message *msg) {
+    msg->
 }
 
 #elif defined(linux)

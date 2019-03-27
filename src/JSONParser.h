@@ -104,7 +104,7 @@ public:
 
         LexicalParser(std::string &s);
 
-        LexicalParser(std::string &&s);
+        LexicalParser(const std::string &s);
 
         LexicalParser(const char *filePath);;
 
@@ -122,11 +122,9 @@ public:
     Token current;
     JSONParser();
 
-    JSONParser(std::string &source);
-
-    JSONParser(std::string &&s);
-
     JSONParser(const char *filePath);
+
+    JSONParser(const std::string&);
     void parse(HashMap* keySpace);
 
     void parseAll(std::vector<HashMap *> &dbs);

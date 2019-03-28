@@ -12,25 +12,29 @@
 #include <mutex>
 #include <chrono>
 #include <ratio>
+#include <functional>
 
 using namespace std;
 using namespace chrono;
 
-class TTLStruct {
+class Timer {
 public:
-    string key;
-    time_point<system_clock,seconds> ttl;
-    string client_name;
-    bool operator<(TTLStruct& other) {
-        return ttl>other.ttl;
+    std::function<void()> task = nullptr;
+    time_point<system_clock,seconds> expireTime;
+    bool isLoop = false;
+    duration<int> period;
+    bool operator<(const Timer& other) const {
+        return expireTime>other.expireTime;
     }
+    Timer(std::function<void()> t,time_point<system_clock,seconds> et,bool l = false,duration<int> p = duration<int>(0)):task(t),expireTime(et),isLoop(l),period(p){};
 };
 
 class TimeHeap {
-    priority_queue<TTLStruct> ttlQueue;
+    priority_queue<Timer> ttlQueue;
     mutex mtx;
     condition_variable notEmptyCV;
-    void put(TTLStruct& ts);
+public:
+    void put(Timer& ts);
     void start();
 };
 

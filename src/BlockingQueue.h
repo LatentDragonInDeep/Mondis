@@ -14,20 +14,25 @@ template <typename T>
 class BlockingQueue {
 public:
     T take() {
+        lock_guard lck(mtx);
         if (innerQueue.empty()) {
-            unique_lock<mutex> lck(mtx);
+            unique_lock<mutex> lck(notEmptyMtx);
             notEmptyCV.wait(lck);
         }
-        return innerQueue.pop();
+        T t = innerQueue.back();
+        innerQueue.pop();
+        return t;
     };
     T put(T t) {
+        lock_guard lck(mtx);
         innerQueue.push(t);
         notEmptyCV.notify_all();
     };
 private:
     condition_variable notEmptyCV;
-    mutex mtx;
+    mutex notEmptyMtx;
     queue<T> innerQueue;
+    mutex mtx;
 };
 
 #endif //MONDIS_BLOCKINGQUEUE_H

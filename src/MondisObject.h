@@ -44,7 +44,7 @@ public:
 
     virtual MondisObject *locate(Command *command);
 
-    bool modified();
+    bool hasModified();
 
 };
 

@@ -68,6 +68,7 @@ std::unordered_map<CommandType, std::string> Command::typeToStr = {
         {CommandType::CLIENT_LIST,"CLIENT_LIST"},
         {CommandType::SLAVE_INFO,"SLAVE_INFO"},
         {CommandType::SLAVE_LIST,"SLAVE_LIST"},
+        {CommandType::SET_TTL,"SET_TTL"}
 };
 
 
@@ -134,6 +135,7 @@ std::unordered_map<std::string, CommandType> CommandInterpreter::strToType = {
         {"CLIENT_LIST",CommandType::CLIENT_LIST},
         {"SLAVE_INFO",CommandType::SLAVE_INFO},
         {"SLAVE_LIST",CommandType::SLAVE_LIST},
+        {"SET_TTL",CommandType ::SET_TTL}
 };
 
 CommandInterpreter::CommandInterpreter() {

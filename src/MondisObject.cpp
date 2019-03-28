@@ -25,7 +25,7 @@ MondisObject *MondisData::locate(Command *command) {
     return nullptr;
 }
 
-bool MondisData::modified() {
+bool MondisData::hasModified() {
     hasSerialized = false;
 }
 
@@ -59,7 +59,7 @@ MondisObject::~MondisObject() {
 }
 
 MondisObject *MondisObject::locate(Command *command) {
-    if (type == RAW_INT || type == RAW_STRING || type == RAW_BIN) {
+    if (type == RAW_INT || type == RAW_STRING) {
         return nullptr;
     }
     MondisData *data = (MondisData *) objData;

@@ -20,7 +20,7 @@ void AVLTree::realInsert(KeyValue *kv) {
             cur = new AVLTreeNode;
             cur->data = kv;
             _size++;
-            modified();
+            hasModified();
             cur->parent = parent;
             if (parent != nullptr) {
                 if (leftOrRight) {
@@ -42,7 +42,7 @@ void AVLTree::realInsert(KeyValue *kv) {
             delete cur->data->value;
             cur->data->value = kv->value;
             kv->value = nullptr;
-            modified();
+            hasModified();
             return;
         } else {
             parent = cur;
@@ -174,7 +174,7 @@ void AVLTree::realRemove(KeyValue &kv, AVLTreeNode *root) {
                     root = nullptr;
                 }
                 delete cur;
-                modified();
+                hasModified();
                 _size--;
                 return;
             } else if (cur->left != nullptr && cur->right == nullptr) {
@@ -193,7 +193,7 @@ void AVLTree::realRemove(KeyValue &kv, AVLTreeNode *root) {
                     root = cur->left;
                 }
                 delete cur;
-                modified();
+                hasModified();
                 _size--;
                 return;
             } else if (cur->left == nullptr && cur->right != nullptr) {
@@ -212,7 +212,7 @@ void AVLTree::realRemove(KeyValue &kv, AVLTreeNode *root) {
                     root = cur->right;
                 }
                 delete cur;
-                modified();
+                hasModified();
                 _size--;
                 return;
             } else {

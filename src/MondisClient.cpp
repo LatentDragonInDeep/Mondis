@@ -48,7 +48,7 @@ ExecRes MondisClient::commitTransaction(MondisServer *server) {
         LOGIC_ERROR_AND_RETURN
     }
     if (watchedKeysHasModified) {
-        res.desc = "can not execute the transaction,because the following keys has been modified.\n";
+        res.desc = "can not execute the transaction,because the following keys has been hasModified.\n";
         for (auto &key:modifiedKeys) {
             res.desc += key;
             res.desc += " ";
@@ -76,7 +76,12 @@ ExecRes MondisClient::commitTransaction(MondisServer *server) {
         if (cstruct.isModify) {
             aofBuffer.push_back(next);
         }
-        send(res.toString());
+        mondis::Message *msg = new mondis::Message;
+        msg->set_msg_type(mondis::MsgType::EXEC_RES);
+        msg->set_res_type(mondis::ExecResType(res.type));
+        msg->set_content(res.toString());
+        writeMessage(msg);
+        delete msg;
         server->incrReplicaOffset();
         server->putToPropagateBuffer(next);
         undoCommands->push_back(undo);

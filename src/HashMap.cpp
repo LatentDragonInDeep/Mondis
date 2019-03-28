@@ -16,7 +16,7 @@ bool HashMap::put(string& key, MondisObject *value)
             if (key == cur->key) {
                 delete cur->object;
                 cur->object = value;
-                modified();
+                hasModified();
                 return true;
             }
         }
@@ -29,7 +29,7 @@ bool HashMap::put(string& key, MondisObject *value)
         next->pre = newEntry;
         content.listLen++;
         _size++;
-        modified();
+        hasModified();
         if (((double) _size) / capacity > loadFactor) {
             rehash();
         } else if (content.listLen > treeThreshold) {
@@ -42,8 +42,8 @@ bool HashMap::put(string& key, MondisObject *value)
     newEntry->object = value;
     newEntry->key = key;
     content.tree->insert(newEntry);
-    if (content.tree->modified()) {
-        modified();
+    if (content.tree->hasModified()) {
+        hasModified();
     }
     _size += content.tree->size();
     if (((double) _size) / capacity > loadFactor) {
@@ -294,5 +294,10 @@ void HashMap::clear() {
     for (int i = 0; i < capacity; ++i) {
         arrayFrom[i].clear();
     }
+}
+
+HashMap::HashMap(unsigned int capacity, float loadFactor) {
+    capacity = getCapacity(capacity);
+    this->loadFactor = loadFactor;
 }
 

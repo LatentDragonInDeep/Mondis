@@ -29,7 +29,7 @@ int MondisList::pushBack (MondisObject *object)
     nextSize++;
     nodeToIndex[newNode] = nextSize+headModifyNum;
     indexToNode[nextSize+headModifyNum] = newNode;
-    modified();
+    hasModified();
 }
 
 MondisObject *MondisList::popBack ()
@@ -48,7 +48,7 @@ MondisObject *MondisList::popBack ()
     MondisObject* obj = last->data;
     last->data == nullptr;
     delete last;
-    modified();
+    hasModified();
     indexToNode.erase(nodeToIndex[last]);
     nodeToIndex.erase(last);
 
@@ -105,7 +105,7 @@ int MondisList::pushFront (MondisObject *object)
         indexToNode[-preSize] = newNode;
         nodeToIndex[newNode] = -preSize;
     }
-    modified();
+    hasModified();
 
 }
 
@@ -121,7 +121,7 @@ MondisObject *MondisList::popFront()
         delete res;
         indexToNode.erase(nodeToIndex[res]);
         nodeToIndex.erase(res);
-        modified();
+        hasModified();
         return obj;
     } else if (nextSize > 0) {
         nextSize--;
@@ -134,7 +134,7 @@ MondisObject *MondisList::popFront()
         delete res;
         indexToNode.erase(nodeToIndex[res]);
         nodeToIndex.erase(res);
-        modified();
+        hasModified();
         return obj;
     }
     return nullptr;
@@ -173,7 +173,7 @@ int MondisList::size()
 int MondisList::set (int index, MondisObject *object)
 {
     locate(index)->data = object;
-    modified();
+    hasModified();
 }
 
 

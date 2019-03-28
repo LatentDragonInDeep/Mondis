@@ -12,22 +12,21 @@ using namespace std;
 void TimeHeap::start() {
     while (true) {
         if (!ttlQueue.empty()) {
-            TTLStruct ts = ttlQueue.top();
+            Timer timer = ttlQueue.top();
             ttlQueue.pop();
             auto now = system_clock::now();
-            if (ts.ttl<now) {
+            if (timer.expireTime<now) {
                 continue;
             }
-            auto sleepTime = ts.ttl-now;
+            auto sleepTime = timer.expireTime-now;
             this_thread::sleep_for(sleepTime);
-            mondis::Message * msg = new mondis::Message;
-            msg->set_msg_type(mondis::MsgType::COMMAND);
-            msg->set_command_type(mondis::CommandType::TIMER_COMMAND)
-            msg->set_client_name(ts.client_name);
-            string command = "DEL ";
-            command+=ts.key;
-            msg->set_content(command);
-            MondisServer::getInstance()->putToReadQueue(msg);
+            timer.task();
+            if (timer.isLoop) {
+                Timer next = timer;
+                next.expireTime = timer.expireTime;
+                next.expireTime += timer.period;
+                ttlQueue.push(next);
+            }
         } else{
             unique_lock<mutex> lck(mtx);
             notEmptyCV.wait(lck);
@@ -35,6 +34,7 @@ void TimeHeap::start() {
     }
 }
 
-void TimeHeap::put(TTLStruct& ts) {
+void TimeHeap::put(Timer& ts) {
     ttlQueue.push(ts);
+    notEmptyCV.notify_all();
 }

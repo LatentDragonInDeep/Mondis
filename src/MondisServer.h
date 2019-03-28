@@ -37,6 +37,7 @@
 #include "SplayTree.h"
 #include "BlockingQueue.h"
 #include "mondis.pb.h"
+#include "TimeHeap.h"
 
 using namespace std;
 class Log{
@@ -307,11 +308,7 @@ private:
 
     void replicaToSlave(MondisClient *client, long long slaveReplicaOffset);
 
-    void singleCommandPropagate();
-
-    void replicaCommandPropagate(vector<string> &commands, MondisClient *client);
-
-    string takeFromPropagateBuffer();
+    void replicaCommandPropagate(vector<string> commands,MondisClient* client);
 
     condition_variable notEmpty;
     mutex notEmptyMtx;
@@ -320,12 +317,8 @@ private:
 
     MondisClient *self = nullptr;
 
-    void checkAndHandleIdleConnection();
-
     void closeClient(MondisClient *c);
 
-    thread *sendHeartBeatToSlaves = nullptr;
-    thread *propagateIO = nullptr;
     thread *msgHandler = nullptr;
     thread *msgWriter = nullptr;
     bool autoMoveCommandToMaster = true;
@@ -353,6 +346,9 @@ private:
 
     bool isVoting = false;
 
+    chrono::time_point<chrono::system_clock> preHeartBeat = chrono::system_clock::now();
+    TimeHeap timeHeap;
+
     deque<ExecRes> resQueue;
     ExecRes bindKey(Command *, MondisClient *);
     ExecRes get(Command*,MondisClient*);
@@ -360,6 +356,7 @@ private:
     ExecRes exsits(Command*,MondisClient*);
     ExecRes login(Command*,MondisClient*);
     ExecRes type(Command*,MondisClient*);
+    ExecRes setTTl(Command*,MondisClient*);
     ExecRes selectDb(Command *, MondisClient *);
     ExecRes save(Command*,MondisClient*);
     ExecRes saveAll(Command*,MondisClient*);
@@ -369,8 +366,7 @@ private:
     ExecRes sync(Command*,MondisClient*);
     ExecRes disconnectClient(Command*,MondisClient*);
     ExecRes disconnectSlave(Command*,MondisClient*);
-    ExecRes ping(Command*,MondisClient*);
-    ExecRes pong(Command*,MondisClient*);
+    ExecRes masterInvite(Command*,MondisClient*);
     ExecRes multi(Command*,MondisClient*);
     ExecRes exec(Command*,MondisClient*);
     ExecRes discard(Command*,MondisClient*);
@@ -389,7 +385,7 @@ private:
     ExecRes slaveInfo(Command*,MondisClient*);
     ExecRes slaveList(Command*,MondisClient*);
     ExecRes newPeer(Command*,MondisClient*);
-    ExecRes exit(Command*,MondisClient*);
+    ExecRes mondisExit(Command *, MondisClient *);
 
 };
 

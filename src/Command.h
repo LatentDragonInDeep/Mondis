@@ -85,6 +85,7 @@ namespace util {
 enum CommandType {
     BIND,
     DEL,
+    SET_TTL,
     EXISTS,
     RENAME,
     TYPE,

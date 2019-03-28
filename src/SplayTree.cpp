@@ -20,7 +20,6 @@ void SplayTree::toJson() {
         res += ",\n";
     }
     res += "}\n";
-    return res;
 }
 
 
@@ -39,7 +38,7 @@ SplayTree::~SplayTree() {
 }
 
 bool SplayTree::insert(int score, MondisObject *obj) {
-    modified();
+    hasModified();
     bool leftOrRight = true;
     SplayTreeNode* cur =root;
     SplayTreeNode* parent = nullptr;
@@ -350,7 +349,7 @@ bool SplayTree::remove(SplayTreeNode *target) {
     if(target == nullptr||target == head||target == tail) {
         return false;
     }
-    modified();
+    hasModified();
     if(target->left == nullptr&&target->right == nullptr) {
         if (target == root) {
             root == nullptr;
@@ -433,7 +432,7 @@ void SplayTree::removeRangeByRank(int start, int end) {
     if (start == end) {
         return;
     }
-    modified();
+    hasModified();
     SplayTreeNode *from = getNodeByRank(start - 1);
     SplayTreeNode *to = getNodeByRank(end);
     splay(from, nullptr);
@@ -471,7 +470,7 @@ void SplayTree::removeRangeByScore(int startScore, int endScore) {
     if(startScore == endScore) {
         return;
     }
-    modified();
+    hasModified();
     SplayTreeNode *from = getLowerBound(startScore, false);
     SplayTreeNode *to = getLowerBound(endScore, true);
     if(from == tail||to == head) {

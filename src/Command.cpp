@@ -47,8 +47,7 @@ std::unordered_map<CommandType, std::string> Command::typeToStr = {
         {CommandType::COUNT,"COUNT"},
         {CommandType::SLAVE_OF,"SLAVE_OF"},
         {CommandType::SYNC,"SYNC"},
-        {CommandType::DISCONNECT_SLAVE,"DISCONNECT_SLAVE"},
-        {CommandType::DISCONNECT_CLIENT,"DISCONNECT_CLIENT"},
+        {CommandType::CLIENT_KILL,"CLIENT_KILL"},
         {CommandType::MULTI,"MULTI"},
         {CommandType::EXEC,"EXEC"},
         {CommandType::DISCARD,"DISCARD"},
@@ -64,11 +63,9 @@ std::unordered_map<CommandType, std::string> Command::typeToStr = {
         {CommandType::UNVOTE,"UNVOTE"},
         {CommandType::MASTER_DEAD,"MASTER_DEAD"},
         {CommandType::I_AM_NEW_MASTER,"I_AM_NEW_MASTER"},
-        {CommandType::CLIENT_INFO,"CLIENT_INFO"},
         {CommandType::CLIENT_LIST,"CLIENT_LIST"},
-        {CommandType::SLAVE_INFO,"SLAVE_INFO"},
-        {CommandType::SLAVE_LIST,"SLAVE_LIST"},
-        {CommandType::SET_TTL,"SET_TTL"}
+        {CommandType::SET_TTL,"SET_TTL"},
+        {CommandType::UPDATE_OFFSET,"UPDATE_OFFSET"}
 };
 
 
@@ -115,8 +112,7 @@ std::unordered_map<std::string, CommandType> CommandInterpreter::strToType = {
         {"COUNT",CommandType::COUNT},
         {"SLAVE_OF",CommandType::SLAVE_OF},
         {"SYNC",CommandType::SYNC},
-        {"DISCONNECT_SLAVE",CommandType::DISCONNECT_SLAVE},
-        {"DISCONNECT_CLIENT",CommandType::DISCONNECT_CLIENT},
+        {"CLIENT_KILL",CommandType::CLIENT_KILL},
         {"MULTI",CommandType::MULTI},
         {"EXEC",CommandType::EXEC},
         {"DISCARD",CommandType::DISCARD},
@@ -131,11 +127,9 @@ std::unordered_map<std::string, CommandType> CommandInterpreter::strToType = {
         {"UNVOTE",CommandType::UNVOTE},
         {"MASTER_DEAD",CommandType::MASTER_DEAD},
         {"I_AM_NEW_MASTER",CommandType::I_AM_NEW_MASTER},
-        {"CLIENT_INFO",CommandType::CLIENT_INFO},
         {"CLIENT_LIST",CommandType::CLIENT_LIST},
-        {"SLAVE_INFO",CommandType::SLAVE_INFO},
-        {"SLAVE_LIST",CommandType::SLAVE_LIST},
-        {"SET_TTL",CommandType ::SET_TTL}
+        {"SET_TTL",CommandType ::SET_TTL},
+        {"UPDATE_OFFSET",CommandType::UPDATE_OFFSET}
 };
 
 CommandInterpreter::CommandInterpreter() {

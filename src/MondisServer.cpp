@@ -494,13 +494,11 @@ ExecRes MondisServer::execute(const string &commandStr, MondisClient *client) {
     if (serverStatus == SLAVE && cstruct.isModify) {
         if (autoMoveCommandToMaster) {
             Command::destroyCommand(command);
-            isRedirecting = true;
             mondis::Message * msg = new mondis::Message;
             msg->set_msg_type(mondis::MsgType::COMMAND);
             msg->set_command_type(mondis::CommandType::SLAVE_FORWARD);
             msg->set_content(commandStr);
             putToWriteQueue(msg);
-            redirectCV.notify_all();
             return res;
         } else {
             res.desc = "the current server is a slave,can not undoExecute command which will modify database state";
@@ -636,10 +634,8 @@ void MondisServer::init() {
     self = new MondisClient(this, (SOCKET) 0);
 #elif defined(linux)
     self = new MondisClient(this,0);
-    clientsEpollFd = epoll_create(maxClientNum);
-    clientEvents = new epoll_event[maxClientNum];
-    peersEpollFd = epoll_create(maxSlaveNum);
-    peerEvents = new epoll_event[maxSlaveNum];
+    epollFd = epoll_create(maxClientNum+maxSlaveNum);
+    epollEvents = new epoll_event[maxClientNum+maxSlaveNum];
 #endif
     self->type = SERVER_SELF;
     self->hasAuthenticate = true;
@@ -683,7 +679,7 @@ void MondisServer::init() {
     //控制台事件循环
     std::thread eventLoop(&MondisServer::startEventLoop, this);
 
-    selectAndHandle(true);
+    selectAndHandle();
     //读线程
     msgHandler = new std::thread(&MondisServer::msgHandle, this);
     //写线程
@@ -747,7 +743,7 @@ void MondisServer::acceptSocket() {
         int noDelay = 1;
         setsockopt(clientFd, IPPROTO_TCP, FNDELAY, &noDelay, sizeof(noDelay));
         allModifyMtx.lock();
-        fdToClient[clientFd] = client;
+        fdToClients[clientFd] = client;
         allModifyMtx.unlock();
         clientModifyMtx.lock();
         idToClients[client->id]=client;
@@ -770,12 +766,10 @@ MondisServer::MondisServer() {
 
 MondisServer::~MondisServer() {
 #ifdef linux
-    delete[] clientEvents;
-    delete[] peerEvents;
+    delete[] epollEvents;
 #endif
     delete replicaCommandBuffer;
     delete commandPropagateBuffer;
-    delete sendHeartBeatToSlaves;
     delete msgHandler;
     delete msgWriter;
 }
@@ -806,26 +800,8 @@ void MondisServer::replicaToSlave(MondisClient *client, long long slaveReplicaOf
     newPeer += " ";
     newPeer += to_string(client->port);
 
-    peersModifyMtx.lock_shared();
-    for (auto &kv:idToPeers) {
-        if (kv.second != client) {
-            //TODO
-        }
-    }
-    peersModifyMtx.unlock_shared();
+    putCommandMsgToWriteQueue(newPeer,0,mondis::CommandType::MASTER_COMMAND,mondis::SendToType::ALL_PEERS);
     isPropagating = false;
-    if (sendHeartBeatToSlaves == nullptr) {
-        sendHeartBeatToSlaves = new std::thread([&]() {
-            while (true) {
-                peersModifyMtx.lock_shared();
-                for (auto &kv:idToPeers) {
-                    //TODO
-                }
-                peersModifyMtx.unlock_shared();
-                std::this_thread::sleep_for(chrono::milliseconds(toSlaveHeartBeatDuration));
-            }
-        });
-    }
 }
 
 bool MondisServer::putToPropagateBuffer(const string &curCommand) {
@@ -860,20 +836,24 @@ void MondisServer::closeClient(MondisClient *client) {
     allModifyMtx.unlock();
     idToPeersAndClients.erase(client->id);
 #elif defined(linux)
+    watchedKeyMtx.lock();
+    for (auto &key:client->watchedKeys) {
+        keyToWatchedClients[key].erase(keyToWatchedClients[key].find(client));
+    }
+    watchedKeyMtx.unlock();
+    epoll_ctl(epollFd, EPOLL_CTL_DEL, client->fd, nullptr);
     if(client->type == CLIENT) {
-        epoll_ctl(clientsEpollFd, EPOLL_CTL_DEL, client->fd, nullptr);
         clientModifyMtx.lock();
         idToClients.erase(idToClients.find(client->id));
         clientModifyMtx.unlock();
     } else if(client->type == PEER) {
-        epoll_ctl(peersEpollFd, EPOLL_CTL_DEL, client->fd, nullptr);
         peersModifyMtx.lock();
         idToPeers.erase(idToPeers.find(client->id));
         peersModifyMtx.unlock();
     }
     idToPeersAndClients.erase(client->id);
     allModifyMtx.lock();
-    fdToClient.erase(fdToClient.find(client->fd));
+    fdToClients.erase(fdToClients.find(client->fd));
     allModifyMtx.unlock();
 #endif
     delete client;
@@ -1111,8 +1091,7 @@ unordered_set<CommandType> MondisServer::controlCommands = {
         CommandType:: DEL,
         CommandType:: SLAVE_OF,
         CommandType:: SYNC,
-        CommandType:: DISCONNECT_SLAVE,
-        CommandType:: DISCONNECT_CLIENT,
+        CommandType:: CLIENT_KILL,
         CommandType:: MULTI,
         CommandType:: EXEC,
         CommandType:: DISCARD,
@@ -1125,10 +1104,7 @@ unordered_set<CommandType> MondisServer::controlCommands = {
         CommandType:: ASK_FOR_VOTE,
         CommandType:: MASTER_DEAD,
         CommandType:: I_AM_NEW_MASTER,
-        CommandType:: CLIENT_INFO,
         CommandType:: CLIENT_LIST,
-        CommandType:: SLAVE_INFO,
-        CommandType:: SLAVE_LIST,
         CommandType:: NEW_CLIENT,
 };
 MondisServer* MondisServer::server = nullptr;
@@ -1158,7 +1134,7 @@ bool MondisServer::isModifyCommand(Command *command) {
     return modifyCommands.find(command->type) != modifyCommands.end();
 }
 
-void MondisServer::selectAndHandle(bool isClient) {
+void MondisServer::selectAndHandle() {
 #ifdef WIN32
     timeval timeout;
         timeout.tv_sec = 0;
@@ -1167,13 +1143,6 @@ void MondisServer::selectAndHandle(bool isClient) {
 #elif defined(linux)
     int epollFd = 0;
     epoll_event* events = nullptr;
-    if(isClient){
-        epollFd = clientsEpollFd;
-        events = clientEvents;
-    } else{
-        epollFd = peersEpollFd;
-        events = peerEvents;
-    }
 #endif
     while (true) {
 #ifdef WIN32
@@ -1212,11 +1181,11 @@ void MondisServer::selectAndHandle(bool isClient) {
             continue;
         }
         for(int i=0;i<nfds;i++) {
-            MondisClient* client = fdToClient[events[i].data.fd];
+            MondisClient* client = fdToClients[events[i].data.fd];
             if(events[i].events&EPOLLRDHUP){
-                closeClient(fdToClient[client->fd]);
+                closeClient(fdToClients[client->fd]);
             } else {
-
+                putToReadQueue(client->nextMessage());
             }
         }
 #endif
@@ -1283,6 +1252,7 @@ unordered_map<CommandType,CommandHandler> MondisServer::commandHandlers = {
         {CommandType::SELECT, &MondisServer::selectDb},
         {CommandType::RENAME, &MondisServer::renameKey},
         {CommandType::GET,&MondisServer::get},
+        {CommandType::SET_TTL,&MondisServer::setTTl},
         {CommandType::EXISTS,&MondisServer::exsits},
         {CommandType::EXIT, &MondisServer::mondisExit},
         {CommandType::SAVE,&MondisServer::save},
@@ -1291,8 +1261,7 @@ unordered_map<CommandType,CommandHandler> MondisServer::commandHandlers = {
         {CommandType::M_SIZE,&MondisServer::size},
         {CommandType::SLAVE_OF, &MondisServer::beSlaveOf},
         {CommandType::SYNC,&MondisServer::sync},
-        {CommandType::DISCONNECT_CLIENT,&MondisServer::disconnectClient},
-        {CommandType::DISCONNECT_SLAVE,&MondisServer::disconnectSlave},
+        {CommandType::CLIENT_KILL,&MondisServer::disconnectClient},
         {CommandType::MULTI,&MondisServer::multi},
         {CommandType::EXEC,&MondisServer::exec},
         {CommandType::DISCARD,&MondisServer::discard},
@@ -1306,11 +1275,9 @@ unordered_map<CommandType,CommandHandler> MondisServer::commandHandlers = {
         {CommandType::UNVOTE,&MondisServer::unvote},
         {CommandType::MASTER_DEAD,&MondisServer::masterDead},
         {CommandType::I_AM_NEW_MASTER,&MondisServer::iAmNewMaster},
-        {CommandType::CLIENT_INFO,&MondisServer::clientInfo},
         {CommandType::CLIENT_LIST,&MondisServer::clientList},
-        {CommandType::SLAVE_INFO,&MondisServer::slaveInfo},
-        {CommandType::SLAVE_LIST,&MondisServer::slaveList},
-        {CommandType::MASTER_INVITE,&MondisServer::masterInvite}
+        {CommandType::MASTER_INVITE,&MondisServer::masterInvite},
+        {CommandType::UPDATE_OFFSET,&MondisServer::updateOffset}
 };
 
 ExecRes MondisServer::bindKey(Command *command, MondisClient *client) {
@@ -1473,7 +1440,12 @@ ExecRes MondisServer::renameKey(Command *command, MondisClient *client) {
     CHECK_PARAM_TYPE(1, PLAIN)
     MondisObject *data = dbs[client->dBIndex]->get(PARAM(0));
     if (data == nullptr) {
-        res.desc = "the object whose key is" + PARAM(0) + "does not exists";
+        res.desc = "the object whose key is " + PARAM(0) + " does not exists";
+        LOGIC_ERROR_AND_RETURN
+    }
+    bool containsNew = dbs[client->dBIndex]->containsKey(PARAM(1));
+    if (containsNew) {
+        res.desc = "the object whose key is " + PARAM(0) + " already exists";
         LOGIC_ERROR_AND_RETURN
     }
     dbs[client->dBIndex]->put(PARAM(0), nullptr);
@@ -1539,7 +1511,7 @@ ExecRes MondisServer::beSlaveOf(Command *command, MondisClient *client) {
         msg->set_content("PING");
         msg->set_client_id(0);
         putToWriteQueue(msg);
-    }),chrono::system_clock::now(),true,chrono::duration<int,seconds>(5));
+    }),chrono::system_clock::now(),true,chrono::duration<int>(5));
     timeHeap.put(timer);
 }
 
@@ -1556,10 +1528,10 @@ ExecRes MondisServer::sync(Command *command, MondisClient *client) {
         socketToClient.erase(socketToClient.find(client->sock));
         allModifyMtx.unlock();
 #elif defined(linux)
-        epoll_ctl(clientsEpollFd,EPOLL_CTL_DEL,client->fd, nullptr);
-                allModifyMtx.lock();
-                fdToClient.erase(fdToClient.find(client->fd));
-                allModifyMtx.unlock();
+        epoll_ctl(epollFd,EPOLL_CTL_DEL,client->fd, nullptr);
+        allModifyMtx.lock();
+        fdToClients.erase(fdToClients.find(client->fd));
+        allModifyMtx.unlock();
 #endif
         delete client;
         return res;
@@ -1570,9 +1542,7 @@ ExecRes MondisServer::sync(Command *command, MondisClient *client) {
     FD_CLR(client->sock, &clientFds);
     FD_SET(client->sock, &peerFds);
 #elif defined(linux)
-    epoll_ctl(clientsEpollFd,EPOLL_CTL_DEL,client->fd, nullptr);
-            epoll_ctl(peersEpollFd,EPOLL_CTL_ADD,client->fd, nullptr);
-
+    epoll_ctl(epollFd,EPOLL_CTL_DEL,client->fd, nullptr);
 #endif
     CHECK_PARAM_NUM(1)
     CHECK_PARAM_TYPE(0, PLAIN)
@@ -1731,9 +1701,9 @@ ExecRes MondisServer::newClient(Command *command, MondisClient *client) {
         socketToClient.erase(socketToClient.find(client->sock));
         allModifyMtx.unlock();
 #elif defined(linux)
-        epoll_ctl(clientsEpollFd,EPOLL_CTL_DEL,client->fd, nullptr);
+        epoll_ctl(epollFd,EPOLL_CTL_DEL,client->fd, nullptr);
                 allModifyMtx.lock();
-                fdToClient.erase(fdToClient.find(client->fd));
+                fdToClients.erase(fdToClients.find(client->fd));
                 allModifyMtx.unlock();
 #endif
         idToClients.erase(idToClients.find(client->id));
@@ -1791,8 +1761,11 @@ ExecRes MondisServer::masterDead(Command *command, MondisClient *client) {
 #ifdef WIN32
     FD_CLR(client->sock, &peerFds);
 #elif defined(linux)
-    epoll_ctl(clientsEpollFd,EPOLL_CTL_DEL,client->fd, nullptr);
+    epoll_ctl(epollFd,EPOLL_CTL_DEL,client->fd, nullptr);
 #endif
+    string updateOffset = "UPDATE_OFFSET ";
+    updateOffset += to_string(replicaOffset);
+    putCommandMsgToWriteQueue(updateOffset,0,mondis::CommandType::PEER_COMMAND,mondis::SendToType::ALL_PEERS);
     OK_AND_RETURN;
 }
 
@@ -1801,7 +1774,7 @@ ExecRes MondisServer::iAmNewMaster(Command *command, MondisClient *client) {
 #ifdef WIN32
     FD_CLR(client->sock, &peerFds);
 #elif defined(linux)
-    epoll_ctl(clientsEpollFd,EPOLL_CTL_DEL,client->fd, nullptr);
+    epoll_ctl(epollFd,EPOLL_CTL_DEL,client->fd, nullptr);
 #endif
     client->type = ClientType::MASTER;
     isVoting = false;
@@ -1811,35 +1784,6 @@ ExecRes MondisServer::iAmNewMaster(Command *command, MondisClient *client) {
     string sync = "SYNC ";
     sync += to_string(replicaOffset);
     putCommandMsgToWriteQueue(sync, client->id, mondis::CommandType::SLAVE_FORWARD, mondis::SendToType::ALL_PEERS);
-    OK_AND_RETURN
-}
-
-ExecRes MondisServer::clientInfo(Command *command, MondisClient *client) {
-    ExecRes res;
-    CHECK_PARAM_NUM(1)
-    CHECK_PARAM_TYPE(0, PLAIN)
-    clientModifyMtx.lock_shared();
-    if (idToClients.find(atoi(PARAM(0).c_str())) == idToClients.end()) {
-        res.desc = "client whose id is ";
-        res.desc += PARAM(0);
-        res.desc += " does not exists";
-        LOGIC_ERROR_AND_RETURN
-    }
-    MondisClient *c = idToClients[atoi(PARAM(0).c_str())];
-    clientModifyMtx.unlock_shared();
-    res.desc += "id:";
-    res.desc += PARAM(0);
-    res.desc += "\nip:";
-    res.desc += c->ip;
-    res.desc += "\nport:";
-    res.desc += to_string(c->port);
-    res.desc += "\nhasAuthenticated:";
-    res.desc += util::to_string(c->hasAuthenticate);
-    res.desc += "\ndbIndex:";
-    res.desc += to_string(c->dBIndex);
-    res.desc += "\nisIntransaction:";
-    res.desc += util::to_string(c->isInTransaction);
-    res.desc += "\n";
     OK_AND_RETURN
 }
 
@@ -1855,42 +1799,21 @@ ExecRes MondisServer::clientList(Command *command, MondisClient *client) {
     for (auto &kv:idToClients) {
         res.desc += kv.first;
         res.desc += ",\n";
+        res.desc += "id:";
+        res.desc += PARAM(0);
+        res.desc += "\nip:";
+        res.desc += kv.second->ip;
+        res.desc += "\nport:";
+        res.desc += to_string(kv.second->port);
+        res.desc += "\nhasAuthenticated:";
+        res.desc += util::to_string(kv.second->hasAuthenticate);
+        res.desc += "\ndbIndex:";
+        res.desc += to_string(kv.second->dBIndex);
+        res.desc += "\nisIntransaction:";
+        res.desc += util::to_string(kv.second->isInTransaction);
+        res.desc += "\n";
     }
     clientModifyMtx.unlock_shared();
-    OK_AND_RETURN
-}
-
-ExecRes MondisServer::slaveInfo(Command *command, MondisClient *client) {
-    ExecRes res;
-    CHECK_PARAM_NUM(1)
-    CHECK_PARAM_TYPE(0, PLAIN)
-    hasVoteFor = true;
-    res = beSlaveOf(command, client);
-    if (res.type == OK) {
-        masterIP = PARAM(0);
-        masterPort = atoi(PARAM(1).c_str());
-    }
-    return res;
-}
-
-ExecRes MondisServer::slaveList(Command *command, MondisClient *client) {
-    ExecRes res;
-    if (serverStatus == ServerStatus::SV_STAT_SLAVE) {
-        res.desc = "current server is a slave,can not has slaves";
-        LOGIC_ERROR_AND_RETURN
-    }
-    CHECK_PARAM_NUM(0)
-    res.desc = "current server has ";
-    clientModifyMtx.lock_shared();
-    res.desc += idToClients.size();
-    clientModifyMtx.unlock_shared();
-    res.desc += " slaves,and the following are the list:\n";
-    peersModifyMtx.lock_shared();
-    for (auto &kv:idToPeers) {
-        res.desc += kv.first;
-        res.desc += ",\n";
-    }
-    peersModifyMtx.unlock_shared();
     OK_AND_RETURN
 }
 
@@ -2016,8 +1939,24 @@ ExecRes MondisServer::setTTl(Command* command,MondisClient* client) {
         msg->set_command_type(mondis::CommandType::TIMER_COMMAND);
         msg->set_content(string("DEL ")+PARAM(0));
         putToReadQueue(msg);
-    }),chrono::system_clock::now()+duration<int,seconds>(atoi(PARAM(1).c_str())));
+    }),chrono::system_clock::now()+chrono::duration<int,std::ratio<1,1>>(atoi(PARAM(1).c_str())));
     timeHeap.put(timer);
     OK_AND_RETURN
+}
+
+ExecRes MondisServer::updateOffset(Command *command, MondisClient * client) {
+    ExecRes res;
+    CHECK_PARAM_NUM(1)
+    CHECK_PARAM_TYPE(0,PLAIN)
+    unsigned long long  otherOffset = std::stoull(PARAM(0),0,10);
+    if (otherOffset>=replicaOffset) {
+        if (otherOffset>maxOtherReplicaOffset) {
+            maxOffsetClients.clear();
+            maxOffsetClients.insert(client);
+            maxOtherReplicaOffset = otherOffset;
+        } else if (otherOffset == maxOtherReplicaOffset) {
+            maxOffsetClients.insert(client);
+        }
+    }
 }
 

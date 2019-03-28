@@ -133,8 +133,7 @@ enum CommandType {
     M_ERROR,
     SLAVE_OF,
     SYNC,
-    DISCONNECT_SLAVE,
-    DISCONNECT_CLIENT,
+    CLIENT_KILL,
     MULTI,
     EXEC,
     DISCARD,
@@ -146,13 +145,11 @@ enum CommandType {
     ASK_FOR_VOTE,
     VOTE,
     UNVOTE,
+    UPDATE_OFFSET,
     MASTER_INVITE,
     MASTER_DEAD,
     I_AM_NEW_MASTER,
-    CLIENT_INFO,
     CLIENT_LIST,
-    SLAVE_INFO,
-    SLAVE_LIST,
 };
 
 enum ExecResType {

@@ -82,6 +82,7 @@ enum ClientType {
 
 class MondisClient {
 public:
+    friend class MondisServer;
     unsigned id;            /* Client incremental unique ID. */
 #ifdef WIN32
     SOCKET sock;
@@ -163,11 +164,6 @@ private:
     int maxCommandReplicaBufferSize = 1024 * 1024;
     int maxCommandPropagateBufferSize = 1024;
     int maxSlaveNum = 1024;
-    int maxSlaveIdle = 10000;
-    int maxMasterIdle = 10000;
-    int maxClientIdle = 10000;
-    int toSlaveHeartBeatDuration = 3000;
-    int toClientHeartBeatDuration = 3000;
     deque<string> * replicaCommandBuffer = new deque<string>();
     bool isSlaveOf = false;
     pid_t pid;
@@ -212,22 +208,19 @@ public:
                                        mondis::SendToType sendToType);
     void putExecResMsgToWriteQueue(const ExecRes &res, unsigned int clientId, mondis::SendToType sendToType);
 private:
-    long long replicaOffset = 0;
+    unsigned long long replicaOffset = 0;
+    unsigned long long maxOtherReplicaOffset = 0;
     static unordered_set<CommandType> modifyCommands;
     static unordered_set<CommandType> transactionAboutCommands;
     static unordered_map<CommandType,CommandHandler> commandHandlers;
-    static void initStaticMember();
 
     bool isPropagating = false;
     condition_variable redirectCV;
-    mutex redirectMtx;
 
     shared_mutex allModifyMtx;
     shared_mutex clientModifyMtx;
     shared_mutex peersModifyMtx;
     shared_mutex watchedKeyMtx;
-
-    bool isRedirecting = false;
 
     queue<string> *commandPropagateBuffer;
     
@@ -236,7 +229,7 @@ private:
     string masterIP;
     int masterPort;
     bool hasVoteFor = false;
-    unordered_set<MondisClient *> maxOffsetClients;
+    unordered_set<MondisClient*> maxOffsetClients;
     MondisClient *master = nullptr;
 #ifdef WIN32
     fd_set clientFds;
@@ -244,15 +237,12 @@ private:
     unordered_map<SOCKET, MondisClient *> socketToClient;
 
 #elif defined(linux)
-    int clientsEpollFd;
-    int peersEpollFd;
-    epoll_event* clientEvents;
-    epoll_event* peerEvents;
+    int epollFd;
+    epoll_event* epollEvents;
     struct epoll_event listenEvent;
-    unordered_map<int,MondisClient*> fdToClient;
+    unordered_map<int,MondisClient*> fdToClients;
 #endif
-
-    void selectAndHandle(bool isClient);
+    void selectAndHandle();
 public:
     static MondisServer* getInstance();
     unsigned id;
@@ -380,13 +370,13 @@ private:
     ExecRes masterDead(Command*,MondisClient*);
     ExecRes iAmNewMaster(Command*,MondisClient*);
     ExecRes updateOffset(Command*,MondisClient*);
-    ExecRes clientInfo(Command*,MondisClient*);
     ExecRes clientList(Command*,MondisClient*);
-    ExecRes slaveInfo(Command*,MondisClient*);
-    ExecRes slaveList(Command*,MondisClient*);
     ExecRes newPeer(Command*,MondisClient*);
     ExecRes mondisExit(Command *, MondisClient *);
 
+    ExecRes startTransaction(MondisClient*);
+    ExecRes commitTransaction(MondisClient*);
+    ExecRes closeTransaction(MondisClient*);
 };
 
 

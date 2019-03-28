@@ -18,11 +18,6 @@ MondisClient::~MondisClient() {
 #endif
 }
 
-void MondisClient::updateHeartBeatTime() {
-    preInteraction = chrono::duration_cast<chrono::milliseconds>(
-            chrono::system_clock::now().time_since_epoch()).count();
-}
-
 void MondisClient::closeTransaction() {
     isInTransaction = false;
     watchedKeys.clear();

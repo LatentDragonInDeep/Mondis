@@ -3,8 +3,6 @@
 //
 
 #include "TimeHeap.h"
-#include "mondis.pb.h"
-#include "MondisServer.h"
 #include <thread>
 #include <condition_variable>
 using namespace std;

@@ -712,7 +712,7 @@ void MondisServer::acceptSocket() {
         client->ip = inet_ntoa(remoteAddr.sin_addr);
         client->port = ntohs(remoteAddr.sin_port);
         client->id = nextClientId();
-        FD_SET(clientSock, &clientFds);
+        FD_SET(clientSock, &fds);
         allModifyMtx.lock();
         socketToClient[client->sock] = client;
         allModifyMtx.unlock();
@@ -755,8 +755,7 @@ void MondisServer::acceptSocket() {
 
 MondisServer::MondisServer() {
 #ifdef WIN32
-    FD_ZERO(&clientFds);
-    FD_ZERO(&peerFds);
+    FD_ZERO(&fds);
 #elif defined(linux)
     listenEvent.events = EPOLLET|EPOLLIN;
 #endif
@@ -816,7 +815,6 @@ bool MondisServer::putToPropagateBuffer(const string &curCommand) {
 void MondisServer::closeClient(MondisClient *client) {
 #ifdef WIN32
     if (client->type == CLIENT) {
-        FD_CLR(client->sock, &clientFds);
         watchedKeyMtx.lock();
         for (auto &key:client->watchedKeys) {
             keyToWatchedClients[key].erase(keyToWatchedClients[key].find(client));
@@ -826,11 +824,11 @@ void MondisServer::closeClient(MondisClient *client) {
         idToClients.erase(idToClients.find(client->id));
         clientModifyMtx.unlock();
     } else if (client->type == PEER) {
-        FD_CLR(client->sock, &peerFds);
         peersModifyMtx.lock();
         idToPeers.erase(idToPeers.find(client->id));
         peersModifyMtx.unlock();
     }
+    FD_CLR(client->sock, &fds);
     allModifyMtx.lock();
     socketToClient.erase(socketToClient.find(client->sock));
     allModifyMtx.unlock();
@@ -1146,23 +1144,12 @@ void MondisServer::selectAndHandle() {
 #endif
     while (true) {
 #ifdef WIN32
-        if (isClient) {
-            FD_ZERO(&clientFds);
-            clientModifyMtx.lock_shared();
-            for (auto &kv:idToClients) {
-                FD_SET(kv.second->sock, &clientFds);
-            }
-            clientModifyMtx.unlock_shared();
-            fds = &clientFds;
-        } else {
-            FD_ZERO(&peerFds);
-            peersModifyMtx.lock_shared();
-            for (auto &kv:idToPeers) {
-                FD_SET(kv.second->sock, &clientFds);
-            }
-            peersModifyMtx.unlock_shared();
-            fds = &peerFds;
+        FD_ZERO(&fds);
+        clientModifyMtx.lock_shared();
+        for (auto &kv:idToClients) {
+            FD_SET(kv.second->sock, &fds);
         }
+        clientModifyMtx.unlock_shared();
         int ret = select(0, fds, nullptr, nullptr, &timeout);
         if (ret <= 0) {
             continue;
@@ -1523,7 +1510,7 @@ ExecRes MondisServer::sync(Command *command, MondisClient *client) {
         res.type = LOGIC_ERROR;
         res.desc = "can not build connection because has up to max slave number!";
 #ifdef WIN32
-        FD_CLR(client->sock, &clientFds);
+        FD_CLR(client->sock, &fds);
         allModifyMtx.lock();
         socketToClient.erase(socketToClient.find(client->sock));
         allModifyMtx.unlock();
@@ -1538,12 +1525,6 @@ ExecRes MondisServer::sync(Command *command, MondisClient *client) {
     }
     peersModifyMtx.unlock_shared();
     client->type = PEER;
-#ifdef WIN32
-    FD_CLR(client->sock, &clientFds);
-    FD_SET(client->sock, &peerFds);
-#elif defined(linux)
-    epoll_ctl(epollFd,EPOLL_CTL_DEL,client->fd, nullptr);
-#endif
     CHECK_PARAM_NUM(1)
     CHECK_PARAM_TYPE(0, PLAIN)
     CHECK_AND_DEFINE_INT_LEGAL(1, offset);
@@ -1696,7 +1677,7 @@ ExecRes MondisServer::newClient(Command *command, MondisClient *client) {
         msg->set_content(res.toString());
         client->writeMessage(msg);
 #ifdef WIN32
-        FD_CLR(client->sock, &clientFds);
+        FD_CLR(client->sock, &fds);
         allModifyMtx.lock();
         socketToClient.erase(socketToClient.find(client->sock));
         allModifyMtx.unlock();
@@ -1759,7 +1740,7 @@ ExecRes MondisServer::masterDead(Command *command, MondisClient *client) {
     master = nullptr;
     res.needSend = false;
 #ifdef WIN32
-    FD_CLR(client->sock, &peerFds);
+    FD_CLR(client->sock, &fds);
 #elif defined(linux)
     epoll_ctl(epollFd,EPOLL_CTL_DEL,client->fd, nullptr);
 #endif
@@ -1772,7 +1753,7 @@ ExecRes MondisServer::masterDead(Command *command, MondisClient *client) {
 ExecRes MondisServer::iAmNewMaster(Command *command, MondisClient *client) {
     ExecRes res;
 #ifdef WIN32
-    FD_CLR(client->sock, &peerFds);
+    FD_CLR(client->sock, &fds);
 #elif defined(linux)
     epoll_ctl(epollFd,EPOLL_CTL_DEL,client->fd, nullptr);
 #endif

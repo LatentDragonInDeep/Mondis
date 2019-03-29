@@ -232,8 +232,7 @@ private:
     unordered_set<MondisClient*> maxOffsetClients;
     MondisClient *master = nullptr;
 #ifdef WIN32
-    fd_set clientFds;
-    fd_set peerFds;
+    fd_set fds;
     unordered_map<SOCKET, MondisClient *> socketToClient;
 
 #elif defined(linux)

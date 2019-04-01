@@ -1273,7 +1273,8 @@ ExecRes MondisServer::bindKey(Command *command, MondisClient *client) {
     CHECK_PARAM_TYPE(0, PLAIN)
     CHECK_PARAM_TYPE(1, STRING)
     KEY(0)
-    dbs[client->dBIndex]->put(key, parser.parseObject((*command)[1].content));
+    MondisObject * obj = parser.parseObject((*command)[1].content);
+    dbs[client->dBIndex]->put(key, obj);
     OK_AND_RETURN
 };
 

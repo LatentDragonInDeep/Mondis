@@ -3,6 +3,7 @@
 //
 
 #include <fcntl.h>
+#include <unistd.h>
 #include "JSONParser.h"
 #include "HashMap.h"
 #include "MondisList.h"
@@ -146,7 +147,7 @@ MondisObject *JSONParser::parseJSONArray(LexicalParser *lp, bool isNeedNext) {
                 return res;
             } else if (first->getJson() == "\"SET\"") {
                 res->type = SET;
-                HashMap *data = new HashMap();
+                HashMap *data = new HashMap(16,0.75,true);
                 res->objData = data;
                 MondisObject *cur = nullptr;
                 while (true) {
@@ -199,7 +200,9 @@ MondisObject *JSONParser::parseJSONArray(LexicalParser *lp, bool isNeedNext) {
     }
 }
 
-JSONParser::JSONParser() {}
+JSONParser::JSONParser() {
+    lexicalParser = new LexicalParser;
+}
 
 void JSONParser::matchToken(LexicalParser *lp, ParserTokenType type) {
     Token next = lp->nextToken();

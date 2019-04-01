@@ -66,13 +66,6 @@ public:
     MondisObject* object = nullptr;
     Entry* pre = nullptr;
     Entry* next = nullptr;
-    bool compare(Entry& other) {
-        return key.compare(other.key);
-    }
-
-    bool equals(Entry& other) {
-        return key == other.key;
-    }
 
     Entry(string &key, MondisObject *data) : key(key), object(data) {};
     Entry(KeyValue* kv):key(kv->key),object(kv->value){
@@ -201,7 +194,6 @@ private:
     unsigned int _size = 0;
     const int treeThreshold = 8;
     const bool isValueNull = false;
-    bool isIntset = true;
 
     struct Content {
         Entry *head = new Entry;
@@ -319,7 +311,7 @@ private:
     };
 public:
     HashMap();
-    HashMap(unsigned int capacity, float loadFactor);
+    HashMap(unsigned int capacity, float loadFactor,bool = false);
     ~HashMap();
 
     bool put(string& key, MondisObject *value);

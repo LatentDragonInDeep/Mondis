@@ -4,7 +4,7 @@
 
 #include "HashMap.h"
 
-HashMap::HashMap ():HashMap(16,0.75f) {}
+HashMap::HashMap():HashMap(16,0.75f) {}
 
 bool HashMap::put(string& key, MondisObject *value)
 {
@@ -76,6 +76,26 @@ MondisObject *HashMap::get (string &key)
 
 bool HashMap::containsKey (string &key)
 {
+    if (isValueNull) {
+        int index = getIndex(hash(key));
+        Content &content = arrayFrom[index];
+        if(content.isList) {
+            Entry *cur = content.head->next;
+            for (; cur != content.tail; cur = cur->next) {
+                if(key == cur->key)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        KeyValue *kv = content.tree->get(key);
+        if (kv == nullptr) {
+            return false;
+        }
+        return true;
+    }
     return get(key) != nullptr;
 }
 
@@ -87,10 +107,7 @@ unsigned HashMap::getIndex(unsigned hash)
 int HashMap::getCapacity (int capa)
 {
     int init = 1;
-    while ((init<<1)<capa) {
-        init<<=1;
-    }
-
+    while ((init<<=1)<capa){}
     return init;
 }
 
@@ -136,6 +153,10 @@ void HashMap::toTree (int index)
 void HashMap::rehash ()
 {
     capacity<<=1;
+    if (arrayTo!= nullptr) {
+        delete [] arrayTo;
+        arrayTo = nullptr;
+    }
     arrayTo = new Content[capacity];
     for (int i = 0; i < capacity>>1;++i)
     {
@@ -296,8 +317,9 @@ void HashMap::clear() {
     }
 }
 
-HashMap::HashMap(unsigned int capacity, float loadFactor) {
-    capacity = getCapacity(capacity);
+HashMap::HashMap(unsigned int capa, float loadFactor,bool isVN):isValueNull(isVN) {
+    capacity = getCapacity(capa);
     this->loadFactor = loadFactor;
+    arrayFrom = new Content[capacity];
 }
 

@@ -25,7 +25,7 @@ public class SimpleClient {
                             selector.selectDb();
                             Iterator<SelectionKey> iterator = selector.selectedKeys().iterator();
                             while (iterator.hasNext()){
-                                SelectionKey key = iterator.next();
+                                SelectionKey key = iterator.nextMsg();
                                 if(key.isReadable()){
                                     ByteBuffer buffer = ByteBuffer.allocate(4096);
                                     int hasRead;

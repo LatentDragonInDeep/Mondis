@@ -1137,7 +1137,7 @@ void MondisServer::selectAndHandle() {
     timeval timeout;
         timeout.tv_sec = 0;
         timeout.tv_usec = 500000;
-        fd_set *fds = nullptr;
+        fd_set fds;
 #elif defined(linux)
     int epollFd = 0;
     epoll_event* events = nullptr;
@@ -1150,15 +1150,18 @@ void MondisServer::selectAndHandle() {
             FD_SET(kv.second->sock, &fds);
         }
         clientModifyMtx.unlock_shared();
-        int ret = select(0, fds, nullptr, nullptr, &timeout);
+        int ret = select(0, &fds, nullptr, nullptr, &timeout);
         if (ret <= 0) {
             continue;
         }
         allModifyMtx.lock_shared();
         for (auto pair:socketToClient) {
-            if (FD_ISSET(pair.first, fds)) {
+            if (FD_ISSET(pair.first, &fds)) {
                 MondisClient *client = pair.second;
-                putToReadQueue(client->nextMessage());
+                mondis::Message* msg = nullptr;
+                while ((msg = client->nextMessage())!= nullptr) {
+                    putToReadQueue(msg);
+                }
             }
         }
         allModifyMtx.unlock_shared();
@@ -1172,7 +1175,7 @@ void MondisServer::selectAndHandle() {
             if(events[i].events&EPOLLRDHUP){
                 closeClient(fdToClients[client->fd]);
             } else {
-                putToReadQueue(client->nextMessage());
+                putToReadQueue(client->nextMsg());
             }
         }
 #endif

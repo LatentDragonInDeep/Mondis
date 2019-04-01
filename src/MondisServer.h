@@ -107,6 +107,14 @@ public:
 
     int hasExecutedCommandNumInTransaction = 0;
     bool hasAuthenticate = true;
+private:
+    queue<mondis::Message*> recvMsgs;
+    char * halfPacketBuffer = nullptr;
+    unsigned nextMessageLen = 0;
+    mondis::Message* nextMsg = nullptr;
+    unsigned nextMsgHasRecv = 0;
+    unsigned nextDataLenHasRecv = 0;
+    char * nextDataLenBuffer = nullptr;
 #ifdef WIN32
 
     MondisClient(MondisServer *server, SOCKET sock);
@@ -126,6 +134,11 @@ public:
 
     ExecRes commitTransaction(MondisServer *server);
 
+private:
+
+    void readMessage();
+
+public:
     mondis::Message* nextMessage();
 
     void writeMessage(mondis::Message* msg);

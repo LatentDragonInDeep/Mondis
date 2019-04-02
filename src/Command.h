@@ -165,9 +165,9 @@ public:
     static std::unordered_map<std::string, ExecResType> strToType;
     ExecResType type = OK;
     std::string desc;
-    bool needSend = true;
+    bool needReturn = true;
     ExecRes():type(LOGIC_ERROR){};
-    std::string toString() {
+    std::string toString() const {
         std::string res;
         res+=typeToStr[type];
         res+=" ";

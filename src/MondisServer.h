@@ -37,7 +37,7 @@
 #include "SplayTree.h"
 #include "BlockingQueue.h"
 #include "mondis.pb.h"
-#include "TimeHeap.h"
+#include "TimerHeap.h"
 
 using namespace std;
 class Log{
@@ -180,8 +180,14 @@ enum SendToType {
 class Action {
 public:
     mondis::Message * msg = nullptr;
-    SendToType sendTo = SendToType::SPECIFY_CLIENT;
-    MondisClient* client;
+    MondisClient* client = nullptr;
+};
+
+class ActionResult {
+public:
+    mondis::Message * msg = nullptr;
+    SendToType sendToType = SendToType::SPECIFY_CLIENT;
+    MondisClient* client = nullptr;
 };
 
 class MondisServer {
@@ -227,11 +233,11 @@ private:
     unordered_map<unsigned, MondisClient *> idToClients;
     unordered_map<unsigned,MondisClient*> idToPeersAndClients;
     BlockingQueue<Action> readQueue;
-    BlockingQueue<Action> writeQueue;
+    BlockingQueue<ActionResult> writeQueue;
     void writeToClient();
 public:
     void putToReadQueue(Action &action);
-    void putToWriteQueue(Action &action);
+    void putToWriteQueue(ActionResult &actionResult);
     void putCommandMsgToWriteQueue(const string &cmdStr, unsigned int clientId, mondis::CommandType commandType,
                                        SendToType sendToType);
     void putExecResMsgToWriteQueue(const ExecRes &res, unsigned int clientId, SendToType sendToType);
@@ -338,6 +344,7 @@ private:
 
     thread *msgHandler = nullptr;
     thread *msgWriter = nullptr;
+    thread *timer = nullptr;
     bool autoMoveCommandToMaster = true;
 
     void saveAll(const string &jsonFile);
@@ -364,7 +371,7 @@ private:
     bool isVoting = false;
 
     chrono::time_point<chrono::system_clock> preHeartBeat = chrono::system_clock::now();
-    TimeHeap timeHeap;
+    TimerHeap timeHeap;
 
     deque<ExecRes> resQueue;
     ExecRes bindKey(Command *, MondisClient *);

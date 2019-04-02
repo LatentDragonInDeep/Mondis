@@ -498,11 +498,11 @@ ExecRes MondisServer::execute(const string &commandStr, MondisClient *client) {
             msg->set_msg_type(mondis::MsgType::COMMAND);
             msg->set_command_type(mondis::CommandType::SLAVE_FORWARD);
             msg->set_content(commandStr);
-            Action action;
-            action.client = master;
-            action.sendTo = SendToType ::SPECIFY_CLIENT;
-            action.msg = msg;
-            putToWriteQueue(action);
+            ActionResult actionResult;
+            actionResult.client = master;
+            actionResult.sendToType = SendToType ::SPECIFY_CLIENT;
+            actionResult.msg = msg;
+            putToWriteQueue(actionResult);
             return res;
         } else {
             res.desc = "the current server is a slave,can not undoExecute command which will modify database state";
@@ -687,6 +687,7 @@ void MondisServer::init() {
     //写线程
     msgWriter = new std::thread(&MondisServer::writeToClient,this);
     runStatus = RunStatus ::RUNNING;
+    timer = new std::thread(&TimerHeap::start,timeHeap);
     selectAndHandle();
 }
 
@@ -786,11 +787,11 @@ void MondisServer::replicaToSlave(MondisClient *client, long long slaveReplicaOf
         msg->set_msg_type(mondis::MsgType::DATA);
         msg->set_data_type(mondis::DataType::SYNC_DATA);
         msg->set_content(*temp);
-        Action action;
-        action.msg = msg;
-        action.client = client;
-        action.sendTo = SendToType::SPECIFY_CLIENT;
-        putToWriteQueue(action);
+        ActionResult actionResult;
+        actionResult.msg = msg;
+        actionResult.client = client;
+        actionResult.sendToType = SendToType::SPECIFY_CLIENT;
+        putToWriteQueue(actionResult);
         delete temp;
         isPropagating = true;
         vector<string> commands(replicaCommandBuffer->begin() + (replicaOffset - start), replicaCommandBuffer->end());
@@ -1079,7 +1080,9 @@ unordered_set<CommandType> MondisServer::clientControlCommands = {
         CommandType:: DISCARD,
         CommandType:: WATCH,
         CommandType:: UNWATCH,
-        CommandType:: MASTER_INFO
+        CommandType:: MASTER_INFO,
+        CommandType:: NEW_CLIENT,
+        CommandType:: SET_TTL,
 };
 
 unordered_set<CommandType> MondisServer::controlCommands = {
@@ -1111,6 +1114,7 @@ unordered_set<CommandType> MondisServer::controlCommands = {
         CommandType:: I_AM_NEW_MASTER,
         CommandType:: CLIENT_LIST,
         CommandType:: NEW_CLIENT,
+        CommandType:: SET_TTL,
 };
 MondisServer* MondisServer::server = nullptr;
 
@@ -1204,10 +1208,14 @@ void MondisServer::msgHandle() {
         Action action = readQueue.take();
         mondis::Message *msg = action.msg;
         switch (msg->msg_type()) {
-            case mondis::MsgType::COMMAND:
-                putExecResMsgToWriteQueue(execute(msg->content(), action.client),action.client->id,SendToType::SPECIFY_CLIENT);
-            break;
-            case mondis::MsgType::DATA:
+            case mondis::MsgType::COMMAND: {
+                ExecRes res = execute(msg->content(), action.client);
+                if (msg->command_type() == mondis::CommandType::CLIENT_COMMAND && res.needReturn) {
+                    putExecResMsgToWriteQueue(res, action.client->id, SendToType::SPECIFY_CLIENT);
+                }
+                break;
+            }
+            case mondis::MsgType::DATA: {
                 switch (msg->data_type()) {
                     case mondis::DataType::SYNC_DATA: {
                         for (auto db:dbs) {
@@ -1216,30 +1224,32 @@ void MondisServer::msgHandle() {
                         JSONParser temp(msg->content());
                         temp.parseAll(dbs);
                     }
-                    case mondis::DataType::CONTROL_MSG:{
-                        cout<<msg->content();
+                    case mondis::DataType::CONTROL_MSG: {
+                        cout << msg->content();
                     }
-                    case mondis::DataType ::HEART_BEAT: {
-                        if (msg->content() == "PING" && serverStatus == ServerStatus ::SV_STAT_MASTER) {
-                            mondis::Message * reply = new mondis::Message;
+                    case mondis::DataType::HEART_BEAT: {
+                        if (msg->content() == "PING" && serverStatus == ServerStatus::SV_STAT_MASTER) {
+                            mondis::Message *reply = new mondis::Message;
                             reply->set_msg_type(mondis::MsgType::DATA);
                             reply->set_data_type(mondis::DataType::HEART_BEAT);
                             reply->set_content("PONG");
-                            Action a0;
+                            ActionResult a0;
                             a0.client = action.client;
                             a0.msg = reply;
-                            a0.sendTo = SendToType::SPECIFY_CLIENT;
+                            a0.sendToType = SendToType::SPECIFY_CLIENT;
                             putToWriteQueue(a0);
                         }
                     }
                 }
-            break;
-            case mondis::MsgType ::EXEC_RES:
+                break;
+            }
+            case mondis::MsgType::EXEC_RES: {
                 ExecRes res;
-                res.type = (ExecResType)msg->res_type();
+                res.type = (ExecResType) msg->res_type();
                 res.desc = msg->content();
                 resQueue.push_front(res);
-            break;
+                break;
+            }
         }
         delete msg;
     }
@@ -1515,8 +1525,7 @@ ExecRes MondisServer::beSlaveOf(Command *command, MondisClient *client) {
         msg->set_content("PING");
         Action action;
         action.msg = msg;
-        action.sendTo = SendToType::SPECIFY_PEER;
-        putToWriteQueue(action);
+        putToReadQueue(action);
     }),chrono::system_clock::now(),true,chrono::duration<int>(5));
     timeHeap.put(timer);
 }
@@ -1685,7 +1694,7 @@ ExecRes MondisServer::getMasterInfo(Command *command, MondisClient *client) {
 
 ExecRes MondisServer::newClient(Command *command, MondisClient *client) {
     ExecRes res;
-    res.needSend = false;
+    res.needReturn = false;
     clientModifyMtx.lock();
     if (idToClients.size() > maxClientNum) {
         res.type = LOGIC_ERROR;
@@ -1723,7 +1732,7 @@ ExecRes MondisServer::askForVote(Command *command, MondisClient *client) {
         putCommandMsgToWriteQueue("VOTE", client->id, mondis::CommandType::PEER_COMMAND, SendToType::SPECIFY_PEER);
         hasVoteFor = true;
     }
-    res.needSend = false;
+    res.needReturn = false;
     OK_AND_RETURN
 }
 
@@ -1736,13 +1745,13 @@ ExecRes MondisServer::vote(Command *command, MondisClient *client) {
         putCommandMsgToWriteQueue("I_AM_A_NEW_MASTER",0,mondis::CommandType::PEER_COMMAND,SendToType::ALL_PEERS);
     }
     peersModifyMtx.unlock_shared();
-    res.needSend = false;
+    res.needReturn = false;
     OK_AND_RETURN
 }
 
 ExecRes MondisServer::unvote(Command *command, MondisClient *client) {
     ExecRes res;
-    res.needSend = false;
+    res.needReturn = false;
     OK_AND_RETURN
 }
 
@@ -1751,7 +1760,7 @@ ExecRes MondisServer::masterDead(Command *command, MondisClient *client) {
     isVoting = true;
     delete master;
     master = nullptr;
-    res.needSend = false;
+    res.needReturn = false;
 #ifdef WIN32
     FD_CLR(client->sock, &fds);
 #elif defined(linux)
@@ -1844,8 +1853,8 @@ ExecRes MondisServer::mondisExit(Command *command, MondisClient *client) {
 
 void MondisServer::writeToClient() {
     while (true) {
-        Action action = writeQueue.take();
-        mondis::Message * msg = action.msg;
+        ActionResult actionResult = writeQueue.take();
+        mondis::Message * msg = actionResult.msg;
         if (msg->msg_type() == mondis::MsgType::DATA && msg->data_type() == mondis::DataType::HEART_BEAT) {
             if (chrono::system_clock::now() - preHeartBeat > chrono::duration<int>(10)) {
                 mondis::Message* masterDead = new mondis::Message;
@@ -1858,7 +1867,7 @@ void MondisServer::writeToClient() {
                 continue;
             }
         }
-        switch (action.sendTo) {
+        switch (actionResult.sendToType) {
             case SendToType ::ALL_PEERS:
                 for(auto kv:idToPeers) {
                     kv.second->writeMessage(msg);
@@ -1870,18 +1879,18 @@ void MondisServer::writeToClient() {
                 }
                 break;
             case SendToType::SPECIFY_CLIENT:
-                action.client->writeMessage(msg);
+                actionResult.client->writeMessage(msg);
                 break;
             case SendToType ::SPECIFY_PEER:
-                action.client->writeMessage(msg);
+                actionResult.client->writeMessage(msg);
                 break;
         }
         delete msg;
     }
 }
 
-void MondisServer::putToWriteQueue(Action &action) {
-    writeQueue.put(action);
+void MondisServer::putToWriteQueue(ActionResult &actionResult) {
+    writeQueue.put(actionResult);
 }
 
 void MondisServer::putCommandMsgToWriteQueue(const string &cmdStr, unsigned int clientId, mondis::CommandType commandType,
@@ -1890,22 +1899,23 @@ void MondisServer::putCommandMsgToWriteQueue(const string &cmdStr, unsigned int 
     msg->set_msg_type(mondis::MsgType::COMMAND);
     msg->set_command_type(commandType);
     msg->set_content(cmdStr);
-    Action action;
-    action.msg = msg;
-    action.sendTo = sendToType;
-    putToWriteQueue(action);
+    ActionResult actionResult;
+    actionResult.msg = msg;
+    actionResult.sendToType = sendToType;
+    putToWriteQueue(actionResult);
 }
 
 void MondisServer::putExecResMsgToWriteQueue(const ExecRes &res, unsigned int clientId, SendToType sendToType) {
     mondis::Message* msg = new mondis::Message;
     msg->set_msg_type(mondis::MsgType::EXEC_RES);
     msg->set_res_type((mondis::ExecResType)(res.type));
-    msg->set_content(res.desc);
-    Action action;
-    action.msg = msg;
-    action.client = idToPeersAndClients[clientId];
-    action.sendTo = sendToType;
-    putToWriteQueue(action);
+    string resStr = res.toString();
+    msg->set_content(resStr);
+    ActionResult actionResult;
+    actionResult.msg = msg;
+    actionResult.client = idToPeersAndClients[clientId];
+    actionResult.sendToType = sendToType;
+    putToWriteQueue(actionResult);
 }
 
 void MondisServer::replicaCommandPropagate(vector<string> commands, MondisClient *client) {
@@ -1918,7 +1928,7 @@ ExecRes MondisServer::masterInvite(Command *command, MondisClient *client) {
     ExecRes res;
     client->type = ClientType ::PEER;
     idToPeers[client->id] = client;
-    res.needSend = false;
+    res.needReturn = false;
     OK_AND_RETURN
 }
 

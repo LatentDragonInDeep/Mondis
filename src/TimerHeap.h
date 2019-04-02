@@ -2,8 +2,8 @@
 // Created by 11956 on 2019/3/24.
 //
 
-#ifndef MONDIS_TIMEHEAP_H
-#define MONDIS_TIMEHEAP_H
+#ifndef MONDIS_TIMERHEAP_H
+#define MONDIS_TIMERHEAP_H
 
 #include <queue>
 #include "MondisObject.h"
@@ -28,9 +28,10 @@ public:
     Timer(std::function<void()> t, decltype(chrono::system_clock::now()) et,bool l = false,chrono::duration<int> p = chrono::duration<int>(1)):task(t),expireTime(et),isLoop(l),period(p){};
 };
 
-class TimeHeap {
+class TimerHeap {
     priority_queue<Timer> ttlQueue;
     mutex mtx;
+    mutex notEmptyMtx;
     condition_variable notEmptyCV;
 public:
     void put(Timer& ts);
@@ -38,4 +39,4 @@ public:
 };
 
 
-#endif //MONDIS_TIMEHEAP_H
+#endif //MONDIS_TIMERHEAP_H

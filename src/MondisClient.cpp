@@ -181,7 +181,6 @@ void MondisClient::readMessage() {
 #endif
         mondis::Message *nextMsg = new mondis::Message;
         nextMsg->ParseFromArray(halfPacketBuffer, nextMessageLen);
-        cout<<nextMsg->content();
         recvMsgs.push(nextMsg);
         nextMessageLen = 0;
         nextMsgHasRecv = 0;

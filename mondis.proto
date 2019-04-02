@@ -31,21 +31,10 @@ enum CommandType {
     TIMER_COMMAND = 4;
 }
 
-//发送给谁
-enum SendToType {
-    ALL_CLIENTS = 0;
-    ALL_PEERS = 1;
-    SPECIFY_CLIENT = 2;
-    SPECIFY_PEER = 3;
-    NO_ONE = 4;
-}
-
 message Message {
     MsgType msg_type= 1; //消息类型
     string content = 2; //内容
     ExecResType res_type= 3; //执行结果类型
     DataType data_type= 4; //数据类型
     CommandType command_type = 5; //命令来源
-    SendToType send_to_type = 6; //发给谁
-    uint32 client_id = 7;
 }

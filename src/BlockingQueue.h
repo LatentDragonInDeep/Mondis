@@ -14,7 +14,6 @@ template <typename T>
 class BlockingQueue {
 public:
     T take() {
-        lock_guard lck(mtx);
         if (innerQueue.empty()) {
             unique_lock<mutex> lck(notEmptyMtx);
             notEmptyCV.wait(lck);

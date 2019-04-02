@@ -169,6 +169,21 @@ enum RunStatus {
 
 typedef ExecRes (MondisServer::*CommandHandler)(Command*,MondisClient*);
 
+enum SendToType {
+    ALL_CLIENTS,
+    ALL_PEERS,
+    SPECIFY_CLIENT,
+    SPECIFY_PEER,
+    NO_ONE,
+};
+
+class Action {
+public:
+    mondis::Message * msg = nullptr;
+    SendToType sendTo = SendToType::SPECIFY_CLIENT;
+    MondisClient* client;
+};
+
 class MondisServer {
 private:
     static MondisServer* server;
@@ -211,15 +226,15 @@ private:
     unordered_map<unsigned, MondisClient *> idToPeers;
     unordered_map<unsigned, MondisClient *> idToClients;
     unordered_map<unsigned,MondisClient*> idToPeersAndClients;
-    BlockingQueue<mondis::Message*> readQueue;
-    BlockingQueue<mondis::Message*> writeQueue;
+    BlockingQueue<Action> readQueue;
+    BlockingQueue<Action> writeQueue;
     void writeToClient();
 public:
-    void putToReadQueue(mondis::Message *msg);
-    void putToWriteQueue(mondis::Message* msg);
+    void putToReadQueue(Action &action);
+    void putToWriteQueue(Action &action);
     void putCommandMsgToWriteQueue(const string &cmdStr, unsigned int clientId, mondis::CommandType commandType,
-                                       mondis::SendToType sendToType);
-    void putExecResMsgToWriteQueue(const ExecRes &res, unsigned int clientId, mondis::SendToType sendToType);
+                                       SendToType sendToType);
+    void putExecResMsgToWriteQueue(const ExecRes &res, unsigned int clientId, SendToType sendToType);
 private:
     unsigned long long replicaOffset = 0;
     unsigned long long maxOtherReplicaOffset = 0;

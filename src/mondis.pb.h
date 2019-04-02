@@ -152,30 +152,6 @@ inline bool CommandType_Parse(
   return ::google::protobuf::internal::ParseNamedEnum<CommandType>(
     CommandType_descriptor(), name, value);
 }
-enum SendToType {
-  ALL_CLIENTS = 0,
-  ALL_PEERS = 1,
-  SPECIFY_CLIENT = 2,
-  SPECIFY_PEER = 3,
-  NO_ONE = 4,
-  SendToType_INT_MIN_SENTINEL_DO_NOT_USE_ = std::numeric_limits<::google::protobuf::int32>::min(),
-  SendToType_INT_MAX_SENTINEL_DO_NOT_USE_ = std::numeric_limits<::google::protobuf::int32>::max()
-};
-bool SendToType_IsValid(int value);
-const SendToType SendToType_MIN = ALL_CLIENTS;
-const SendToType SendToType_MAX = NO_ONE;
-const int SendToType_ARRAYSIZE = SendToType_MAX + 1;
-
-const ::google::protobuf::EnumDescriptor* SendToType_descriptor();
-inline const ::std::string& SendToType_Name(SendToType value) {
-  return ::google::protobuf::internal::NameOfEnum(
-    SendToType_descriptor(), value);
-}
-inline bool SendToType_Parse(
-    const ::std::string& name, SendToType* value) {
-  return ::google::protobuf::internal::ParseNamedEnum<SendToType>(
-    SendToType_descriptor(), name, value);
-}
 // ===================================================================
 
 class Message final :
@@ -311,18 +287,6 @@ class Message final :
   ::mondis::CommandType command_type() const;
   void set_command_type(::mondis::CommandType value);
 
-  // .mondis.SendToType send_to_type = 6;
-  void clear_send_to_type();
-  static const int kSendToTypeFieldNumber = 6;
-  ::mondis::SendToType send_to_type() const;
-  void set_send_to_type(::mondis::SendToType value);
-
-  // uint32 client_id = 7;
-  void clear_client_id();
-  static const int kClientIdFieldNumber = 7;
-  ::google::protobuf::uint32 client_id() const;
-  void set_client_id(::google::protobuf::uint32 value);
-
   // @@protoc_insertion_point(class_scope:mondis.Message)
  private:
   class HasBitSetters;
@@ -333,8 +297,6 @@ class Message final :
   int res_type_;
   int data_type_;
   int command_type_;
-  int send_to_type_;
-  ::google::protobuf::uint32 client_id_;
   mutable ::google::protobuf::internal::CachedSize _cached_size_;
   friend struct ::TableStruct_mondis_2eproto;
 };
@@ -458,34 +420,6 @@ inline void Message::set_command_type(::mondis::CommandType value) {
   // @@protoc_insertion_point(field_set:mondis.Message.command_type)
 }
 
-// .mondis.SendToType send_to_type = 6;
-inline void Message::clear_send_to_type() {
-  send_to_type_ = 0;
-}
-inline ::mondis::SendToType Message::send_to_type() const {
-  // @@protoc_insertion_point(field_get:mondis.Message.send_to_type)
-  return static_cast< ::mondis::SendToType >(send_to_type_);
-}
-inline void Message::set_send_to_type(::mondis::SendToType value) {
-  
-  send_to_type_ = value;
-  // @@protoc_insertion_point(field_set:mondis.Message.send_to_type)
-}
-
-// uint32 client_id = 7;
-inline void Message::clear_client_id() {
-  client_id_ = 0u;
-}
-inline ::google::protobuf::uint32 Message::client_id() const {
-  // @@protoc_insertion_point(field_get:mondis.Message.client_id)
-  return client_id_;
-}
-inline void Message::set_client_id(::google::protobuf::uint32 value) {
-  
-  client_id_ = value;
-  // @@protoc_insertion_point(field_set:mondis.Message.client_id)
-}
-
 #ifdef __GNUC__
   #pragma GCC diagnostic pop
 #endif  // __GNUC__
@@ -516,11 +450,6 @@ template <> struct is_proto_enum< ::mondis::CommandType> : ::std::true_type {};
 template <>
 inline const EnumDescriptor* GetEnumDescriptor< ::mondis::CommandType>() {
   return ::mondis::CommandType_descriptor();
-}
-template <> struct is_proto_enum< ::mondis::SendToType> : ::std::true_type {};
-template <>
-inline const EnumDescriptor* GetEnumDescriptor< ::mondis::SendToType>() {
-  return ::mondis::SendToType_descriptor();
 }
 
 }  // namespace protobuf

@@ -104,13 +104,19 @@ void MondisClient::writeMessage(mondis::Message *msg) {
     string * data = new string;
     msg->SerializeToString(data);
     unsigned len = data->length();
-    char * dataLenPtr = (char*)(&len);
-    string lenStr(dataLenPtr, sizeof(unsigned));
+    char * dataLenPtr = (char*)&len;
+    char dataLenBuf[4];
+    for (int i = 0; i < 4; ++i) {
+        dataLenBuf[i] = dataLenPtr[3-i];
+    }
+    string lenStr(dataLenBuf, sizeof(unsigned));
     data->insert(0,lenStr);
     unsigned hasWrite = 0;
     unsigned writed = 0;
+    unsigned totalLen = data->length();
 #ifdef WIN32
-    while ((writed = send(sock,data->data()+hasWrite,data->length(),0)!=0)) {
+    while (hasWrite < totalLen){
+        writed = send(sock,data->data()+hasWrite,totalLen,0);
         hasWrite+=writed;
     }
 #elif defined(linux)
@@ -123,107 +129,67 @@ void MondisClient::writeMessage(mondis::Message *msg) {
 
 void MondisClient::readMessage() {
     while (true) {
-#ifdef WIN32
-        if (nextDataLenBuffer!= nullptr) {
-            unsigned recved = 0;
-            while ( nextDataLenHasRecv< 4) {
-                recved = recv(sock, nextDataLenBuffer+nextDataLenHasRecv, 4 - nextDataLenHasRecv, 0);
-                if (recved == 0) {
-                    return;
-                }
-                nextMsgHasRecv += recved;
-            }
-            nextMessageLen = *((unsigned*)nextDataLenBuffer);
-            while ( nextMsgHasRecv< nextMessageLen) {
-                recved = recv(sock, halfPacketBuffer+nextMsgHasRecv, nextMessageLen - nextMsgHasRecv, 0);
-                if (recved == 0) {
-                    return;
-                }
-                nextMsgHasRecv += recved;
-            }
-            nextMsg->ParseFromArray(halfPacketBuffer,nextMessageLen);
-            recvMsgs.push(nextMsg);
-            nextMessageLen = 0;
-            nextMsgHasRecv = 0;
+        int recved = 0;
+        if (nextDataLenBuffer == nullptr) {
+            nextDataLenBuffer = new char[4];
             nextDataLenHasRecv = 0;
-            delete halfPacketBuffer;
-            delete nextDataLenBuffer;
-            halfPacketBuffer = nullptr;
-            nextDataLenBuffer = nullptr;
-            nextMsg = nullptr;
-            continue;
         }
-        unsigned dataLen;
-        char *dataLenPtr = (char *) &dataLen;
-        unsigned hasRecv = 0;
-        unsigned recved = 0;
-        mondis::Message *msg = new mondis::Message;
-        while (hasRecv < 4) {
-            recved = recv(sock, dataLenPtr, sizeof(unsigned) - hasRecv, 0);
-            if (recved == 0) {
-                delete msg;
+#ifdef WIN32
+        if (nextDataLenBuffer != nullptr) {
+            while (nextDataLenHasRecv < 4) {
+                recved = recv(sock, nextDataLenBuffer + nextDataLenHasRecv, 4 - nextDataLenHasRecv, 0);
+                if (recved == SOCKET_ERROR) {
+                    return;
+                }
+                nextDataLenHasRecv += recved;
+            }
+            for (int i = 0; i <4; ++i) {
+                nextMessageLen |= (((unsigned)nextDataLenBuffer[i])<<(24-i*8));
+            }
+            nextMsgHasRecv = 0;
+        }
+        if (halfPacketBuffer == nullptr) {
+            halfPacketBuffer = new char[nextMessageLen];
+            nextMsgHasRecv = 0;
+        }
+        while (nextMsgHasRecv < nextMessageLen) {
+            recved = recv(sock, halfPacketBuffer + nextMsgHasRecv, nextMessageLen - nextMsgHasRecv, 0);
+            if (recved == SOCKET_ERROR) {
                 return;
             }
-            hasRecv += recved;
-        }
-        char *readBuffer = new char[dataLen];
-        hasRecv = 0;
-        while (hasRecv < dataLen) {
-            recved = recv(sock, dataLenPtr, dataLen - hasRecv, 0);
-            if (recved == 0) {
-                halfPacketBuffer = readBuffer;
-                nextMessageLen = dataLen;
-                nextMsg = msg;
-                nextMsgHasRecv = hasRecv;
-                return;
-            }
-            hasRecv += recved;
+            nextMsgHasRecv += recved;
         }
 #elif defined(linux)
-        if (halfPacketBuffer!= nullptr) {
-            unsigned hasRecv = 0;
-            unsigned recved = 0;
-            while ( hasRecv< nextMessageLen) {
-                recved = recv(fd, halfPacketBuffer+hasRecv, nextMessageLen - hasRecv, 0);
-                hasRecv += recved;
+        if (nextDataLenBuffer != nullptr) {
+            while (nextDataLenHasRecv < 4) {
+                recved = recv(fd, nextDataLenBuffer + nextDataLenHasRecv, 4 - nextDataLenHasRecv, 0);
+                if (recved == 0) {
+                    return;
+                }
+                nextDataLenHasRecv += recved;
             }
-            nextMsg->ParseFromArray(halfPacketBuffer,nextMessageLen);
-            recvMsgs.push(nextMsg);
-            nextMessageLen = 0;
-            delete halfPacketBuffer;
-            halfPacketBuffer = nullptr;
-            nextMsg = nullptr;
-            continue;
+            nextMessageLen = *((unsigned *) nextDataLenBuffer);
+            nextMsgHasRecv = 0;
         }
-        unsigned dataLen;
-        char *dataLenPtr = (char *) &dataLen;
-        unsigned hasRecv = 0;
-        unsigned recved = 0;
-        mondis::Message *msg = new mondis::Message;
-        while (hasRecv < 4) {
-            recved = recv(fd, dataLenPtr, sizeof(unsigned) - hasRecv, 0);
-            if (recved == 0&&hasRecv == 0) {
-                delete msg;
-                return;
-            }
-            hasRecv += recved;
-        }
-        char *readBuffer = new char[dataLen];
-        hasRecv = 0;
-        while (hasRecv < dataLen) {
-            recved = recv(fd, dataLenPtr, dataLen - hasRecv, 0);
+        while (nextMsgHasRecv < nextMessageLen) {
+            recved = recv(fd, halfPacketBuffer + nextMsgHasRecv, nextMessageLen - nextMsgHasRecv, 0);
             if (recved == 0) {
-                halfPacketBuffer = readBuffer;
-                nextMessageLen = dataLen;
-                nextMsg = msg;
                 return;
             }
-            hasRecv += recved;
+            nextMsgHasRecv += recved;
         }
 #endif
-        msg->ParseFromArray(readBuffer, dataLen);
-        delete[] readBuffer;
-        recvMsgs.push(msg);
+        mondis::Message *nextMsg = new mondis::Message;
+        nextMsg->ParseFromArray(halfPacketBuffer, nextMessageLen);
+        cout<<nextMsg->content();
+        recvMsgs.push(nextMsg);
+        nextMessageLen = 0;
+        nextMsgHasRecv = 0;
+        nextDataLenHasRecv = 0;
+        delete [] halfPacketBuffer;
+        delete [] nextDataLenBuffer;
+        halfPacketBuffer = nullptr;
+        nextDataLenBuffer = nullptr;
     }
 }
 

@@ -15,7 +15,18 @@ void TimerHeap::start() {
             ttlQueue.pop();
             mtx.unlock();
             auto now = chrono::system_clock::now();
-            if (timer.expireTime<now) {
+            if (now< timer.expireTime) {
+                this_thread::sleep_for(timer.expireTime - now);
+            }
+            now = chrono::system_clock::now();
+            chrono::duration<int,ratio<1,1000000000>> diff;
+            if (now > timer.expireTime) {
+                diff = now - timer.expireTime;
+            } else {
+                diff = timer.expireTime - now;
+            }
+
+            if (diff > chrono::duration<int,ratio<1,1000000000>>(5000000)) {
                 continue;
             }
             auto sleepTime = timer.expireTime-now;

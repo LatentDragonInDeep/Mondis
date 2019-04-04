@@ -78,6 +78,7 @@ enum ClientType {
     CLIENT,
     SERVER_SELF,
     SLAVE,
+    TIMER,
 };
 
 class MondisClient {
@@ -320,7 +321,7 @@ private:
 
     void msgHandle();
 
-    void startEventLoop();
+    void serverEventLoop();
     void applyConf();
 
     void parseConfFile(string& confFile);

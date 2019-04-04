@@ -454,7 +454,7 @@ int MondisServer::start(string &confFile) {
     init();
 }
 
-void MondisServer::startEventLoop() {
+void MondisServer::serverEventLoop() {
     cout << "start event loop,now you can input command" << endl;
     while (true) {
         cout << username + "@Mondis>";
@@ -681,13 +681,13 @@ void MondisServer::init() {
     //接收连接
     std::thread accept(&MondisServer::acceptSocket, this);
     //控制台事件循环
-    std::thread eventLoop(&MondisServer::startEventLoop, this);
+    std::thread eventLoop(&MondisServer::serverEventLoop, this);
     //读线程
     msgHandler = new std::thread(&MondisServer::msgHandle, this);
     //写线程
     msgWriter = new std::thread(&MondisServer::writeToClient,this);
     runStatus = RunStatus ::RUNNING;
-    timer = new std::thread(&TimerHeap::start,timeHeap);
+    timer = new std::thread(&TimerHeap::start,&timeHeap);
     selectAndHandle();
 }
 
@@ -1939,17 +1939,20 @@ ExecRes MondisServer::setTTl(Command* command,MondisClient* client) {
     CHECK_PARAM_TYPE(1,PLAIN)
     if (!dbs[client->dBIndex]->containsKey(PARAM(0))) {
         res.desc = "target key doesn't exists!";
-        INVALID_AND_RETURN
+        LOGIC_ERROR_AND_RETURN
     }
-    Timer timer(std::bind([=]() {
+    Timer timer(std::bind([=](string key) {
         mondis::Message* msg = new mondis::Message;
         msg->set_msg_type(mondis::MsgType::COMMAND);
         msg->set_command_type(mondis::CommandType::TIMER_COMMAND);
-        msg->set_content(string("DEL ")+PARAM(0));
+        string del("DEL ");
+        del+=key;
+        msg->set_content(del);
         Action action;
+        action.client = self;
         action.msg = msg;
         putToReadQueue(action);
-    }),chrono::system_clock::now()+chrono::duration<int,std::ratio<1,1>>(atoi(PARAM(1).c_str())));
+    },PARAM(0)),chrono::system_clock::now()+chrono::duration<int,std::ratio<1,1>>(atoi(PARAM(1).c_str())));
     timeHeap.put(timer);
     OK_AND_RETURN
 }

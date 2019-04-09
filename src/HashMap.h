@@ -6,6 +6,8 @@
 #define MONDIS_HASHMAP_H
 
 #include <stack>
+#include <mutex>
+#include <shared_mutex>
 
 #include "MondisObject.h"
 #include "Command.h"
@@ -68,11 +70,13 @@ public:
     Entry* next = nullptr;
 
     Entry(string &key, MondisObject *data) : key(key), object(data) {};
-    Entry(KeyValue* kv):key(kv->key),object(kv->value){
-        kv->key= "";
-        kv->value = nullptr;
-    };
     Entry(){};
+    Entry(Entry&other) {
+        key = other.key;
+        object = other.object;
+        other.key = "";
+        other.object = nullptr;
+    }
     ~Entry (){
         delete object;
     }
@@ -146,7 +150,6 @@ public:
         }
     };
 public:
-    void insert(Entry *entry);
 
     void insert(KeyValue *kv);
 
@@ -245,8 +248,10 @@ private:
             }
         }
     };
-    Content * arrayFrom;
-    Content * arrayTo;
+    Content * arrayFrom = nullptr;
+    Content * arrayTo = nullptr;
+    mutex* mutexes = nullptr;
+    shared_mutex globalMutex;
     class MapIterator{
     private:
         Entry* cur = nullptr;
@@ -254,7 +259,7 @@ private:
         unsigned slotIndex = 0;
         AVLTree::AVLIterator avlIterator;
         bool isTree = false;
-        HashMap *map;
+        HashMap *map = nullptr;
         Content *pc = nullptr;
         bool isInit = true;
         bool lookForNext() {
@@ -285,6 +290,9 @@ private:
             isInit = lookForNext();
         };
         bool next() {
+            if (map->hasModified()) {
+                return false;
+            }
             if (isInit) {
                 isInit = false;
                 return true;
@@ -303,7 +311,7 @@ private:
         Entry* operator->() {
             if(isTree) {
                 KeyValue *kv = avlIterator->data;
-                Entry temp(kv);
+                Entry temp(kv->key,kv->value);
                 return &temp;
             }
             return cur;
@@ -327,7 +335,7 @@ private:
     void toTree (int index);
     int getCapacity(int);
     unsigned getIndex(unsigned hash);
-    void add(int index,Entry* entry);
+    void addToSlot(int index, Entry *entry);
     void toJson();
     HashMap::MapIterator iterator();
 

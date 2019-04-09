@@ -537,7 +537,6 @@ ExecRes MondisServer::execute(const string &commandStr, MondisClient *client) {
             replicaCommandBuffer->push_back(commandStr);
         }
         replicaOffset++;
-        while (!putToPropagateBuffer(commandStr));
     }
 
     return res;
@@ -632,7 +631,7 @@ void MondisServer::init() {
     runStatus = LOADING;
     interpreter = new CommandInterpreter;
     for (int i = 0; i < databaseNum; ++i) {
-        dbs.push_back(new HashMap(16, 0.75f));
+        dbs.push_back(new HashMap(128, 0.75f));
     }
 #ifdef WIN32
     self = new MondisClient(this, (SOCKET) 0);
@@ -765,7 +764,6 @@ MondisServer::MondisServer() {
     listenEvent.events = EPOLLET|EPOLLIN;
 #endif
     replicaCommandBuffer = new deque<string>;
-    commandPropagateBuffer = new queue<string>;
 }
 
 MondisServer::~MondisServer() {
@@ -773,7 +771,6 @@ MondisServer::~MondisServer() {
     delete[] epollEvents;
 #endif
     delete replicaCommandBuffer;
-    delete commandPropagateBuffer;
     delete msgHandler;
     delete msgWriter;
 }
@@ -809,15 +806,6 @@ void MondisServer::replicaToSlave(MondisClient *client, long long slaveReplicaOf
 
     putCommandMsgToWriteQueue(newPeer,0,mondis::CommandType::MASTER_COMMAND,SendToType::ALL_PEERS);
     isPropagating = false;
-}
-
-bool MondisServer::putToPropagateBuffer(const string &curCommand) {
-    if(commandPropagateBuffer->size() == maxCommandPropagateBufferSize) {
-        return false;
-    }
-    commandPropagateBuffer->push(curCommand);
-    notEmpty.notify_all();
-    return true;
 }
 
 void MondisServer::closeClient(MondisClient *client) {
@@ -1210,6 +1198,9 @@ void MondisServer::msgHandle() {
         switch (msg->msg_type()) {
             case mondis::MsgType::COMMAND: {
                 ExecRes res = execute(msg->content(), action.client);
+                if (serverStatus == ServerStatus::SV_STAT_MASTER) {
+                    putCommandMsgToWriteQueue(msg->content(),action.client->id,msg->command_type(),SendToType::ALL_PEERS);
+                }
                 if (msg->command_type() == mondis::CommandType::CLIENT_COMMAND && res.needReturn) {
                     putExecResMsgToWriteQueue(res, action.client->id, SendToType::SPECIFY_CLIENT);
                 }

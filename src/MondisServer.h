@@ -84,11 +84,11 @@ enum ClientType {
 class MondisClient {
 public:
     friend class MondisServer;
-    unsigned id;            /* Client incremental unique ID. */
+    unsigned id;
 #ifdef WIN32
     SOCKET sock;
 #elif defined(linux)
-    int fd;/* Client socket. */
+    int fd;
 #endif
     ClientType type = CLIENT;
     int dBIndex = 0;
@@ -115,7 +115,7 @@ private:
     mondis::Message* nextMsg = nullptr;
     unsigned nextMsgHasRecv = 0;
     unsigned nextDataLenHasRecv = 0;
-    char * nextDataLenBuffer = nullptr;
+    char * nextDataLenBuffer = new char[4];
 #ifdef WIN32
 
     MondisClient(MondisServer *server, SOCKET sock);
@@ -248,17 +248,11 @@ private:
     static unordered_set<CommandType> modifyCommands;
     static unordered_set<CommandType> transactionAboutCommands;
     static unordered_map<CommandType,CommandHandler> commandHandlers;
-
     bool isPropagating = false;
-    condition_variable redirectCV;
-
     shared_mutex allModifyMtx;
     shared_mutex clientModifyMtx;
     shared_mutex peersModifyMtx;
     shared_mutex watchedKeyMtx;
-
-    queue<string> *commandPropagateBuffer;
-    
     string masterUsername;
     string masterPassword;
     string masterIP;
@@ -294,8 +288,6 @@ public:
     static JSONParser *getJSONParser();
 
     bool handleWatchedKey(const string &key);
-
-    bool putToPropagateBuffer(const string &curCommand);
 
     void incrReplicaOffset();
 
@@ -334,9 +326,6 @@ private:
 
     void replicaCommandPropagate(vector<string> commands,MondisClient* client);
 
-    condition_variable notEmpty;
-    mutex notEmptyMtx;
-
     unordered_map<string, unordered_set<MondisClient *>> keyToWatchedClients;
 
     MondisClient *self = nullptr;
@@ -359,11 +348,7 @@ private:
 
     void getJson(string *res);
 
-    static unsigned curClientId;
-
     unsigned nextClientId();
-
-    static string nextDefaultClientName();
 
     unsigned voteNum = 0;
 
@@ -408,10 +393,6 @@ private:
     ExecRes clientList(Command*,MondisClient*);
     ExecRes newPeer(Command*,MondisClient*);
     ExecRes mondisExit(Command *, MondisClient *);
-
-    ExecRes startTransaction(MondisClient*);
-    ExecRes commitTransaction(MondisClient*);
-    ExecRes closeTransaction(MondisClient*);
 };
 
 

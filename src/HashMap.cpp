@@ -4,98 +4,108 @@
 
 #include "HashMap.h"
 
-HashMap::HashMap():HashMap(16,0.75f) {}
+HashMap::HashMap():HashMap(128,0.75f) {}
 
 bool HashMap::put(string& key, MondisObject *value)
 {
+    if (((double) _size) / capacity > loadFactor) {
+        rehash();
+    }
+    globalMutex.lock_shared();
     int index = getIndex(hash(key));
+    lock_guard lck(mutexes[index]);
     Content &content = arrayFrom[index];
     if(content.isList) {
-        Entry *cur = content.head->next;
-        for (; cur != content.tail; cur = cur->next) {
+        for (Entry *cur = content.head->next; cur != content.tail; cur = cur->next) {
             if (key == cur->key) {
                 delete cur->object;
                 cur->object = value;
                 hasModified();
+                globalMutex.unlock_shared();
                 return true;
             }
         }
         Entry *newEntry = new Entry(key, value);
-        cur = content.head;
-        Entry *next = cur->next;
-        cur->next = newEntry;
-        newEntry->pre = cur;
+        Entry *next = content.head->next;
+        content.head->next = newEntry;
+        newEntry->pre = content.head;
         newEntry->next = next;
         next->pre = newEntry;
         content.listLen++;
         _size++;
         hasModified();
-        if (((double) _size) / capacity > loadFactor) {
-            rehash();
-        } else if (content.listLen > treeThreshold) {
+        if (content.listLen > treeThreshold) {
             toTree(index);
         }
+        globalMutex.unlock_shared();
         return true;
     }
     _size -= content.tree->size();
-    Entry* newEntry = new Entry;
-    newEntry->object = value;
-    newEntry->key = key;
-    content.tree->insert(newEntry);
+    content.tree->insert(key,value);
     if (content.tree->hasModified()) {
         hasModified();
     }
     _size += content.tree->size();
-    if (((double) _size) / capacity > loadFactor) {
-        rehash();
-        return true;
-    }
+    return true;
 }
 
-MondisObject *HashMap::get (string &key)
+MondisObject *HashMap::get(string &key)
 {
+    globalMutex.lock_shared();
     int index = getIndex(hash(key));
+    lock_guard lck(mutexes[index]);
     Content &content = arrayFrom[index];
     if(content.isList) {
         Entry *cur = content.head->next;
         for (; cur != content.tail; cur = cur->next) {
             if(key == cur->key)
             {
+                globalMutex.unlock_shared();
                 return cur->object;
             }
         }
+        globalMutex.unlock_shared();
         return nullptr;
     }
 
     KeyValue *kv = content.tree->get(key);
     if (kv == nullptr) {
+        globalMutex.unlock_shared();
         return nullptr;
     }
+    globalMutex.unlock_shared();
     return kv->value;
 }
 
 bool HashMap::containsKey (string &key)
 {
+    globalMutex.lock_shared();
     if (isValueNull) {
         int index = getIndex(hash(key));
+        lock_guard lck(mutexes[index]);
         Content &content = arrayFrom[index];
         if(content.isList) {
             Entry *cur = content.head->next;
             for (; cur != content.tail; cur = cur->next) {
                 if(key == cur->key)
                 {
+                    globalMutex.unlock_shared();
                     return true;
                 }
             }
+            globalMutex.unlock_shared();
             return false;
         }
 
         KeyValue *kv = content.tree->get(key);
         if (kv == nullptr) {
+            globalMutex.unlock_shared();
             return false;
         }
+        globalMutex.unlock_shared();
         return true;
     }
+    globalMutex.unlock_shared();
     return get(key) != nullptr;
 }
 
@@ -113,7 +123,9 @@ int HashMap::getCapacity (int capa)
 
 bool HashMap::remove (string &key)
 {
+    globalMutex.lock_shared();
     int index = getIndex(hash(key));
+    lock_guard lck(mutexes[index]);
     Content &content = arrayFrom[index];
     if(content.isList) {
         Entry *cur = content.head->next;
@@ -124,6 +136,7 @@ bool HashMap::remove (string &key)
                 cur->next->pre = pre;
                 delete cur;
                 _size--;
+                globalMutex.unlock_shared();
                 return true;
             }
         }
@@ -131,8 +144,10 @@ bool HashMap::remove (string &key)
     if(content.tree->get(key)) {
         _size--;
         content.tree->remove(key);
+        globalMutex.unlock_shared();
         return true;
     }
+    globalMutex.unlock_shared();
     return false;
 }
 
@@ -140,44 +155,45 @@ void HashMap::toTree (int index)
 {
     AVLTree * tree = new AVLTree;
     Content &content = arrayFrom[index];
-    Entry *cur = content.head;
-    for (; cur != content.tail; cur = cur->next)
+    for (Entry *cur = content.head; cur != content.tail; cur = cur->next)
     {
-        tree->insert(cur);
+        tree->insert(cur->toKeyValue());
     }
     content.isList = false;
     content.tree = tree;
     content.reset();
 }
 
-void HashMap::rehash ()
+void HashMap::rehash()
 {
+    globalMutex.lock();
     capacity<<=1;
-    if (arrayTo!= nullptr) {
-        delete [] arrayTo;
-        arrayTo = nullptr;
-    }
     arrayTo = new Content[capacity];
     for (int i = 0; i < capacity>>1;++i)
     {
         if(arrayFrom[i].isList) {
-            for (Entry *cur = arrayFrom[i].head->next; cur != arrayFrom[i].tail;)
+            for (Entry *cur = arrayFrom[i].head->next; cur != arrayFrom[i].tail;cur = cur->next)
             {
                 int index = hash(cur->key)&(capacity-1);
-                add(index,cur);
+                Entry* newEntry = new Entry(*cur);
+                addToSlot(index, newEntry);
             }
         }
         else{
             auto treeIterator = arrayFrom[i].tree->iterator();
             while (treeIterator.next()) {
                 int index = hash(treeIterator->data->key)&(capacity-1);
-                add(index,new Entry(treeIterator->data));
+                addToSlot(index, new Entry(treeIterator->data->key,treeIterator->data->value));
                 delete arrayFrom[i].tree;
             }
         }
     }
-    delete[] arrayFrom;
+    delete [] arrayFrom;
+    delete [] mutexes;
     arrayFrom = arrayTo;
+    arrayTo = nullptr;
+    mutexes = new mutex[capacity];
+    globalMutex.unlock();
 }
 
 HashMap::~HashMap ()
@@ -185,23 +201,18 @@ HashMap::~HashMap ()
     delete[] arrayFrom;
 }
 
-void HashMap::add (int index, Entry *entry)
+void HashMap::addToSlot(int index, Entry *entry)
 {
-    Entry* cur = entry;
-    if (arrayTo[index].head == nullptr) {
-        arrayTo[index].head = cur;
-        arrayTo[index].tail = cur;
-    }
-    else{
         Entry *pre = arrayTo[index].tail->pre;
-        pre->next = cur;
-        cur->pre = pre;
-        arrayTo[index].tail = cur;
+        pre->next = entry;
+        entry->pre = pre;
+        arrayTo[index].tail->pre = entry;
+        entry->next = arrayTo[index].tail;
         arrayTo[index].listLen++;
-    }
 }
 
 void HashMap::toJson() {
+    globalMutex.lock();
     if (isValueNull) {
         json = "";
         json += "[\n";
@@ -221,6 +232,7 @@ void HashMap::toJson() {
         }
         json += '}';
     }
+    globalMutex.unlock();
 }
 
 HashMap::MapIterator HashMap::iterator() {
@@ -312,14 +324,17 @@ unsigned HashMap::size() {
 }
 
 void HashMap::clear() {
+    globalMutex.lock();
     for (int i = 0; i < capacity; ++i) {
         arrayFrom[i].clear();
     }
+    globalMutex.unlock();
 }
 
 HashMap::HashMap(unsigned int capa, float loadFactor,bool isVN):isValueNull(isVN) {
     capacity = getCapacity(capa);
     this->loadFactor = loadFactor;
     arrayFrom = new Content[capacity];
+    mutexes = new mutex[capacity];
 }
 

@@ -71,14 +71,9 @@ ExecRes MondisClient::commitTransaction(MondisServer *server) {
         if (cstruct.isModify) {
             aofBuffer.push_back(next);
         }
-        mondis::Message *msg = new mondis::Message;
-        msg->set_msg_type(mondis::MsgType::EXEC_RES);
-        msg->set_res_type(mondis::ExecResType(res.type));
-        msg->set_content(res.toString());
-        writeMessage(msg);
-        delete msg;
+        server->putExecResMsgToWriteQueue(res,id,SendToType::SPECIFY_CLIENT);
         server->incrReplicaOffset();
-        server->putToPropagateBuffer(next);
+        server->putCommandMsgToWriteQueue(next,0,mondis::CommandType::MASTER_COMMAND,SendToType::ALL_PEERS);
         undoCommands->push_back(undo);
         hasExecutedCommandNumInTransaction++;
     }
@@ -130,23 +125,16 @@ void MondisClient::writeMessage(mondis::Message *msg) {
 void MondisClient::readMessage() {
     while (true) {
         int recved = 0;
-        if (nextDataLenBuffer == nullptr) {
-            nextDataLenBuffer = new char[4];
-            nextDataLenHasRecv = 0;
-        }
 #ifdef WIN32
-        if (nextDataLenBuffer != nullptr) {
-            while (nextDataLenHasRecv < 4) {
-                recved = recv(sock, nextDataLenBuffer + nextDataLenHasRecv, 4 - nextDataLenHasRecv, 0);
-                if (recved == SOCKET_ERROR) {
-                    return;
-                }
-                nextDataLenHasRecv += recved;
+        while (nextDataLenHasRecv < 4) {
+            recved = recv(sock, nextDataLenBuffer + nextDataLenHasRecv, 4 - nextDataLenHasRecv, 0);
+            if (recved == SOCKET_ERROR) {
+                return;
             }
-            for (int i = 0; i <4; ++i) {
-                nextMessageLen |= (((unsigned)nextDataLenBuffer[i])<<(24-i*8));
-            }
-            nextMsgHasRecv = 0;
+            nextDataLenHasRecv += recved;
+        }
+        for (int i = 0; i <4; ++i) {
+            nextMessageLen |= (((unsigned)nextDataLenBuffer[i])<<(24-i*8));
         }
         if (halfPacketBuffer == nullptr) {
             halfPacketBuffer = new char[nextMessageLen];
@@ -181,14 +169,14 @@ void MondisClient::readMessage() {
 #endif
         mondis::Message *nextMsg = new mondis::Message;
         nextMsg->ParseFromArray(halfPacketBuffer, nextMessageLen);
-        recvMsgs.push(nextMsg);
+        if (nextMsg->IsInitialized()) {
+            recvMsgs.push(nextMsg);
+        }
         nextMessageLen = 0;
         nextMsgHasRecv = 0;
         nextDataLenHasRecv = 0;
         delete [] halfPacketBuffer;
-        delete [] nextDataLenBuffer;
         halfPacketBuffer = nullptr;
-        nextDataLenBuffer = nullptr;
     }
 }
 
@@ -197,7 +185,7 @@ mondis::Message *MondisClient::nextMessage() {
     if (recvMsgs.empty()) {
         return nullptr;
     }
-    mondis::Message * next = recvMsgs.back();
+    mondis::Message * next = recvMsgs.front();
     recvMsgs.pop();
     return next;
 }

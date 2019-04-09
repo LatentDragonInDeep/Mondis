@@ -7,10 +7,6 @@
 
 using namespace std;
 
-void AVLTree::insert(Entry *entry) {
-    realInsert(entry->toKeyValue());
-}
-
 void AVLTree::realInsert(KeyValue *kv) {
     bool leftOrRight = true;
     AVLTreeNode *cur = root;

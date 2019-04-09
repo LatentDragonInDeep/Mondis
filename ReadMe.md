@@ -1,5 +1,5 @@
 # Mondis
-Mondis is a key-value database powered by redis and add some new feature。
+Mondis is a key-value database powered by redis and addToSlot some new feature。
 # 什么是Mondis
 Mondis是一个key-value数据库，它很像redis，但是支持许多redis不支持的新特性。实际上，它的名字mondis就是取自mongodb与redis。
 下面，让我们了解以及学习如何来使用它。
@@ -237,7 +237,7 @@ read系列命令在剩余长度小于想要读取的长度时，会读到末尾�
 获取并返回list下标从from到to之间的所有元素。包括from处的元素，不包括to。返回的格式是json数组。
 
 ## set命令
-### add [data]
+### addToSlot [data]
 将data添加到list里面。data的反序列化结果的编码只能是RAW_INT或者RAW_STRING，否则会出错。下同。
 ### remove [data]
 从set里面删除data。

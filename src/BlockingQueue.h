@@ -8,29 +8,36 @@
 #include <queue>
 #include <condition_variable>
 #include <mutex>
+#include <list>
 
 using namespace std;
 template <typename T>
 class BlockingQueue {
 public:
     T take() {
-        if (innerQueue.empty()) {
+        mtx.lock();
+        bool isEmpty = innerQueue.empty();
+        mtx.unlock();
+        if (isEmpty) {
             unique_lock<mutex> lck(notEmptyMtx);
             notEmptyCV.wait(lck);
         }
-        T t = innerQueue.back();
+        mtx.lock();
+        T t = innerQueue.front();
         innerQueue.pop();
+        mtx.unlock();
         return t;
     };
     T put(T t) {
-        lock_guard lck(mtx);
+        mtx.lock();
         innerQueue.push(t);
+        mtx.unlock();
         notEmptyCV.notify_all();
     };
 private:
     condition_variable notEmptyCV;
     mutex notEmptyMtx;
-    queue<T> innerQueue;
+    queue<T,std::list<T>> innerQueue;
     mutex mtx;
 };
 

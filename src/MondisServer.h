@@ -212,7 +212,7 @@ private:
     int jsonDuration = 10;
     string workDir;
     string logFile;
-    vector<HashMap *> dbs;
+    vector<HashMap*> dbs;
     int daemonize = false;
     static JSONParser parser;
     ofstream logFileOut;

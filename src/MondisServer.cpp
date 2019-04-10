@@ -630,9 +630,10 @@ void MondisServer::init() {
     cout << "is Initializing..." << endl;
     runStatus = LOADING;
     interpreter = new CommandInterpreter;
-    for (int i = 0; i < databaseNum; ++i) {
-        dbs.push_back(new HashMap(128, 0.75f));
+    for (int i = 0; i <databaseNum;++i) {
+        dbs.push_back(nullptr);
     }
+    dbs[0] = new HashMap();
 #ifdef WIN32
     self = new MondisClient(this, (SOCKET) 0);
 #elif defined(linux)
@@ -1388,6 +1389,9 @@ ExecRes MondisServer::selectDb(Command *command, MondisClient *client) {
         LOGIC_ERROR_AND_RETURN
     }
     client->dBIndex = index;
+    if (dbs[index] == nullptr) {
+        dbs[index] = new HashMap();
+    }
     OK_AND_RETURN
 }
 
@@ -1487,7 +1491,7 @@ ExecRes MondisServer::size(Command *command, MondisClient *client) {
 
 ExecRes MondisServer::beSlaveOf(Command *command, MondisClient *client) {
     ExecRes res;
-    CHECK_PARAM_NUM(4)
+    CHECK_PARAM_NUM(2)
     CHECK_PARAM_TYPE(0, PLAIN)
     CHECK_PARAM_TYPE(1, PLAIN)
     MondisClient *m = buildConnection(PARAM(2), atoi(PARAM(3).c_str()));

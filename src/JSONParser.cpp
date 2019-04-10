@@ -230,6 +230,9 @@ void JSONParser::parseAll(std::vector<HashMap *> &dbs) {
         AVLTree *tree = (AVLTree *) cur.value->objData;
         AVLTree::AVLIterator iter = tree->iterator();
         while (iter.next()) {
+            if (dbs[dbIndex] == nullptr) {
+                dbs[dbIndex] = new HashMap();
+            }
             dbs[dbIndex]->put(iter->data->key, iter->data->value);
             tree->remove(iter->data->key);
         }

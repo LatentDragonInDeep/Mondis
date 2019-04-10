@@ -993,6 +993,9 @@ MondisClient *MondisServer::buildConnection(const string &ip, int port) {
     WSADATA data;
     WSAStartup(sockVersion, &data);
     SOCKET masterSock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (masterSock == INVALID_SOCKET) {
+        return nullptr;
+    }
     sockaddr_in serAddr;
     serAddr.sin_family = AF_INET;
     serAddr.sin_port = htons(port);
@@ -1234,6 +1237,7 @@ void MondisServer::msgHandle() {
                         }
                         JSONParser temp(msg->content());
                         temp.parseAll(dbs);
+                        syncFin.notify_all();
                     }
                     case mondis::DataType::CONTROL_MSG: {
                         cout << msg->content();
@@ -1258,7 +1262,7 @@ void MondisServer::msgHandle() {
                 ExecRes res;
                 res.type = (ExecResType) msg->res_type();
                 res.desc = msg->content();
-                resQueue.push_front(res);
+                resQueue.put(res);
                 break;
             }
         }
@@ -1508,12 +1512,8 @@ ExecRes MondisServer::beSlaveOf(Command *command, MondisClient *client) {
                               SendToType::SPECIFY_PEER);
     putCommandMsgToWriteQueue(string("SYNC ") + to_string(replicaOffset), 0, mondis::CommandType::PEER_COMMAND,
                               SendToType::SPECIFY_PEER);
-    ExecRes syncRes = resQueue.back();
-    if (syncRes.type != OK) {
-        res.desc = "sync failed!";
-        closeClient(m);
-        LOGIC_ERROR_AND_RETURN
-    }
+    unique_lock lck(syncFinMtx);
+    syncFin.wait(lck);
     Timer timer(std::bind([=]{
         mondis::Message* msg = new mondis::Message;
         msg->set_msg_type(mondis::MsgType::DATA);
@@ -1523,7 +1523,7 @@ ExecRes MondisServer::beSlaveOf(Command *command, MondisClient *client) {
         action.msg = msg;
         putToReadQueue(action);
     }),chrono::system_clock::now(),true,chrono::duration<int>(5));
-    timeHeap.put(timer);
+    OK_AND_RETURN
 }
 
 ExecRes MondisServer::sync(Command *command, MondisClient *client) {
@@ -1914,6 +1914,7 @@ void MondisServer::putCommandMsgToWriteQueue(const string &cmdStr, unsigned int 
     msg->set_content(cmdStr);
     ActionResult actionResult;
     actionResult.msg = msg;
+    actionResult.client = idToPeersAndClients[clientId];
     actionResult.sendToType = sendToType;
     putToWriteQueue(actionResult);
 }

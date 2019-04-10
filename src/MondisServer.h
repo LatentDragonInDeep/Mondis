@@ -359,8 +359,9 @@ private:
 
     chrono::time_point<chrono::system_clock> preHeartBeat = chrono::system_clock::now();
     TimerHeap timeHeap;
-
-    deque<ExecRes> resQueue;
+    condition_variable syncFin;
+    mutex syncFinMtx;
+    BlockingQueue<ExecRes> resQueue;
     ExecRes bindKey(Command *, MondisClient *);
     ExecRes get(Command*,MondisClient*);
     ExecRes del(Command*,MondisClient*);

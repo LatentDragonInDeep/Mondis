@@ -1494,7 +1494,7 @@ ExecRes MondisServer::beSlaveOf(Command *command, MondisClient *client) {
     CHECK_PARAM_NUM(2)
     CHECK_PARAM_TYPE(0, PLAIN)
     CHECK_PARAM_TYPE(1, PLAIN)
-    MondisClient *m = buildConnection(PARAM(2), atoi(PARAM(3).c_str()));
+    MondisClient *m = buildConnection(PARAM(0), atoi(PARAM(1).c_str()));
     if (m == nullptr) {
         res.desc = "can not connect to the master!";
         res.type = INTERNAL_ERROR;

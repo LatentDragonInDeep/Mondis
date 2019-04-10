@@ -1486,36 +1486,16 @@ ExecRes MondisServer::beSlaveOf(Command *command, MondisClient *client) {
     CHECK_PARAM_NUM(4)
     CHECK_PARAM_TYPE(0, PLAIN)
     CHECK_PARAM_TYPE(1, PLAIN)
-    CHECK_PARAM_TYPE(2, PLAIN)
-    CHECK_PARAM_TYPE(3, PLAIN)
-    hasVoteFor = true;
-    if (res.type == OK) {
-        masterIP = PARAM(0);
-        masterPort = atoi(PARAM(1).c_str());
-    }
-    CHECK_PARAM_NUM(4);
-    CHECK_PARAM_TYPE(0, PLAIN)
-    string login = "LOGIN ";
-    login += masterUsername;
-    login += " ";
-    login += masterPassword;
-    MondisClient *c = buildConnection(PARAM(2), atoi(PARAM(3).c_str()));
-    if (c == nullptr) {
+    MondisClient *m = buildConnection(PARAM(2), atoi(PARAM(3).c_str()));
+    if (m == nullptr) {
         res.desc = "can not connect to the master!";
         res.type = INTERNAL_ERROR;
         return res;
     }
-    master = c;
-    idToPeers[0] = c;
-    idToPeersAndClients[0] = c;
-    c->id = 0;
-    putCommandMsgToWriteQueue(login, c->id, mondis::CommandType::CLIENT_COMMAND, SendToType::SPECIFY_PEER);
-    ExecRes loginRes = resQueue.back();
-    if (loginRes.type != OK) {
-        res.desc = "username or password error";
-        closeClient(c);
-        LOGIC_ERROR_AND_RETURN
-    }
+    master = m;
+    idToPeers[0] = m;
+    idToPeersAndClients[0] = m;
+    m->id = 0;
     putCommandMsgToWriteQueue(string("MY_IDENTITY slave"), 0, mondis::CommandType::PEER_COMMAND,
                               SendToType::SPECIFY_PEER);
     putCommandMsgToWriteQueue(string("SYNC ") + to_string(replicaOffset), 0, mondis::CommandType::PEER_COMMAND,
@@ -1523,7 +1503,7 @@ ExecRes MondisServer::beSlaveOf(Command *command, MondisClient *client) {
     ExecRes syncRes = resQueue.back();
     if (syncRes.type != OK) {
         res.desc = "sync failed!";
-        closeClient(c);
+        closeClient(m);
         LOGIC_ERROR_AND_RETURN
     }
     Timer timer(std::bind([=]{

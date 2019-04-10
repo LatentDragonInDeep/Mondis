@@ -1182,7 +1182,7 @@ void MondisServer::selectAndHandle() {
         FD_ZERO(&fds);
         allModifyMtx.lock();
         for (auto &kv:socketToClient) {
-            FD_SET(kv.second->sock, &fds);
+            FD_SET(kv.first, &fds);
         }
         allModifyMtx.unlock();
         int ret = select(0, &fds, nullptr, nullptr, &timeout);

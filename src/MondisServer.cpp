@@ -1307,7 +1307,7 @@ unordered_map<CommandType,CommandHandler> MondisServer::commandHandlers = {
         {CommandType::UPDATE_OFFSET,&MondisServer::updateOffset},
         {CommandType::NEW_PEER,&MondisServer::newPeer},
         {CommandType::DEL_PEER,&MondisServer::deletePeer},
-        {CommandType::SYNC_FIN,&MondisServer::syncFinCV},
+        {CommandType::SYNC_FIN,&MondisServer::syncFin},
 };
 
 ExecRes MondisServer::bindKey(Command *command, MondisClient *client) {

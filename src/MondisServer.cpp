@@ -792,6 +792,7 @@ MondisServer::~MondisServer() {
 void MondisServer::replicaToSlave(MondisClient *client, long long slaveReplicaOffset) {
     if (replicaOffset - slaveReplicaOffset > maxCommandReplicaBufferSize) {
         const long long start = replicaOffset;
+        isPropagating = true;
         string *temp = new string;
         getJson(temp);
         mondis::Message* msg = new mondis::Message;
@@ -804,7 +805,6 @@ void MondisServer::replicaToSlave(MondisClient *client, long long slaveReplicaOf
         actionResult.sendToType = SendToType::SPECIFY_CLIENT;
         putToWriteQueue(actionResult);
         delete temp;
-        isPropagating = true;
         vector<string> commands(replicaCommandBuffer->begin() + (replicaOffset - start), replicaCommandBuffer->end());
         replicaCommandPropagate(commands, client);
     } else {
@@ -1088,6 +1088,7 @@ unordered_set<CommandType> MondisServer::clientControlCommands = {
         CommandType:: MASTER_INFO,
         CommandType:: MY_IDENTITY,
         CommandType:: SET_TTL,
+        CommandType:: DEL_PEER,
 };
 
 unordered_set<CommandType> MondisServer::controlCommands = {
@@ -1119,6 +1120,8 @@ unordered_set<CommandType> MondisServer::controlCommands = {
         CommandType:: I_AM_NEW_MASTER,
         CommandType:: CLIENT_LIST,
         CommandType:: SET_TTL,
+        CommandType:: MY_IDENTITY,
+        CommandType:: DEL_PEER,
 };
 MondisServer* MondisServer::server = nullptr;
 
@@ -1296,7 +1299,8 @@ unordered_map<CommandType,CommandHandler> MondisServer::commandHandlers = {
         {CommandType::I_AM_NEW_MASTER,&MondisServer::iAmNewMaster},
         {CommandType::CLIENT_LIST,&MondisServer::clientList},
         {CommandType::UPDATE_OFFSET,&MondisServer::updateOffset},
-        {CommandType::NEW_PEER,&MondisServer::newPeer}
+        {CommandType::NEW_PEER,&MondisServer::newPeer},
+        {CommandType::DEL_PEER,&MondisServer::deletePeer},
 };
 
 ExecRes MondisServer::bindKey(Command *command, MondisClient *client) {
@@ -1520,27 +1524,6 @@ ExecRes MondisServer::beSlaveOf(Command *command, MondisClient *client) {
 
 ExecRes MondisServer::sync(Command *command, MondisClient *client) {
     ExecRes res;
-    peersModifyMtx.lock_shared();
-    if (idToPeers.size() > maxSlaveNum) {
-        ExecRes res;
-        res.type = LOGIC_ERROR;
-        res.desc = "can not build connection because has up to max slave number!";
-#ifdef WIN32
-        FD_CLR(client->sock, &fds);
-        allModifyMtx.lock();
-        socketToClient.erase(socketToClient.find(client->sock));
-        allModifyMtx.unlock();
-#elif defined(linux)
-        epoll_ctl(epollFd,EPOLL_CTL_DEL,client->fd, nullptr);
-        allModifyMtx.lock();
-        fdToClients.erase(fdToClients.find(client->fd));
-        allModifyMtx.unlock();
-#endif
-        delete client;
-        return res;
-    }
-    peersModifyMtx.unlock_shared();
-    client->type = PEER;
     CHECK_PARAM_NUM(1)
     CHECK_PARAM_TYPE(0, PLAIN)
     CHECK_AND_DEFINE_INT_LEGAL(1, offset);
@@ -1555,10 +1538,6 @@ ExecRes MondisServer::sync(Command *command, MondisClient *client) {
         delete client;
         LOGIC_ERROR_AND_RETURN
     }
-    peersModifyMtx.lock();
-    idToPeers[nextClientId()] = client;
-    peersModifyMtx.unlock();
-    client->type = PEER;
     std::thread t(&MondisServer::replicaToSlave, this, client, offset);
     OK_AND_RETURN
 }
@@ -1575,11 +1554,13 @@ ExecRes MondisServer::disconnectClient(Command *command, MondisClient *client) {
 
 ExecRes MondisServer::deletePeer(Command *command, MondisClient *client) {
     ExecRes res;
-    CHECK_COMMAND_FROM_CLIENT
     CHECK_PARAM_NUM(1)
     CHECK_PARAM_TYPE(0,PLAIN)
     int clientId = atoi(PARAM(0).c_str());
     closeClient(idToPeers[clientId]);
+    if(serverStatus == ServerStatus::SV_STAT_MASTER) {
+        putCommandMsgToWriteQueue("DEL_PEER "+PARAM(0),0,mondis::CommandType::MASTER_COMMAND,SendToType::ALL_PEERS);
+    }
     OK_AND_RETURN
 }
 
@@ -1719,6 +1700,9 @@ ExecRes MondisServer::ensureIdentity(Command *command, MondisClient *client) {
         res.needReturn = false;
         OK_AND_RETURN
     } else if(PARAM(0) == "slave"){
+        if(serverStatus == ServerStatus::SV_STAT_UNDETERMINED) {
+            serverStatus = ServerStatus::SV_STAT_MASTER;
+        }
         if (idToPeers.size() > maxSlaveNum) {
             res.type = LOGIC_ERROR;
             res.desc = "can not build connection because has up to max slave number!";

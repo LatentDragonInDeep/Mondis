@@ -64,7 +64,8 @@ std::unordered_map<CommandType, std::string> Command::typeToStr = {
         {CommandType::CLIENT_LIST,"CLIENT_LIST"},
         {CommandType::SET_TTL,"SET_TTL"},
         {CommandType::UPDATE_OFFSET,"UPDATE_OFFSET"},
-        {CommandType::NEW_PEER,"NEW_PEER"}
+        {CommandType::NEW_PEER,"NEW_PEER"},
+        {CommandType::DEL_PEER,"DEL_PEER"}
 };
 
 
@@ -128,7 +129,8 @@ std::unordered_map<std::string, CommandType> CommandInterpreter::strToType = {
         {"CLIENT_LIST",CommandType::CLIENT_LIST},
         {"SET_TTL",CommandType::SET_TTL},
         {"UPDATE_OFFSET",CommandType::UPDATE_OFFSET},
-        {"NEW_PEER",CommandType::NEW_PEER}
+        {"NEW_PEER",CommandType::NEW_PEER},
+        {"DEL_PEER",CommandType::DEL_PEER},
 };
 
 CommandInterpreter::CommandInterpreter() {

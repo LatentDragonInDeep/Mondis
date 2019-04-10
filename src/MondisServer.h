@@ -159,6 +159,7 @@ public:
 enum ServerStatus {
     SV_STAT_MASTER,
     SV_STAT_SLAVE,
+    SV_STAT_UNDETERMINED,
 };
 
 enum RunStatus {

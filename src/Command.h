@@ -149,6 +149,7 @@ enum CommandType {
     MASTER_DEAD,
     I_AM_NEW_MASTER,
     CLIENT_LIST,
+    DEL_PEER,
 };
 
 enum ExecResType {

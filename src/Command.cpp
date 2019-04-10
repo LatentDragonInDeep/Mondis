@@ -55,9 +55,7 @@ std::unordered_map<CommandType, std::string> Command::typeToStr = {
         {CommandType::UNWATCH,"UNWATCH"},
         {CommandType::SAVE_ALL,"SAVE_ALL"},
         {CommandType::MASTER_INFO,"MASTER_INFO"},
-        {CommandType::NEW_PEER,"NEW_PEER"},
-        {CommandType::NEW_CLIENT,"NEW_CLIENT"},
-        {CommandType::MASTER_INVITE,"MASTER_INVITE"},
+        {CommandType::MY_IDENTITY,"MY_IDENTITY"},
         {CommandType::ASK_FOR_VOTE,"ASK_FOR_VOTE"},
         {CommandType::VOTE,"VOTE"},
         {CommandType::UNVOTE,"UNVOTE"},
@@ -65,7 +63,8 @@ std::unordered_map<CommandType, std::string> Command::typeToStr = {
         {CommandType::I_AM_NEW_MASTER,"I_AM_NEW_MASTER"},
         {CommandType::CLIENT_LIST,"CLIENT_LIST"},
         {CommandType::SET_TTL,"SET_TTL"},
-        {CommandType::UPDATE_OFFSET,"UPDATE_OFFSET"}
+        {CommandType::UPDATE_OFFSET,"UPDATE_OFFSET"},
+        {CommandType::NEW_PEER,"NEW_PEER"}
 };
 
 
@@ -120,16 +119,16 @@ std::unordered_map<std::string, CommandType> CommandInterpreter::strToType = {
         {"UNWATCH",CommandType::UNWATCH},
         {"SAVE_ALL",CommandType::SAVE_ALL},
         {"MASTER_INFO",CommandType::MASTER_INFO},
-        {"NEW_PEER",CommandType::NEW_PEER},
-        {"NEW_CLIENT",CommandType::NEW_CLIENT},
+        {"MY_IDENTITY",CommandType::MY_IDENTITY},
         {"ASK_FOR_VOTE",CommandType::ASK_FOR_VOTE},
         {"VOTE",CommandType::VOTE},
         {"UNVOTE",CommandType::UNVOTE},
         {"MASTER_DEAD",CommandType::MASTER_DEAD},
         {"I_AM_NEW_MASTER",CommandType::I_AM_NEW_MASTER},
         {"CLIENT_LIST",CommandType::CLIENT_LIST},
-        {"SET_TTL",CommandType ::SET_TTL},
-        {"UPDATE_OFFSET",CommandType::UPDATE_OFFSET}
+        {"SET_TTL",CommandType::SET_TTL},
+        {"UPDATE_OFFSET",CommandType::UPDATE_OFFSET},
+        {"NEW_PEER",CommandType::NEW_PEER}
 };
 
 CommandInterpreter::CommandInterpreter() {

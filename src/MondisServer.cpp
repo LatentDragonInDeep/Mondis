@@ -698,7 +698,21 @@ void MondisServer::acceptSocket() {
     sockaddr_in sockAddr;
     memset(&sockAddr, 0, sizeof(sockAddr));
     sockAddr.sin_family = PF_INET;
-    sockAddr.sin_addr.S_un.S_addr = inet_addr("127.0.0.1");
+    char * selfIp = nullptr;
+    char hostName[256];
+    ::gethostname(hostName,256);
+    hostent *hostEnt = ::gethostbyname(hostName);
+    in_addr addr;
+    for(int i= 0;;i++)
+    {
+        char *p = hostEnt->h_addr_list[i];
+        if(p == NULL) {
+            break;
+        }
+        memcpy(&addr.S_un.S_addr,p,hostEnt->h_length);
+        selfIp = ::inet_ntoa(addr);
+    }
+    sockAddr.sin_addr.S_un.S_addr = inet_addr(selfIp);
     sockAddr.sin_port = htons(port);
     bind(servSock, (SOCKADDR *) &sockAddr, sizeof(SOCKADDR));
     listen(servSock, 10);
@@ -809,6 +823,9 @@ void MondisServer::replicaToSlave(MondisClient *client, long long slaveReplicaOf
 }
 
 void MondisServer::closeClient(MondisClient *client) {
+    if (client == nullptr) {
+        return;
+    }
 #ifdef WIN32
     if (client->type == CLIENT) {
         watchedKeyMtx.lock();
@@ -1069,7 +1086,7 @@ unordered_set<CommandType> MondisServer::clientControlCommands = {
         CommandType:: WATCH,
         CommandType:: UNWATCH,
         CommandType:: MASTER_INFO,
-        CommandType:: NEW_CLIENT,
+        CommandType:: MY_IDENTITY,
         CommandType:: SET_TTL,
 };
 
@@ -1094,14 +1111,13 @@ unordered_set<CommandType> MondisServer::controlCommands = {
         CommandType:: WATCH,
         CommandType:: UNWATCH,
         CommandType:: MASTER_INFO,
-        CommandType:: NEW_PEER,
+        CommandType:: MY_IDENTITY,
         CommandType:: VOTE,
         CommandType:: UNVOTE,
         CommandType:: ASK_FOR_VOTE,
         CommandType:: MASTER_DEAD,
         CommandType:: I_AM_NEW_MASTER,
         CommandType:: CLIENT_LIST,
-        CommandType:: NEW_CLIENT,
         CommandType:: SET_TTL,
 };
 MondisServer* MondisServer::server = nullptr;
@@ -1272,16 +1288,15 @@ unordered_map<CommandType,CommandHandler> MondisServer::commandHandlers = {
         {CommandType::WATCH,&MondisServer::watch},
         {CommandType::UNWATCH,&MondisServer::unwatch},
         {CommandType::MASTER_INFO, &MondisServer::getMasterInfo},
-        {CommandType::NEW_PEER,&MondisServer::newPeer},
-        {CommandType::NEW_CLIENT, &MondisServer::newClient},
+        {CommandType::MY_IDENTITY,&MondisServer::ensureIdentity},
         {CommandType::ASK_FOR_VOTE,&MondisServer::askForVote},
         {CommandType::VOTE,&MondisServer::vote},
         {CommandType::UNVOTE,&MondisServer::unvote},
         {CommandType::MASTER_DEAD,&MondisServer::masterDead},
         {CommandType::I_AM_NEW_MASTER,&MondisServer::iAmNewMaster},
         {CommandType::CLIENT_LIST,&MondisServer::clientList},
-        {CommandType::MASTER_INVITE,&MondisServer::masterInvite},
-        {CommandType::UPDATE_OFFSET,&MondisServer::updateOffset}
+        {CommandType::UPDATE_OFFSET,&MondisServer::updateOffset},
+        {CommandType::NEW_PEER,&MondisServer::newPeer}
 };
 
 ExecRes MondisServer::bindKey(Command *command, MondisClient *client) {
@@ -1501,6 +1516,8 @@ ExecRes MondisServer::beSlaveOf(Command *command, MondisClient *client) {
         closeClient(c);
         LOGIC_ERROR_AND_RETURN
     }
+    putCommandMsgToWriteQueue(string("MY_IDENTITY slave"), 0, mondis::CommandType::PEER_COMMAND,
+                              SendToType::SPECIFY_PEER);
     putCommandMsgToWriteQueue(string("SYNC ") + to_string(replicaOffset), 0, mondis::CommandType::PEER_COMMAND,
                               SendToType::SPECIFY_PEER);
     ExecRes syncRes = resQueue.back();
@@ -1576,10 +1593,13 @@ ExecRes MondisServer::disconnectClient(Command *command, MondisClient *client) {
     OK_AND_RETURN
 }
 
-ExecRes MondisServer::disconnectSlave(Command *command, MondisClient *client) {
+ExecRes MondisServer::deletePeer(Command *command, MondisClient *client) {
     ExecRes res;
     CHECK_COMMAND_FROM_CLIENT
-    closeClient(client);
+    CHECK_PARAM_NUM(1)
+    CHECK_PARAM_TYPE(0,PLAIN)
+    int clientId = atoi(PARAM(0).c_str());
+    closeClient(idToPeers[clientId]);
     OK_AND_RETURN
 }
 
@@ -1683,36 +1703,70 @@ ExecRes MondisServer::getMasterInfo(Command *command, MondisClient *client) {
     }
 }
 
-ExecRes MondisServer::newClient(Command *command, MondisClient *client) {
+ExecRes MondisServer::ensureIdentity(Command *command, MondisClient *client) {
     ExecRes res;
     res.needReturn = false;
-    clientModifyMtx.lock();
-    if (idToClients.size() > maxClientNum) {
-        res.type = LOGIC_ERROR;
-        res.desc = "can not build connection because has up to max client number!";
-        mondis::Message *msg = new mondis::Message;
-        msg->set_msg_type(mondis::MsgType::EXEC_RES);
-        msg->set_res_type(mondis::ExecResType::LOGIC_ERROR);
-        msg->set_content(res.toString());
-        client->writeMessage(msg);
+    CHECK_PARAM_NUM(1)
+    CHECK_PARAM_TYPE(0,PLAIN)
+    if (PARAM(0) == "client") {
+        if (idToClients.size() > maxClientNum) {
+            res.desc = "can not build connection because has up to max client number!";
+            mondis::Message *msg = new mondis::Message;
+            msg->set_msg_type(mondis::MsgType::EXEC_RES);
+            msg->set_res_type(mondis::ExecResType::LOGIC_ERROR);
+            msg->set_content(res.toString());
+            client->writeMessage(msg);
 #ifdef WIN32
-        FD_CLR(client->sock, &fds);
-        allModifyMtx.lock();
-        socketToClient.erase(socketToClient.find(client->sock));
-        allModifyMtx.unlock();
+            FD_CLR(client->sock, &fds);
+            socketToClient.erase(socketToClient.find(client->sock));
 #elif defined(linux)
-        epoll_ctl(epollFd,EPOLL_CTL_DEL,client->fd, nullptr);
-                allModifyMtx.lock();
-                fdToClients.erase(fdToClients.find(client->fd));
-                allModifyMtx.unlock();
+            epoll_ctl(epollFd,EPOLL_CTL_DEL,client->fd, nullptr);
+            fdToClients.erase(fdToClients.find(client->fd));
 #endif
-        idToClients.erase(idToClients.find(client->id));
-        delete client;
+            idToPeersAndClients.erase(idToClients.find(client->id));
+            delete client;
+            LOGIC_ERROR_AND_RETURN
+        } else {
+            clientModifyMtx.lock();
+            client->type = ClientType::CLIENT;
+            idToClients[client->id] = client;
+            clientModifyMtx.unlock();
+            OK_AND_RETURN
+        }
+    } else if (PARAM(0) == "peer") {
+        client->type = ClientType ::PEER;
+        idToPeers[client->id] = client;
+        res.needReturn = false;
+        OK_AND_RETURN
+    } else if(PARAM(0) == "slave"){
+        if (idToPeers.size() > maxSlaveNum) {
+            res.type = LOGIC_ERROR;
+            res.desc = "can not build connection because has up to max slave number!";
+            mondis::Message *msg = new mondis::Message;
+            msg->set_msg_type(mondis::MsgType::EXEC_RES);
+            msg->set_res_type(mondis::ExecResType::LOGIC_ERROR);
+            msg->set_content(res.toString());
+            client->writeMessage(msg);
+#ifdef WIN32
+            FD_CLR(client->sock, &fds);
+            socketToClient.erase(socketToClient.find(client->sock));
+#elif defined(linux)
+            epoll_ctl(epollFd,EPOLL_CTL_DEL,client->fd, nullptr);
+            fdToClients.erase(fdToClients.find(client->fd));
+#endif
+            idToPeersAndClients.erase(idToClients.find(client->id));
+            delete client;
+            LOGIC_ERROR_AND_RETURN
+        } else {
+            peersModifyMtx.lock();
+            client->type = ClientType::SLAVE;
+            idToPeers[client->id] = client;
+            peersModifyMtx.unlock();
+            OK_AND_RETURN
+        }
+    } else {
+        LOGIC_ERROR_AND_RETURN
     }
-    client->type = ClientType ::CLIENT;
-    clientModifyMtx.unlock();
-    client->type = CLIENT;
-    OK_AND_RETURN
 }
 
 ExecRes MondisServer::askForVote(Command *command, MondisClient *client) {
@@ -1832,7 +1886,7 @@ ExecRes MondisServer::newPeer(Command *command, MondisClient *client) {
     idToPeers[atoi(PARAM(2).c_str())] = client;
     idToPeersAndClients[atoi(PARAM(2).c_str())] = client;
     peersModifyMtx.unlock();
-    putCommandMsgToWriteQueue("MASTER_INVITE",client->id,mondis::CommandType::PEER_COMMAND,SendToType::SPECIFY_PEER);
+    putCommandMsgToWriteQueue("MY_IDENTITY peer",client->id,mondis::CommandType::PEER_COMMAND,SendToType::SPECIFY_PEER);
     OK_AND_RETURN
 }
 
@@ -1913,14 +1967,6 @@ void MondisServer::replicaCommandPropagate(vector<string> commands, MondisClient
     for (auto c:commands){
         putCommandMsgToWriteQueue(c,client->id,mondis::CommandType::MASTER_COMMAND,SendToType::SPECIFY_CLIENT);
     }
-}
-
-ExecRes MondisServer::masterInvite(Command *command, MondisClient *client) {
-    ExecRes res;
-    client->type = ClientType ::PEER;
-    idToPeers[client->id] = client;
-    res.needReturn = false;
-    OK_AND_RETURN
 }
 
 ExecRes MondisServer::setTTl(Command* command,MondisClient* client) {

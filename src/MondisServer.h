@@ -203,7 +203,7 @@ private:
     bool isSlaveOf = false;
     pid_t pid;
     std::string configfile;
-    int port = 6379;
+    int port = 56379;
     int databaseNum = 16;
     bool aof = true;
     int aofSyncStrategy = 1;
@@ -375,15 +375,14 @@ private:
     ExecRes beSlaveOf(Command *, MondisClient *);
     ExecRes sync(Command*,MondisClient*);
     ExecRes disconnectClient(Command*,MondisClient*);
-    ExecRes disconnectSlave(Command*,MondisClient*);
-    ExecRes masterInvite(Command*,MondisClient*);
+    ExecRes deletePeer(Command *, MondisClient *);
     ExecRes multi(Command*,MondisClient*);
     ExecRes exec(Command*,MondisClient*);
     ExecRes discard(Command*,MondisClient*);
     ExecRes watch(Command*,MondisClient*);
     ExecRes unwatch(Command*,MondisClient*);
     ExecRes getMasterInfo(Command *, MondisClient *);
-    ExecRes newClient(Command *command, MondisClient *client);
+    ExecRes ensureIdentity(Command *command, MondisClient *client);
     ExecRes askForVote(Command*,MondisClient*);
     ExecRes vote(Command*,MondisClient*);
     ExecRes unvote(Command*,MondisClient*);

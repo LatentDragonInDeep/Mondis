@@ -530,7 +530,7 @@ ExecRes MondisServer::execute(const string &commandStr, MondisClient *client) {
         return res;
     }
     appendLog(commandStr, res);
-    if (isModifyCommand && res.type == OK) {
+    if (cstruct.isModify && res.type == OK) {
         appendAof(commandStr);
         if (replicaCommandBuffer->size() == maxCommandReplicaBufferSize) {
             replicaCommandBuffer->pop_front();
@@ -806,12 +806,15 @@ void MondisServer::replicaToSlave(MondisClient *client, long long slaveReplicaOf
         actionResult.sendToType = SendToType::SPECIFY_CLIENT;
         putToWriteQueue(actionResult);
         delete temp;
-        vector<string> commands(replicaCommandBuffer->begin() + (replicaOffset - start), replicaCommandBuffer->end());
+        auto begin  = replicaCommandBuffer->begin()+(replicaOffset - slaveReplicaOffset);
+        auto end = replicaCommandBuffer->end();
+        vector<string> commands(begin,end);
         replicaCommandPropagate(commands, client);
     } else {
         isPropagating = true;
-        vector<string> commands(replicaCommandBuffer->begin() + (replicaOffset - slaveReplicaOffset),
-                                replicaCommandBuffer->end());
+        auto begin  = replicaCommandBuffer->begin()+(replicaOffset - slaveReplicaOffset);
+        auto end = replicaCommandBuffer->end();
+        vector<string> commands(begin,end);
         replicaCommandPropagate(commands, client);
     }
     string newPeer = "NEW_PEER ";
@@ -993,20 +996,21 @@ MondisClient *MondisServer::buildConnection(const string &ip, int port) {
     WORD sockVersion = MAKEWORD(2, 2);
     WSADATA data;
     WSAStartup(sockVersion, &data);
-    SOCKET masterSock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (masterSock == INVALID_SOCKET) {
+    SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if ( sock== INVALID_SOCKET) {
         return nullptr;
     }
     sockaddr_in serAddr;
     serAddr.sin_family = AF_INET;
     serAddr.sin_port = htons(port);
     serAddr.sin_addr.S_un.S_addr = inet_addr(ip.c_str());
-    if (connect(masterSock, (sockaddr *) &serAddr, sizeof(serAddr)) == SOCKET_ERROR) {
+    if (connect(sock, (sockaddr *) &serAddr, sizeof(serAddr)) == SOCKET_ERROR) {
         return res;
     }
     unsigned long iMode = 0;
-    ioctlsocket(masterSock, FIONBIO, &iMode);
-    res = new MondisClient(this, masterSock);
+    ioctlsocket(sock, FIONBIO, &iMode);
+    res = new MondisClient(this, sock);
+    FD_SET(sock,&fds);
 #elif defined(linux)
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     sockaddr_in serAddr;
@@ -1019,7 +1023,8 @@ MondisClient *MondisServer::buildConnection(const string &ip, int port) {
     }
     int flags = fcntl(sockfd, F_GETFL, 0);
     fcntl(sockfd, F_SETFL, flags | O_NONBLOCK);
-    master = new MondisClient(this,masterFd);
+    res = new MondisClient(this,masterFd);
+    epoll_ctl(m->fd,EPOLL_CTL_ADD,m->fd,&listenEvent);
 #endif
     res->hasAuthenticate = true;
     return res;
@@ -1532,19 +1537,12 @@ ExecRes MondisServer::sync(Command *command, MondisClient *client) {
     ExecRes res;
     CHECK_PARAM_NUM(1)
     CHECK_PARAM_TYPE(0, PLAIN)
-    CHECK_AND_DEFINE_INT_LEGAL(1, offset);
+    CHECK_AND_DEFINE_INT_LEGAL(0, offset);
     if (serverStatus == ServerStatus::SV_STAT_SLAVE) {
-        Command *temp = new Command;
-        temp->type = MASTER_INFO;
-        ExecRes realRes = execute(temp, nullptr);
-        Command::destroyCommand(temp);
-        res.desc = "the target server is a slave,if you want continue,please input correct master "
-                  "ip and port.the target server's master ip and port is ";
-        res.desc += realRes.desc;
-        delete client;
+        res.desc = "the target server is not a master";
         LOGIC_ERROR_AND_RETURN
     }
-    std::thread t(&MondisServer::replicaToSlave, this, client, offset);
+    replicaToSlave(client, offset);
     OK_AND_RETURN
 }
 

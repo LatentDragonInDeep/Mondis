@@ -821,7 +821,6 @@ void MondisServer::replicaToSlave(MondisClient *client, long long slaveReplicaOf
     newPeer += client->ip;
     newPeer += " ";
     newPeer += to_string(client->port);
-
     putCommandMsgToWriteQueue(newPeer,0,mondis::CommandType::MASTER_COMMAND,SendToType::ALL_PEERS);
     isPropagating = false;
     putCommandMsgToWriteQueue("SYNC_FIN",client->id,mondis::CommandType::MASTER_COMMAND,SendToType::SPECIFY_PEER);
@@ -850,7 +849,6 @@ void MondisServer::closeClient(MondisClient *client) {
     allModifyMtx.lock();
     socketToClient.erase(socketToClient.find(client->sock));
     allModifyMtx.unlock();
-    idToPeersAndClients.erase(client->id);
 #elif defined(linux)
     watchedKeyMtx.lock();
     for (auto &key:client->watchedKeys) {
@@ -872,6 +870,7 @@ void MondisServer::closeClient(MondisClient *client) {
     fdToClients.erase(fdToClients.find(client->fd));
     allModifyMtx.unlock();
 #endif
+    idToPeersAndClients.erase(client->id);
     delete client;
 }
 
@@ -1007,10 +1006,14 @@ MondisClient *MondisServer::buildConnection(const string &ip, int port) {
     if (connect(sock, (sockaddr *) &serAddr, sizeof(serAddr)) == SOCKET_ERROR) {
         return res;
     }
-    unsigned long iMode = 0;
+    unsigned long iMode = 1;
     ioctlsocket(sock, FIONBIO, &iMode);
+    BOOL bNoDelay = TRUE;
+    setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char FAR *) &bNoDelay, sizeof(BOOL));
     res = new MondisClient(this, sock);
-    FD_SET(sock,&fds);
+    allModifyMtx.lock();
+    socketToClient[sock] = res;
+    allModifyMtx.unlock();
 #elif defined(linux)
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     sockaddr_in serAddr;
@@ -1024,7 +1027,10 @@ MondisClient *MondisServer::buildConnection(const string &ip, int port) {
     int flags = fcntl(sockfd, F_GETFL, 0);
     fcntl(sockfd, F_SETFL, flags | O_NONBLOCK);
     res = new MondisClient(this,masterFd);
+    allModifyMtx.lock();
     epoll_ctl(m->fd,EPOLL_CTL_ADD,m->fd,&listenEvent);
+    fdToClients[sockFd] = res;
+    allModifyMtx.unlock();
 #endif
     res->hasAuthenticate = true;
     return res;
@@ -1174,16 +1180,15 @@ void MondisServer::selectAndHandle() {
     while (true) {
 #ifdef WIN32
         FD_ZERO(&fds);
-        clientModifyMtx.lock_shared();
-        for (auto &kv:idToClients) {
+        allModifyMtx.lock();
+        for (auto &kv:socketToClient) {
             FD_SET(kv.second->sock, &fds);
         }
-        clientModifyMtx.unlock_shared();
+        allModifyMtx.unlock();
         int ret = select(0, &fds, nullptr, nullptr, &timeout);
         if (ret <= 0) {
             continue;
         }
-        allModifyMtx.lock_shared();
         for (auto pair:socketToClient) {
             if (FD_ISSET(pair.first, &fds)) {
                 MondisClient *client = pair.second;
@@ -1196,7 +1201,6 @@ void MondisServer::selectAndHandle() {
                 }
             }
         }
-        allModifyMtx.unlock_shared();
 #elif defined(linux)
         int nfds = epoll_wait(epollFd, events, maxClientNum, 500);
         if(nfds == 0) {
@@ -1207,7 +1211,12 @@ void MondisServer::selectAndHandle() {
             if(events[i].events&EPOLLRDHUP){
                 closeClient(fdToClients[client->fd]);
             } else {
-                putToReadQueue(client->nextMsg());
+                while ((msg = client->nextMessage())!= nullptr) {
+                    Action action;
+                    action.msg = msg;
+                    action.client = client;
+                    putToReadQueue(action);
+                }
             }
         }
 #endif

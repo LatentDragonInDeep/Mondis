@@ -359,7 +359,7 @@ private:
 
     chrono::time_point<chrono::system_clock> preHeartBeat = chrono::system_clock::now();
     TimerHeap timeHeap;
-    condition_variable syncFin;
+    condition_variable syncFinCV;
     mutex syncFinMtx;
     BlockingQueue<ExecRes> resQueue;
     ExecRes bindKey(Command *, MondisClient *);
@@ -394,6 +394,7 @@ private:
     ExecRes clientList(Command*,MondisClient*);
     ExecRes newPeer(Command*,MondisClient*);
     ExecRes mondisExit(Command *, MondisClient *);
+    ExecRes syncFin(Command *, MondisClient *);
 };
 
 

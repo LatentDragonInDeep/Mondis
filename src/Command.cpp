@@ -65,7 +65,8 @@ std::unordered_map<CommandType, std::string> Command::typeToStr = {
         {CommandType::SET_TTL,"SET_TTL"},
         {CommandType::UPDATE_OFFSET,"UPDATE_OFFSET"},
         {CommandType::NEW_PEER,"NEW_PEER"},
-        {CommandType::DEL_PEER,"DEL_PEER"}
+        {CommandType::DEL_PEER,"DEL_PEER"},
+        {CommandType::SYNC_FIN,"SYNC_FIN"},
 };
 
 
@@ -131,6 +132,7 @@ std::unordered_map<std::string, CommandType> CommandInterpreter::strToType = {
         {"UPDATE_OFFSET",CommandType::UPDATE_OFFSET},
         {"NEW_PEER",CommandType::NEW_PEER},
         {"DEL_PEER",CommandType::DEL_PEER},
+        {"SYNC_FIN",CommandType::SYNC_FIN},
 };
 
 CommandInterpreter::CommandInterpreter() {

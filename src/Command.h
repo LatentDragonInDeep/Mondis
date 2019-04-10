@@ -150,6 +150,7 @@ enum CommandType {
     I_AM_NEW_MASTER,
     CLIENT_LIST,
     DEL_PEER,
+    SYNC_FIN,
 };
 
 enum ExecResType {

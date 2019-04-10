@@ -821,6 +821,7 @@ void MondisServer::replicaToSlave(MondisClient *client, long long slaveReplicaOf
 
     putCommandMsgToWriteQueue(newPeer,0,mondis::CommandType::MASTER_COMMAND,SendToType::ALL_PEERS);
     isPropagating = false;
+    putCommandMsgToWriteQueue("SYNC_FIN",client->id,mondis::CommandType::MASTER_COMMAND,SendToType::SPECIFY_PEER);
 }
 
 void MondisServer::closeClient(MondisClient *client) {
@@ -1126,6 +1127,7 @@ unordered_set<CommandType> MondisServer::controlCommands = {
         CommandType:: SET_TTL,
         CommandType:: MY_IDENTITY,
         CommandType:: DEL_PEER,
+        CommandType:: SYNC_FIN,
 };
 MondisServer* MondisServer::server = nullptr;
 
@@ -1237,7 +1239,6 @@ void MondisServer::msgHandle() {
                         }
                         JSONParser temp(msg->content());
                         temp.parseAll(dbs);
-                        syncFin.notify_all();
                     }
                     case mondis::DataType::CONTROL_MSG: {
                         cout << msg->content();
@@ -1306,6 +1307,7 @@ unordered_map<CommandType,CommandHandler> MondisServer::commandHandlers = {
         {CommandType::UPDATE_OFFSET,&MondisServer::updateOffset},
         {CommandType::NEW_PEER,&MondisServer::newPeer},
         {CommandType::DEL_PEER,&MondisServer::deletePeer},
+        {CommandType::SYNC_FIN,&MondisServer::syncFinCV},
 };
 
 ExecRes MondisServer::bindKey(Command *command, MondisClient *client) {
@@ -1513,7 +1515,7 @@ ExecRes MondisServer::beSlaveOf(Command *command, MondisClient *client) {
     putCommandMsgToWriteQueue(string("SYNC ") + to_string(replicaOffset), 0, mondis::CommandType::PEER_COMMAND,
                               SendToType::SPECIFY_PEER);
     unique_lock lck(syncFinMtx);
-    syncFin.wait(lck);
+    syncFinCV.wait(lck);
     Timer timer(std::bind([=]{
         mondis::Message* msg = new mondis::Message;
         msg->set_msg_type(mondis::MsgType::DATA);
@@ -1977,5 +1979,12 @@ ExecRes MondisServer::updateOffset(Command *command, MondisClient * client) {
             maxOffsetClients.insert(client);
         }
     }
+}
+
+ExecRes MondisServer::syncFin(Command *, MondisClient *) {
+    ExecRes res;
+    res.needReturn = false;
+    syncFinCV.notify_all();
+    return res;
 }
 

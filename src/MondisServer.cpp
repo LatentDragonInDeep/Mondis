@@ -461,8 +461,10 @@ void MondisServer::serverEventLoop() {
         string nextCommand;
         getline(std::cin, nextCommand);
         ExecRes res = execute(nextCommand, self);
-        cout << res.toString();
-        cout << endl;
+        if(res.needReturn) {
+            cout << res.toString();
+            cout << endl;
+        }
     }
 }
 
@@ -489,6 +491,7 @@ ExecRes MondisServer::execute(const string &commandStr, MondisClient *client) {
                     res.type = INTERNAL_ERROR;
                     return res;
                 }
+                break;
             }
             case RunStatus::REPLACTING: {
                 if(client->type!=ClientType::MASTER) {
@@ -498,6 +501,7 @@ ExecRes MondisServer::execute(const string &commandStr, MondisClient *client) {
                     res.type = INTERNAL_ERROR;
                     return res;
                 }
+                break;
             }
             case RunStatus::RECOVERING:{
                 Command::destroyCommand(cstruct.locate);
@@ -1064,6 +1068,8 @@ MondisClient *MondisServer::buildConnection(const string &ip, int port) {
     fdToClients[sockFd] = res;
     allModifyMtx.unlock();
 #endif
+    res->ip = ip;
+    res->port = port;
     res->hasAuthenticate = true;
     return res;
 }
@@ -1287,7 +1293,7 @@ void MondisServer::msgHandle() {
                         temp.parseAll(dbs);
                     }
                     case mondis::DataType::CONTROL_MSG: {
-                        cout << msg->content();
+                        cout << msg->content()<<endl;
                     }
                     case mondis::DataType::HEART_BEAT: {
                         if (msg->content() == "PING" && serverStatus == ServerStatus::SV_STAT_MASTER) {
@@ -1543,6 +1549,7 @@ ExecRes MondisServer::size(Command *command, MondisClient *client) {
 
 ExecRes MondisServer::beSlaveOf(Command *command, MondisClient *client) {
     ExecRes res;
+    res.needReturn = false;
     CHECK_PARAM_NUM(2)
     CHECK_PARAM_TYPE(0, PLAIN)
     CHECK_PARAM_TYPE(1, PLAIN)
@@ -1564,7 +1571,7 @@ ExecRes MondisServer::beSlaveOf(Command *command, MondisClient *client) {
     runStatusMtx.lock();
     runStatus = RunStatus::REPLACTING;
     runStatusMtx.unlock();
-    cout<<"REPLICATING START";
+    cout<<"REPLICATING START"<<endl;
     putControlMsgToWriteQueue("REPLICATING START",0,SendToType::ALL_CLIENTS);
     Timer timer(std::bind([=]{
         mondis::Message* msg = new mondis::Message;
@@ -2037,7 +2044,7 @@ ExecRes MondisServer::syncFin(Command *, MondisClient *) {
     runStatus = RunStatus::RUNNING;
     runStatusMtx.unlock();
     putControlMsgToWriteQueue("REPLICATING FINISHED",0,SendToType::ALL_CLIENTS);
-    cout<<"REPLICATING FINISHED";
+    cout<<"REPLICATING FINISHED"<<endl;
     return res;
 }
 

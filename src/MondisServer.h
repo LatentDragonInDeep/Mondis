@@ -167,6 +167,8 @@ enum RunStatus {
     RECOVERING,
     REPLACTING,
     RUNNING,
+    VOTING,
+    PROPAGATING,
 };
 
 typedef ExecRes (MondisServer::*CommandHandler)(Command*,MondisClient*);
@@ -243,17 +245,18 @@ public:
     void putCommandMsgToWriteQueue(const string &cmdStr, unsigned int clientId, mondis::CommandType commandType,
                                        SendToType sendToType);
     void putExecResMsgToWriteQueue(const ExecRes &res, unsigned int clientId, SendToType sendToType);
+    void putControlMsgToWriteQueue(const string& content,unsigned int clientId, SendToType sendToType);
 private:
     unsigned long long replicaOffset = 0;
     unsigned long long maxOtherReplicaOffset = 0;
     static unordered_set<CommandType> modifyCommands;
     static unordered_set<CommandType> transactionAboutCommands;
     static unordered_map<CommandType,CommandHandler> commandHandlers;
-    bool isPropagating = false;
     shared_mutex allModifyMtx;
     shared_mutex clientModifyMtx;
     shared_mutex peersModifyMtx;
     shared_mutex watchedKeyMtx;
+    shared_mutex runStatusMtx;
     string masterUsername;
     string masterPassword;
     string masterIP;
@@ -355,12 +358,8 @@ private:
 
     const unsigned maxVoteIdle = 10000;
 
-    bool isVoting = false;
-
     chrono::time_point<chrono::system_clock> preHeartBeat = chrono::system_clock::now();
     TimerHeap timeHeap;
-    condition_variable syncFinCV;
-    mutex syncFinMtx;
     BlockingQueue<ExecRes> resQueue;
     ExecRes bindKey(Command *, MondisClient *);
     ExecRes get(Command*,MondisClient*);

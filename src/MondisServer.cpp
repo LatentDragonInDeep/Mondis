@@ -471,20 +471,44 @@ ExecRes MondisServer::execute(const string &commandStr, MondisClient *client) {
     Command *command = interpreter->getCommand(const_cast<string&>(commandStr));
     CommandStruct cstruct = getCommandStruct(command, client);
     ExecRes res;
-    if (isPropagating) {
-        Command::destroyCommand(cstruct.locate);
-        Command::destroyCommand(cstruct.operation);
-        res.desc = "is propagating command to a slave,please try later on";
-        res.type = INTERNAL_ERROR;
-        return res;
+    runStatusMtx.lock_shared();
+    if (runStatus!=RunStatus::RUNNING) {
+        switch (runStatus) {
+            case RunStatus::PROPAGATING:{
+                Command::destroyCommand(cstruct.locate);
+                Command::destroyCommand(cstruct.operation);
+                res.desc = "is propagating command to a slave,please try later on";
+                res.type = INTERNAL_ERROR;
+                return res;
+            }
+            case RunStatus::VOTING:{
+                if (client->type!=ClientType::PEER) {
+                    Command::destroyCommand(cstruct.locate);
+                    Command::destroyCommand(cstruct.operation);
+                    res.desc = "master is dead,the cluster is voting for new master";
+                    res.type = INTERNAL_ERROR;
+                    return res;
+                }
+            }
+            case RunStatus::REPLACTING: {
+                if(client->type!=ClientType::MASTER) {
+                    Command::destroyCommand(cstruct.locate);
+                    Command::destroyCommand(cstruct.operation);
+                    res.desc = "the mondis server is replicating from master";
+                    res.type = INTERNAL_ERROR;
+                    return res;
+                }
+            }
+            case RunStatus::RECOVERING:{
+                Command::destroyCommand(cstruct.locate);
+                Command::destroyCommand(cstruct.operation);
+                res.desc = "the mondis server is recovering from persistence file";
+                res.type = INTERNAL_ERROR;
+                return res;
+            }
+        }
     }
-    if (isVoting && client->type == CLIENT) {
-        Command::destroyCommand(cstruct.locate);
-        Command::destroyCommand(cstruct.operation);
-        res.desc = "master is dead,the cluster is voting for new master";
-        res.type = INTERNAL_ERROR;
-        return res;
-    }
+    runStatusMtx.unlock_shared();
     if ((!client->hasAuthenticate) && (cstruct.operation->type != LOGIN)) {
         Command::destroyCommand(cstruct.locate);
         Command::destroyCommand(cstruct.operation);
@@ -686,8 +710,10 @@ void MondisServer::init() {
     msgHandler = new std::thread(&MondisServer::msgHandle, this);
     //写线程
     msgWriter = new std::thread(&MondisServer::writeToClient,this);
-    runStatus = RunStatus ::RUNNING;
     timer = new std::thread(&TimerHeap::start,&timeHeap);
+    runStatusMtx.lock();
+    runStatus = RunStatus::RUNNING;
+    runStatusMtx.unlock();
     selectAndHandle();
 }
 
@@ -793,9 +819,11 @@ MondisServer::~MondisServer() {
 void MondisServer::replicaToSlave(MondisClient *client, long long slaveReplicaOffset) {
     if (replicaOffset - slaveReplicaOffset > maxCommandReplicaBufferSize) {
         const long long start = replicaOffset;
-        isPropagating = true;
         string *temp = new string;
         getJson(temp);
+        runStatusMtx.lock();
+        runStatus = RunStatus::PROPAGATING;
+        runStatusMtx.unlock();
         mondis::Message* msg = new mondis::Message;
         msg->set_msg_type(mondis::MsgType::DATA);
         msg->set_data_type(mondis::DataType::SYNC_DATA);
@@ -811,7 +839,9 @@ void MondisServer::replicaToSlave(MondisClient *client, long long slaveReplicaOf
         vector<string> commands(begin,end);
         replicaCommandPropagate(commands, client);
     } else {
-        isPropagating = true;
+        runStatusMtx.lock();
+        runStatus = RunStatus::PROPAGATING;
+        runStatusMtx.unlock();
         auto begin  = replicaCommandBuffer->begin()+(replicaOffset - slaveReplicaOffset);
         auto end = replicaCommandBuffer->end();
         vector<string> commands(begin,end);
@@ -822,8 +852,10 @@ void MondisServer::replicaToSlave(MondisClient *client, long long slaveReplicaOf
     newPeer += " ";
     newPeer += to_string(client->port);
     putCommandMsgToWriteQueue(newPeer,0,mondis::CommandType::MASTER_COMMAND,SendToType::ALL_PEERS);
-    isPropagating = false;
     putCommandMsgToWriteQueue("SYNC_FIN",client->id,mondis::CommandType::MASTER_COMMAND,SendToType::SPECIFY_PEER);
+    runStatusMtx.lock();
+    runStatus = RunStatus::RUNNING;
+    runStatusMtx.unlock();
 }
 
 void MondisServer::closeClient(MondisClient *client) {
@@ -1524,12 +1556,16 @@ ExecRes MondisServer::beSlaveOf(Command *command, MondisClient *client) {
     idToPeers[0] = m;
     idToPeersAndClients[0] = m;
     m->id = 0;
+    m->type = ClientType::MASTER;
     putCommandMsgToWriteQueue(string("MY_IDENTITY slave"), 0, mondis::CommandType::PEER_COMMAND,
                               SendToType::SPECIFY_PEER);
     putCommandMsgToWriteQueue(string("SYNC ") + to_string(replicaOffset), 0, mondis::CommandType::PEER_COMMAND,
                               SendToType::SPECIFY_PEER);
-    unique_lock lck(syncFinMtx);
-    syncFinCV.wait(lck);
+    runStatusMtx.lock();
+    runStatus = RunStatus::REPLACTING;
+    runStatusMtx.unlock();
+    cout<<"REPLICATING START";
+    putControlMsgToWriteQueue("REPLICATING START",0,SendToType::ALL_CLIENTS);
     Timer timer(std::bind([=]{
         mondis::Message* msg = new mondis::Message;
         msg->set_msg_type(mondis::MsgType::DATA);
@@ -1763,7 +1799,9 @@ ExecRes MondisServer::vote(Command *command, MondisClient *client) {
     voteNum++;
     peersModifyMtx.lock_shared();
     if (voteNum > idToPeers.size() / 2) {
-        isVoting = false;
+        runStatusMtx.lock();
+        runStatus = RunStatus::RUNNING;
+        runStatusMtx.unlock();
         putCommandMsgToWriteQueue("I_AM_A_NEW_MASTER",0,mondis::CommandType::PEER_COMMAND,SendToType::ALL_PEERS);
     }
     peersModifyMtx.unlock_shared();
@@ -1779,7 +1817,9 @@ ExecRes MondisServer::unvote(Command *command, MondisClient *client) {
 
 ExecRes MondisServer::masterDead(Command *command, MondisClient *client) {
     ExecRes res;
-    isVoting = true;
+    runStatusMtx.lock();
+    runStatus = RunStatus::VOTING;
+    runStatusMtx.unlock();
     delete master;
     master = nullptr;
     res.needReturn = false;
@@ -1802,7 +1842,9 @@ ExecRes MondisServer::iAmNewMaster(Command *command, MondisClient *client) {
     epoll_ctl(epollFd,EPOLL_CTL_DEL,client->fd, nullptr);
 #endif
     client->type = ClientType::MASTER;
-    isVoting = false;
+    runStatusMtx.lock();
+    runStatus = RunStatus::REPLACTING;
+    runStatusMtx.unlock();
     hasVoteFor = true;
     delete master;
     master = client;
@@ -1991,7 +2033,22 @@ ExecRes MondisServer::updateOffset(Command *command, MondisClient * client) {
 ExecRes MondisServer::syncFin(Command *, MondisClient *) {
     ExecRes res;
     res.needReturn = false;
-    syncFinCV.notify_all();
+    runStatusMtx.lock();
+    runStatus = RunStatus::RUNNING;
+    runStatusMtx.unlock();
+    putControlMsgToWriteQueue("REPLICATING FINISHED",0,SendToType::ALL_CLIENTS);
+    cout<<"REPLICATING FINISHED";
     return res;
+}
+
+void MondisServer::putControlMsgToWriteQueue(const string& content, unsigned int clientId, SendToType sendToType) {
+    ActionResult ar;
+    ar.sendToType = SendToType::ALL_CLIENTS;
+    mondis::Message * msg = new mondis::Message;
+    msg->set_msg_type(mondis::MsgType::DATA);
+    msg->set_data_type(mondis::DataType::CONTROL_MSG);
+    msg->set_content("REPLICATING FINISHED");
+    ar.msg = msg;
+    putToWriteQueue(ar);
 }
 

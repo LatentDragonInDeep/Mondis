@@ -206,23 +206,15 @@ private:
         bool isList = true;
 
         Content() {
-            reset();
-        }
-
-        void reset() {
             head->next = tail;
             tail->pre = head;
         }
 
-        void clear() {
+        void reset() {
             if (isList) {
-                Entry *cur = head->next;
-                while (true) {
-                    Entry *next = cur->next;
+                for(Entry *cur = head->next;cur!=tail;cur = cur->next) {
+                    Entry* next = cur->next;
                     delete cur;
-                    if (next == tail) {
-                        break;
-                    }
                     cur = next;
                 }
                 head->next = tail;
@@ -230,22 +222,14 @@ private:
             } else {
                 delete tree;
             }
+            isList = true;
+            listLen = 0;
         }
 
         ~Content() {
-            if (isList) {
-                Entry *cur = head;
-                while (true) {
-                    Entry *next = cur->next;
-                    delete cur;
-                    if (next == nullptr) {
-                        break;
-                    }
-                    cur = next;
-                }
-            } else {
-                delete tree;
-            }
+            delete head;
+            delete tail;
+            delete tree;
         }
     };
     Content * arrayFrom = nullptr;

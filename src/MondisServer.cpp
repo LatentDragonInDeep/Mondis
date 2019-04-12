@@ -820,7 +820,7 @@ MondisServer::~MondisServer() {
 }
 
 void MondisServer::replicaToSlave(MondisClient *client, long long slaveReplicaOffset) {
-    if (replicaOffset - slaveReplicaOffset > replicaCommandBuffer->size()) {
+    if (replicaOffset - slaveReplicaOffset > 1000) {
         string *temp = new string;
         getJson(temp);
         runStatusMtx.lock();
@@ -1068,6 +1068,9 @@ MondisClient *MondisServer::buildConnection(const string &ip, int port) {
 void MondisServer::getJson(string *res) {
     (*res) += "{\n";
     for (int i = 0; i < databaseNum; ++i) {
+        if(dbs[i] == nullptr) {
+            continue;
+        }
         (*res) += "\"";
         (*res) += i;
         (*res) += "\"";
@@ -1278,7 +1281,9 @@ void MondisServer::msgHandle() {
                 switch (msg->data_type()) {
                     case mondis::DataType::SYNC_DATA: {
                         for (auto db:dbs) {
-                            db->clear();
+                            if(db!= nullptr) {
+                                db->clear();
+                            }
                         }
                         JSONParser temp(msg->content());
                         temp.parseAll(dbs);

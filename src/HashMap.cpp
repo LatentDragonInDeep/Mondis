@@ -326,7 +326,7 @@ unsigned HashMap::size() {
 void HashMap::clear() {
     globalMutex.lock();
     for (int i = 0; i < capacity; ++i) {
-        arrayFrom[i].clear();
+        arrayFrom[i].reset();
     }
     globalMutex.unlock();
 }

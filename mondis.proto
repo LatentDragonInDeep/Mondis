@@ -17,13 +17,12 @@ enum MsgType {
 
 //数据类型
 enum DataType {
-    SYNC_DATA = 0;
-    CONTROL_MSG = 1;
-    HEART_BEAT = 2;
+    CONTROL_MSG = 0;
+    HEART_BEAT = 1;
 }
 
 //命令类型
-enum CommandType {
+enum CommandFrom {
     CLIENT_COMMAND = 0;
     MASTER_COMMAND = 1;
     PEER_COMMAND = 2;
@@ -33,8 +32,9 @@ enum CommandType {
 
 message Message {
     MsgType msg_type= 1; //消息类型
-    string content = 2; //内容
-    ExecResType res_type= 3; //执行结果类型
-    DataType data_type= 4; //数据类型
-    CommandType command_type = 5; //命令来源
+    ExecResType res_type= 2; //执行结果类型
+    DataType data_type= 3; //数据类型
+    CommandFrom command_from = 4; //命令来源
+    string content = 5; //内容
+    int32 db_index = 6; //键空间编号
 }

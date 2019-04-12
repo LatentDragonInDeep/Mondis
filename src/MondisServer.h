@@ -241,10 +241,11 @@ private:
 public:
     void putToReadQueue(Action &action);
     void putToWriteQueue(ActionResult &actionResult);
-    void putCommandMsgToWriteQueue(const string &cmdStr, unsigned int clientId, mondis::CommandType commandType,
-                                       SendToType sendToType);
+    void putCommandMsgToWriteQueue(const string &cmdStr, unsigned int clientId, mondis::CommandFrom commandFrom,
+                                   SendToType sendToType, int dbIndex=0);
     void putExecResMsgToWriteQueue(const ExecRes &res, unsigned int clientId, SendToType sendToType);
     void putControlMsgToWriteQueue(const string& content,unsigned int clientId, SendToType sendToType);
+    void replyHeartBeat(int clientId);
 private:
     unsigned long long replicaOffset = 0;
     unsigned long long maxOtherReplicaOffset = 0;
@@ -286,7 +287,7 @@ public:
 
     int start(string& confFile);
 
-    ExecRes execute(Command *command, MondisClient *client);
+    ExecRes execute(Command *command, MondisClient *client, int dbIndex = -1);
 
     static JSONParser *getJSONParser();
 
@@ -306,7 +307,7 @@ public:
 
     void undoExecute(MultiCommand *command, MondisClient *client);
 
-    ExecRes transactionExecute(CommandStruct &cstruct, MondisClient *client);
+    ExecRes transactionExecute(CommandStruct &cstruct, MondisClient *client, int dbIndex = -1);
 
     CommandStruct getCommandStruct(Command *command, MondisClient *client);
 private:
@@ -321,7 +322,7 @@ private:
 
     void parseConfFile(string& confFile);
 
-    ExecRes execute(const string &commandStr, MondisClient *client);
+    ExecRes execute(const string &commandStr, MondisClient *client, int dbIndex);
 
     void acceptSocket();
 

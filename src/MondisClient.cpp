@@ -57,7 +57,7 @@ ExecRes MondisClient::commitTransaction(MondisServer *server) {
         Command *command = server->interpreter->getCommand(next);
         CommandStruct cstruct = server->getCommandStruct(command, this);
         MultiCommand *undo = server->getUndoCommand(cstruct, this);
-        ExecRes res = server->transactionExecute(cstruct, this);
+        ExecRes res = server->transactionExecute(cstruct, this, 0);
         if (res.type != OK) {
             while (hasExecutedCommandNumInTransaction > 0) {
                 MultiCommand *un = undoCommands->back();
@@ -73,7 +73,7 @@ ExecRes MondisClient::commitTransaction(MondisServer *server) {
         }
         server->putExecResMsgToWriteQueue(res,id,SendToType::SPECIFY_CLIENT);
         server->incrReplicaOffset();
-        server->putCommandMsgToWriteQueue(next,0,mondis::CommandType::MASTER_COMMAND,SendToType::ALL_PEERS);
+        server->putCommandMsgToWriteQueue(next, 0, mondis::CommandFrom::MASTER_COMMAND, SendToType::ALL_PEERS, 0);
         undoCommands->push_back(undo);
         hasExecutedCommandNumInTransaction++;
     }

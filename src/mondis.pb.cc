@@ -51,10 +51,11 @@ const ::google::protobuf::uint32 TableStruct_mondis_2eproto::offsets[] PROTOBUF_
   ~0u,  // no _oneof_case_
   ~0u,  // no _weak_field_map_
   PROTOBUF_FIELD_OFFSET(::mondis::Message, msg_type_),
-  PROTOBUF_FIELD_OFFSET(::mondis::Message, content_),
   PROTOBUF_FIELD_OFFSET(::mondis::Message, res_type_),
   PROTOBUF_FIELD_OFFSET(::mondis::Message, data_type_),
-  PROTOBUF_FIELD_OFFSET(::mondis::Message, command_type_),
+  PROTOBUF_FIELD_OFFSET(::mondis::Message, command_from_),
+  PROTOBUF_FIELD_OFFSET(::mondis::Message, content_),
+  PROTOBUF_FIELD_OFFSET(::mondis::Message, db_index_),
 };
 static const ::google::protobuf::internal::MigrationSchema schemas[] PROTOBUF_SECTION_VARIABLE(protodesc_cold) = {
   { 0, -1, sizeof(::mondis::Message)},
@@ -71,24 +72,24 @@ static ::google::protobuf::Message const * const file_default_instances[] = {
 };
 
 const char descriptor_table_protodef_mondis_2eproto[] =
-  "\n\014mondis.proto\022\006mondis\"\264\001\n\007Message\022!\n\010ms"
-  "g_type\030\001 \001(\0162\017.mondis.MsgType\022\017\n\007content"
-  "\030\002 \001(\t\022%\n\010res_type\030\003 \001(\0162\023.mondis.ExecRe"
-  "sType\022#\n\tdata_type\030\004 \001(\0162\020.mondis.DataTy"
-  "pe\022)\n\014command_type\030\005 \001(\0162\023.mondis.Comman"
-  "dType*L\n\013ExecResType\022\006\n\002OK\020\000\022\020\n\014SYNTAX_E"
-  "RROR\020\001\022\022\n\016INTERNAL_ERROR\020\002\022\017\n\013LOGIC_ERRO"
-  "R\020\003*.\n\007MsgType\022\010\n\004DATA\020\000\022\013\n\007COMMAND\020\001\022\014\n"
-  "\010EXEC_RES\020\002*:\n\010DataType\022\r\n\tSYNC_DATA\020\000\022\017"
-  "\n\013CONTROL_MSG\020\001\022\016\n\nHEART_BEAT\020\002*m\n\013Comma"
-  "ndType\022\022\n\016CLIENT_COMMAND\020\000\022\022\n\016MASTER_COM"
-  "MAND\020\001\022\020\n\014PEER_COMMAND\020\002\022\021\n\rSLAVE_FORWAR"
-  "D\020\003\022\021\n\rTIMER_COMMAND\020\004b\006proto3"
+  "\n\014mondis.proto\022\006mondis\"\306\001\n\007Message\022!\n\010ms"
+  "g_type\030\001 \001(\0162\017.mondis.MsgType\022%\n\010res_typ"
+  "e\030\002 \001(\0162\023.mondis.ExecResType\022#\n\tdata_typ"
+  "e\030\003 \001(\0162\020.mondis.DataType\022)\n\014command_fro"
+  "m\030\004 \001(\0162\023.mondis.CommandFrom\022\017\n\007content\030"
+  "\005 \001(\t\022\020\n\010db_index\030\006 \001(\005*L\n\013ExecResType\022\006"
+  "\n\002OK\020\000\022\020\n\014SYNTAX_ERROR\020\001\022\022\n\016INTERNAL_ERR"
+  "OR\020\002\022\017\n\013LOGIC_ERROR\020\003*.\n\007MsgType\022\010\n\004DATA"
+  "\020\000\022\013\n\007COMMAND\020\001\022\014\n\010EXEC_RES\020\002*+\n\010DataTyp"
+  "e\022\017\n\013CONTROL_MSG\020\000\022\016\n\nHEART_BEAT\020\001*m\n\013Co"
+  "mmandFrom\022\022\n\016CLIENT_COMMAND\020\000\022\022\n\016MASTER_"
+  "COMMAND\020\001\022\020\n\014PEER_COMMAND\020\002\022\021\n\rSLAVE_FOR"
+  "WARD\020\003\022\021\n\rTIMER_COMMAND\020\004b\006proto3"
   ;
 ::google::protobuf::internal::DescriptorTable descriptor_table_mondis_2eproto = {
   false, InitDefaults_mondis_2eproto, 
   descriptor_table_protodef_mondis_2eproto,
-  "mondis.proto", &assign_descriptors_table_mondis_2eproto, 510,
+  "mondis.proto", &assign_descriptors_table_mondis_2eproto, 513,
 };
 
 void AddDescriptors_mondis_2eproto() {
@@ -140,18 +141,17 @@ bool DataType_IsValid(int value) {
   switch (value) {
     case 0:
     case 1:
-    case 2:
       return true;
     default:
       return false;
   }
 }
 
-const ::google::protobuf::EnumDescriptor* CommandType_descriptor() {
+const ::google::protobuf::EnumDescriptor* CommandFrom_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&assign_descriptors_table_mondis_2eproto);
   return file_level_enum_descriptors_mondis_2eproto[3];
 }
-bool CommandType_IsValid(int value) {
+bool CommandFrom_IsValid(int value) {
   switch (value) {
     case 0:
     case 1:
@@ -175,10 +175,11 @@ class Message::HasBitSetters {
 
 #if !defined(_MSC_VER) || _MSC_VER >= 1900
 const int Message::kMsgTypeFieldNumber;
-const int Message::kContentFieldNumber;
 const int Message::kResTypeFieldNumber;
 const int Message::kDataTypeFieldNumber;
-const int Message::kCommandTypeFieldNumber;
+const int Message::kCommandFromFieldNumber;
+const int Message::kContentFieldNumber;
+const int Message::kDbIndexFieldNumber;
 #endif  // !defined(_MSC_VER) || _MSC_VER >= 1900
 
 Message::Message()
@@ -195,8 +196,8 @@ Message::Message(const Message& from)
     content_.AssignWithDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), from.content_);
   }
   ::memcpy(&msg_type_, &from.msg_type_,
-    static_cast<size_t>(reinterpret_cast<char*>(&command_type_) -
-    reinterpret_cast<char*>(&msg_type_)) + sizeof(command_type_));
+    static_cast<size_t>(reinterpret_cast<char*>(&db_index_) -
+    reinterpret_cast<char*>(&msg_type_)) + sizeof(db_index_));
   // @@protoc_insertion_point(copy_constructor:mondis.Message)
 }
 
@@ -205,8 +206,8 @@ void Message::SharedCtor() {
       &scc_info_Message_mondis_2eproto.base);
   content_.UnsafeSetDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
   ::memset(&msg_type_, 0, static_cast<size_t>(
-      reinterpret_cast<char*>(&command_type_) -
-      reinterpret_cast<char*>(&msg_type_)) + sizeof(command_type_));
+      reinterpret_cast<char*>(&db_index_) -
+      reinterpret_cast<char*>(&msg_type_)) + sizeof(db_index_));
 }
 
 Message::~Message() {
@@ -235,15 +236,15 @@ void Message::Clear() {
 
   content_.ClearToEmptyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
   ::memset(&msg_type_, 0, static_cast<size_t>(
-      reinterpret_cast<char*>(&command_type_) -
-      reinterpret_cast<char*>(&msg_type_)) + sizeof(command_type_));
+      reinterpret_cast<char*>(&db_index_) -
+      reinterpret_cast<char*>(&msg_type_)) + sizeof(db_index_));
   _internal_metadata_.Clear();
 }
 
 #if GOOGLE_PROTOBUF_ENABLE_EXPERIMENTAL_PARSER
-const char* Message::_InternalParse(const char* begin, const char* end, void* value,
+const char* Message::_InternalParse(const char* begin, const char* end, void* object,
                   ::google::protobuf::internal::ParseContext* ctx) {
-  auto msg = static_cast<Message*>(value);
+  auto msg = static_cast<Message*>(object);
   ::google::protobuf::int32 size; (void)size;
   int depth; (void)depth;
   ::google::protobuf::uint32 tag;
@@ -261,43 +262,50 @@ const char* Message::_InternalParse(const char* begin, const char* end, void* va
         GOOGLE_PROTOBUF_PARSER_ASSERT(ptr);
         break;
       }
-      // string content = 2;
+      // .mondis.ExecResType res_type = 2;
       case 2: {
-        if (static_cast<::google::protobuf::uint8>(tag) != 18) goto handle_unusual;
-        ptr = ::google::protobuf::io::ReadSize(ptr, &size);
-        GOOGLE_PROTOBUF_PARSER_ASSERT(ptr);
-        ctx->extra_parse_data().SetFieldName("mondis.Message.content");
-        value = msg->mutable_content();
-        if (size > end - ptr + ::google::protobuf::internal::ParseContext::kSlopBytes) {
-          parser_till_end = ::google::protobuf::internal::GreedyStringParserUTF8;
-          goto string_till_end;
-        }
-        GOOGLE_PROTOBUF_PARSER_ASSERT(::google::protobuf::internal::StringCheckUTF8(ptr, size, ctx));
-        ::google::protobuf::internal::InlineGreedyStringParser(value, ptr, size, ctx);
-        ptr += size;
-        break;
-      }
-      // .mondis.ExecResType res_type = 3;
-      case 3: {
-        if (static_cast<::google::protobuf::uint8>(tag) != 24) goto handle_unusual;
+        if (static_cast<::google::protobuf::uint8>(tag) != 16) goto handle_unusual;
         ::google::protobuf::uint64 val = ::google::protobuf::internal::ReadVarint(&ptr);
         msg->set_res_type(static_cast<::mondis::ExecResType>(val));
         GOOGLE_PROTOBUF_PARSER_ASSERT(ptr);
         break;
       }
-      // .mondis.DataType data_type = 4;
-      case 4: {
-        if (static_cast<::google::protobuf::uint8>(tag) != 32) goto handle_unusual;
+      // .mondis.DataType data_type = 3;
+      case 3: {
+        if (static_cast<::google::protobuf::uint8>(tag) != 24) goto handle_unusual;
         ::google::protobuf::uint64 val = ::google::protobuf::internal::ReadVarint(&ptr);
         msg->set_data_type(static_cast<::mondis::DataType>(val));
         GOOGLE_PROTOBUF_PARSER_ASSERT(ptr);
         break;
       }
-      // .mondis.CommandType command_type = 5;
-      case 5: {
-        if (static_cast<::google::protobuf::uint8>(tag) != 40) goto handle_unusual;
+      // .mondis.CommandFrom command_from = 4;
+      case 4: {
+        if (static_cast<::google::protobuf::uint8>(tag) != 32) goto handle_unusual;
         ::google::protobuf::uint64 val = ::google::protobuf::internal::ReadVarint(&ptr);
-        msg->set_command_type(static_cast<::mondis::CommandType>(val));
+        msg->set_command_from(static_cast<::mondis::CommandFrom>(val));
+        GOOGLE_PROTOBUF_PARSER_ASSERT(ptr);
+        break;
+      }
+      // string content = 5;
+      case 5: {
+        if (static_cast<::google::protobuf::uint8>(tag) != 42) goto handle_unusual;
+        ptr = ::google::protobuf::io::ReadSize(ptr, &size);
+        GOOGLE_PROTOBUF_PARSER_ASSERT(ptr);
+        ctx->extra_parse_data().SetFieldName("mondis.Message.content");
+        object = msg->mutable_content();
+        if (size > end - ptr + ::google::protobuf::internal::ParseContext::kSlopBytes) {
+          parser_till_end = ::google::protobuf::internal::GreedyStringParserUTF8;
+          goto string_till_end;
+        }
+        GOOGLE_PROTOBUF_PARSER_ASSERT(::google::protobuf::internal::StringCheckUTF8(ptr, size, ctx));
+        ::google::protobuf::internal::InlineGreedyStringParser(object, ptr, size, ctx);
+        ptr += size;
+        break;
+      }
+      // int32 db_index = 6;
+      case 6: {
+        if (static_cast<::google::protobuf::uint8>(tag) != 48) goto handle_unusual;
+        msg->set_db_index(::google::protobuf::internal::ReadVarint(&ptr));
         GOOGLE_PROTOBUF_PARSER_ASSERT(ptr);
         break;
       }
@@ -317,12 +325,12 @@ const char* Message::_InternalParse(const char* begin, const char* end, void* va
   }  // while
   return ptr;
 string_till_end:
-  static_cast<::std::string*>(value)->clear();
-  static_cast<::std::string*>(value)->reserve(size);
+  static_cast<::std::string*>(object)->clear();
+  static_cast<::std::string*>(object)->reserve(size);
   goto len_delim_till_end;
 len_delim_till_end:
   return ctx->StoreAndTailCall(ptr, end, {_InternalParse, msg},
-                               {parser_till_end, value}, size);
+                               {parser_till_end, object}, size);
 }
 #else  // GOOGLE_PROTOBUF_ENABLE_EXPERIMENTAL_PARSER
 bool Message::MergePartialFromCodedStream(
@@ -349,9 +357,51 @@ bool Message::MergePartialFromCodedStream(
         break;
       }
 
-      // string content = 2;
+      // .mondis.ExecResType res_type = 2;
       case 2: {
-        if (static_cast< ::google::protobuf::uint8>(tag) == (18 & 0xFF)) {
+        if (static_cast< ::google::protobuf::uint8>(tag) == (16 & 0xFF)) {
+          int value = 0;
+          DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
+                   int, ::google::protobuf::internal::WireFormatLite::TYPE_ENUM>(
+                 input, &value)));
+          set_res_type(static_cast< ::mondis::ExecResType >(value));
+        } else {
+          goto handle_unusual;
+        }
+        break;
+      }
+
+      // .mondis.DataType data_type = 3;
+      case 3: {
+        if (static_cast< ::google::protobuf::uint8>(tag) == (24 & 0xFF)) {
+          int value = 0;
+          DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
+                   int, ::google::protobuf::internal::WireFormatLite::TYPE_ENUM>(
+                 input, &value)));
+          set_data_type(static_cast< ::mondis::DataType >(value));
+        } else {
+          goto handle_unusual;
+        }
+        break;
+      }
+
+      // .mondis.CommandFrom command_from = 4;
+      case 4: {
+        if (static_cast< ::google::protobuf::uint8>(tag) == (32 & 0xFF)) {
+          int value = 0;
+          DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
+                   int, ::google::protobuf::internal::WireFormatLite::TYPE_ENUM>(
+                 input, &value)));
+          set_command_from(static_cast< ::mondis::CommandFrom >(value));
+        } else {
+          goto handle_unusual;
+        }
+        break;
+      }
+
+      // string content = 5;
+      case 5: {
+        if (static_cast< ::google::protobuf::uint8>(tag) == (42 & 0xFF)) {
           DO_(::google::protobuf::internal::WireFormatLite::ReadString(
                 input, this->mutable_content()));
           DO_(::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
@@ -364,42 +414,13 @@ bool Message::MergePartialFromCodedStream(
         break;
       }
 
-      // .mondis.ExecResType res_type = 3;
-      case 3: {
-        if (static_cast< ::google::protobuf::uint8>(tag) == (24 & 0xFF)) {
-          int value = 0;
-          DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
-                   int, ::google::protobuf::internal::WireFormatLite::TYPE_ENUM>(
-                 input, &value)));
-          set_res_type(static_cast< ::mondis::ExecResType >(value));
-        } else {
-          goto handle_unusual;
-        }
-        break;
-      }
+      // int32 db_index = 6;
+      case 6: {
+        if (static_cast< ::google::protobuf::uint8>(tag) == (48 & 0xFF)) {
 
-      // .mondis.DataType data_type = 4;
-      case 4: {
-        if (static_cast< ::google::protobuf::uint8>(tag) == (32 & 0xFF)) {
-          int value = 0;
           DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
-                   int, ::google::protobuf::internal::WireFormatLite::TYPE_ENUM>(
-                 input, &value)));
-          set_data_type(static_cast< ::mondis::DataType >(value));
-        } else {
-          goto handle_unusual;
-        }
-        break;
-      }
-
-      // .mondis.CommandType command_type = 5;
-      case 5: {
-        if (static_cast< ::google::protobuf::uint8>(tag) == (40 & 0xFF)) {
-          int value = 0;
-          DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
-                   int, ::google::protobuf::internal::WireFormatLite::TYPE_ENUM>(
-                 input, &value)));
-          set_command_type(static_cast< ::mondis::CommandType >(value));
+                   ::google::protobuf::int32, ::google::protobuf::internal::WireFormatLite::TYPE_INT32>(
+                 input, &db_index_)));
         } else {
           goto handle_unusual;
         }
@@ -439,32 +460,37 @@ void Message::SerializeWithCachedSizes(
       1, this->msg_type(), output);
   }
 
-  // string content = 2;
+  // .mondis.ExecResType res_type = 2;
+  if (this->res_type() != 0) {
+    ::google::protobuf::internal::WireFormatLite::WriteEnum(
+      2, this->res_type(), output);
+  }
+
+  // .mondis.DataType data_type = 3;
+  if (this->data_type() != 0) {
+    ::google::protobuf::internal::WireFormatLite::WriteEnum(
+      3, this->data_type(), output);
+  }
+
+  // .mondis.CommandFrom command_from = 4;
+  if (this->command_from() != 0) {
+    ::google::protobuf::internal::WireFormatLite::WriteEnum(
+      4, this->command_from(), output);
+  }
+
+  // string content = 5;
   if (this->content().size() > 0) {
     ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
       this->content().data(), static_cast<int>(this->content().length()),
       ::google::protobuf::internal::WireFormatLite::SERIALIZE,
       "mondis.Message.content");
     ::google::protobuf::internal::WireFormatLite::WriteStringMaybeAliased(
-      2, this->content(), output);
+      5, this->content(), output);
   }
 
-  // .mondis.ExecResType res_type = 3;
-  if (this->res_type() != 0) {
-    ::google::protobuf::internal::WireFormatLite::WriteEnum(
-      3, this->res_type(), output);
-  }
-
-  // .mondis.DataType data_type = 4;
-  if (this->data_type() != 0) {
-    ::google::protobuf::internal::WireFormatLite::WriteEnum(
-      4, this->data_type(), output);
-  }
-
-  // .mondis.CommandType command_type = 5;
-  if (this->command_type() != 0) {
-    ::google::protobuf::internal::WireFormatLite::WriteEnum(
-      5, this->command_type(), output);
+  // int32 db_index = 6;
+  if (this->db_index() != 0) {
+    ::google::protobuf::internal::WireFormatLite::WriteInt32(6, this->db_index(), output);
   }
 
   if (_internal_metadata_.have_unknown_fields()) {
@@ -486,7 +512,25 @@ void Message::SerializeWithCachedSizes(
       1, this->msg_type(), target);
   }
 
-  // string content = 2;
+  // .mondis.ExecResType res_type = 2;
+  if (this->res_type() != 0) {
+    target = ::google::protobuf::internal::WireFormatLite::WriteEnumToArray(
+      2, this->res_type(), target);
+  }
+
+  // .mondis.DataType data_type = 3;
+  if (this->data_type() != 0) {
+    target = ::google::protobuf::internal::WireFormatLite::WriteEnumToArray(
+      3, this->data_type(), target);
+  }
+
+  // .mondis.CommandFrom command_from = 4;
+  if (this->command_from() != 0) {
+    target = ::google::protobuf::internal::WireFormatLite::WriteEnumToArray(
+      4, this->command_from(), target);
+  }
+
+  // string content = 5;
   if (this->content().size() > 0) {
     ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
       this->content().data(), static_cast<int>(this->content().length()),
@@ -494,25 +538,12 @@ void Message::SerializeWithCachedSizes(
       "mondis.Message.content");
     target =
       ::google::protobuf::internal::WireFormatLite::WriteStringToArray(
-        2, this->content(), target);
+        5, this->content(), target);
   }
 
-  // .mondis.ExecResType res_type = 3;
-  if (this->res_type() != 0) {
-    target = ::google::protobuf::internal::WireFormatLite::WriteEnumToArray(
-      3, this->res_type(), target);
-  }
-
-  // .mondis.DataType data_type = 4;
-  if (this->data_type() != 0) {
-    target = ::google::protobuf::internal::WireFormatLite::WriteEnumToArray(
-      4, this->data_type(), target);
-  }
-
-  // .mondis.CommandType command_type = 5;
-  if (this->command_type() != 0) {
-    target = ::google::protobuf::internal::WireFormatLite::WriteEnumToArray(
-      5, this->command_type(), target);
+  // int32 db_index = 6;
+  if (this->db_index() != 0) {
+    target = ::google::protobuf::internal::WireFormatLite::WriteInt32ToArray(6, this->db_index(), target);
   }
 
   if (_internal_metadata_.have_unknown_fields()) {
@@ -536,7 +567,7 @@ size_t Message::ByteSizeLong() const {
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
 
-  // string content = 2;
+  // string content = 5;
   if (this->content().size() > 0) {
     total_size += 1 +
       ::google::protobuf::internal::WireFormatLite::StringSize(
@@ -549,22 +580,29 @@ size_t Message::ByteSizeLong() const {
       ::google::protobuf::internal::WireFormatLite::EnumSize(this->msg_type());
   }
 
-  // .mondis.ExecResType res_type = 3;
+  // .mondis.ExecResType res_type = 2;
   if (this->res_type() != 0) {
     total_size += 1 +
       ::google::protobuf::internal::WireFormatLite::EnumSize(this->res_type());
   }
 
-  // .mondis.DataType data_type = 4;
+  // .mondis.DataType data_type = 3;
   if (this->data_type() != 0) {
     total_size += 1 +
       ::google::protobuf::internal::WireFormatLite::EnumSize(this->data_type());
   }
 
-  // .mondis.CommandType command_type = 5;
-  if (this->command_type() != 0) {
+  // .mondis.CommandFrom command_from = 4;
+  if (this->command_from() != 0) {
     total_size += 1 +
-      ::google::protobuf::internal::WireFormatLite::EnumSize(this->command_type());
+      ::google::protobuf::internal::WireFormatLite::EnumSize(this->command_from());
+  }
+
+  // int32 db_index = 6;
+  if (this->db_index() != 0) {
+    total_size += 1 +
+      ::google::protobuf::internal::WireFormatLite::Int32Size(
+        this->db_index());
   }
 
   int cached_size = ::google::protobuf::internal::ToCachedSize(total_size);
@@ -607,8 +645,11 @@ void Message::MergeFrom(const Message& from) {
   if (from.data_type() != 0) {
     set_data_type(from.data_type());
   }
-  if (from.command_type() != 0) {
-    set_command_type(from.command_type());
+  if (from.command_from() != 0) {
+    set_command_from(from.command_from());
+  }
+  if (from.db_index() != 0) {
+    set_db_index(from.db_index());
   }
 }
 
@@ -642,7 +683,8 @@ void Message::InternalSwap(Message* other) {
   swap(msg_type_, other->msg_type_);
   swap(res_type_, other->res_type_);
   swap(data_type_, other->data_type_);
-  swap(command_type_, other->command_type_);
+  swap(command_from_, other->command_from_);
+  swap(db_index_, other->db_index_);
 }
 
 ::google::protobuf::Metadata Message::GetMetadata() const {

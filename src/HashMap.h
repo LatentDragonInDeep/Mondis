@@ -146,8 +146,8 @@ private:
     unsigned getIndex(unsigned hash);
     void addToSlot(int index, Entry *entry);
     void toJson();
-    HashMap::MapIterator iterator();
 public:
+    HashMap::MapIterator iterator();
     virtual ExecRes execute(Command *command);
 
     virtual MondisObject *locate(Command *command);

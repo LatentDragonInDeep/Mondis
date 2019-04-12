@@ -200,9 +200,8 @@ private:
     friend class MondisClient;
     int maxClientNum = 1024;
     int maxCommandReplicaBufferSize = 1024 * 1024;
-    int maxCommandPropagateBufferSize = 1024;
     int maxSlaveNum = 1024;
-    deque<string> * replicaCommandBuffer = new deque<string>();
+    deque<string> * replicaCommandBuffer = nullptr;
     bool isSlaveOf = false;
     pid_t pid;
     std::string configfile;
@@ -328,8 +327,6 @@ private:
 
     void replicaToSlave(MondisClient *client, long long slaveReplicaOffset);
 
-    void replicaCommandPropagate(vector<string> commands,MondisClient* client);
-
     unordered_map<string, unordered_set<MondisClient *>> keyToWatchedClients;
 
     MondisClient *self = nullptr;
@@ -367,7 +364,7 @@ private:
     ExecRes exsits(Command*,MondisClient*);
     ExecRes login(Command*,MondisClient*);
     ExecRes type(Command*,MondisClient*);
-    ExecRes setTTl(Command*,MondisClient*);
+    ExecRes setTTL(Command *command, MondisClient *client);
     ExecRes selectDb(Command *, MondisClient *);
     ExecRes save(Command*,MondisClient*);
     ExecRes saveAll(Command*,MondisClient*);

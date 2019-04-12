@@ -560,11 +560,12 @@ ExecRes MondisServer::execute(const string &commandStr, MondisClient *client) {
     appendLog(commandStr, res);
     if (cstruct.isModify && res.type == OK) {
         appendAof(commandStr);
-        if (replicaCommandBuffer->size() == maxCommandReplicaBufferSize) {
+        size_t cur = replicaCommandBuffer->size();
+        if (cur > maxCommandReplicaBufferSize) {
             replicaCommandBuffer->pop_front();
-            replicaCommandBuffer->push_back(commandStr);
         }
-        replicaOffset++;
+        replicaCommandBuffer->push_back(commandStr);
+        incrReplicaOffset();
     }
 
     return res;
@@ -619,9 +620,7 @@ void MondisServer::applyConf() {
         } else if(kv.first == "maxClientNum") {
             maxClientNum = atoi(kv.second.c_str());
         } else if(kv.first == "maxCommandReplicaBufferSize") {
-            maxCommandPropagateBufferSize = atoi(kv.second.c_str());
-        } else if(kv.first == "maxCommandPropagateBufferSize" ) {
-            maxCommandPropagateBufferSize=atoi(kv.second.c_str());
+            maxCommandReplicaBufferSize = atoi(kv.second.c_str());
         } else if(kv.first == "masterUsername") {
             masterUsername = kv.second;
         } else if(kv.first == "masterPassword") {
@@ -808,7 +807,7 @@ MondisServer::MondisServer() {
 #elif defined(linux)
     listenEvent.events = EPOLLET|EPOLLIN;
 #endif
-    replicaCommandBuffer = new deque<string>;
+    replicaCommandBuffer = new deque<string>();
 }
 
 MondisServer::~MondisServer() {
@@ -821,14 +820,13 @@ MondisServer::~MondisServer() {
 }
 
 void MondisServer::replicaToSlave(MondisClient *client, long long slaveReplicaOffset) {
-    if (replicaOffset - slaveReplicaOffset > maxCommandReplicaBufferSize) {
-        const long long start = replicaOffset;
+    if (replicaOffset - slaveReplicaOffset > replicaCommandBuffer->size()) {
         string *temp = new string;
         getJson(temp);
         runStatusMtx.lock();
         runStatus = RunStatus::PROPAGATING;
         runStatusMtx.unlock();
-        mondis::Message* msg = new mondis::Message;
+        mondis::Message *msg = new mondis::Message;
         msg->set_msg_type(mondis::MsgType::DATA);
         msg->set_data_type(mondis::DataType::SYNC_DATA);
         msg->set_content(*temp);
@@ -838,18 +836,11 @@ void MondisServer::replicaToSlave(MondisClient *client, long long slaveReplicaOf
         actionResult.sendToType = SendToType::SPECIFY_CLIENT;
         putToWriteQueue(actionResult);
         delete temp;
-        auto begin  = replicaCommandBuffer->begin()+(replicaOffset - slaveReplicaOffset);
-        auto end = replicaCommandBuffer->end();
-        vector<string> commands(begin,end);
-        replicaCommandPropagate(commands, client);
-    } else {
-        runStatusMtx.lock();
-        runStatus = RunStatus::PROPAGATING;
-        runStatusMtx.unlock();
-        auto begin  = replicaCommandBuffer->begin()+(replicaOffset - slaveReplicaOffset);
-        auto end = replicaCommandBuffer->end();
-        vector<string> commands(begin,end);
-        replicaCommandPropagate(commands, client);
+    }
+    auto begin  = replicaCommandBuffer->begin()+(replicaCommandBuffer->size()-replicaOffset + slaveReplicaOffset);
+    auto end = replicaCommandBuffer->end();
+    for (;begin!=end;begin++){
+        putCommandMsgToWriteQueue(*begin,client->id,mondis::CommandType::MASTER_COMMAND,SendToType::SPECIFY_CLIENT);
     }
     string newPeer = "NEW_PEER ";
     newPeer += client->ip;
@@ -1333,7 +1324,7 @@ unordered_map<CommandType,CommandHandler> MondisServer::commandHandlers = {
         {CommandType::SELECT, &MondisServer::selectDb},
         {CommandType::RENAME, &MondisServer::renameKey},
         {CommandType::GET,&MondisServer::get},
-        {CommandType::SET_TTL,&MondisServer::setTTl},
+        {CommandType::SET_TTL, &MondisServer::setTTL},
         {CommandType::EXISTS,&MondisServer::exsits},
         {CommandType::EXIT, &MondisServer::mondisExit},
         {CommandType::SAVE,&MondisServer::save},
@@ -1990,13 +1981,7 @@ void MondisServer::putExecResMsgToWriteQueue(const ExecRes &res, unsigned int cl
     putToWriteQueue(actionResult);
 }
 
-void MondisServer::replicaCommandPropagate(vector<string> commands, MondisClient *client) {
-    for (auto c:commands){
-        putCommandMsgToWriteQueue(c,client->id,mondis::CommandType::MASTER_COMMAND,SendToType::SPECIFY_CLIENT);
-    }
-}
-
-ExecRes MondisServer::setTTl(Command* command,MondisClient* client) {
+ExecRes MondisServer::setTTL(Command *command, MondisClient *client) {
     ExecRes res;
     CHECK_PARAM_NUM(2)
     CHECK_PARAM_TYPE(0,PLAIN)

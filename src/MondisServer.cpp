@@ -823,15 +823,22 @@ MondisServer::~MondisServer() {
 }
 
 void MondisServer::replicaToSlave(MondisClient *client, long long slaveReplicaOffset) {
-    if (replicaOffset - slaveReplicaOffset > 1000) {
+    if (replicaOffset - slaveReplicaOffset > replicaCommandBuffer->size()) {
         slaveReplicaOffset = replicaOffset;
         runStatusMtx.lock();
         runStatus = RunStatus::PROPAGATING;
         runStatusMtx.unlock();
         for (int i =0;i<databaseNum;i++) {
-            auto iter = dbs[i]->iterator();
-            while (iter.next()) {
-                putCommandMsgToWriteQueue("SET "+iter->key+" "+iter->value->getJson(),client->id,mondis::CommandFrom::MASTER_COMMAND,SendToType::SPECIFY_PEER,i);
+            if(dbs[i]!= nullptr) {
+                auto iter = dbs[i]->iterator();
+                while (iter.next()) {
+                    string commandStr = "SET ";
+                    commandStr+=iter->key;
+                    commandStr+=" \"";
+                    commandStr+=iter->value->getJson();
+                    commandStr+="\"";
+                    putCommandMsgToWriteQueue(commandStr, client->id,mondis::CommandFrom::MASTER_COMMAND, SendToType::SPECIFY_PEER, i);
+                }
             }
         }
     }

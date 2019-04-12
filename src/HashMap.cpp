@@ -206,21 +206,23 @@ void HashMap::addToSlot(int index, Entry *entry)
 void HashMap::toJson() {
     globalMutex.lock();
     if (isValueNull) {
-        json = "";
-        json += "[\n";
+        json = "[\"SET\"";
         auto iter = iterator();
+
         while (iter.next()) {
-            json += iter->getJson();
             json += ",\n";
+            json += iter->getJson();
         }
         json += ']';
     } else {
-        json = "";
-        json += "{\n";
+        json = "{";
         auto iter = iterator();
-        while (iter.next()) {
+        if(iter.next()) {
             json += iter->getJson();
+        }
+        while (iter.next()) {
             json += ",\n";
+            json += iter->getJson();
         }
         json += '}';
     }

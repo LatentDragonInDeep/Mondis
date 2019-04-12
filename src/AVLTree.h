@@ -37,10 +37,11 @@ public:
         json = "";
         json+="\"";
         json += key;
-        json+="\"";
-        if (value == nullptr) {
-            json += ":";
+        json+="\":";
+        if (value != nullptr) {
             json += value->getJson();
+        } else {
+            json+="";
         }
     }
 

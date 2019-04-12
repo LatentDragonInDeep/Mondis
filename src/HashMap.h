@@ -78,20 +78,7 @@ private:
         AVLTree::AVLIterator avlIterator;
         HashMap* map = nullptr;
         Content* curContent = nullptr;
-        bool lookForNext() {
-            if (curContent->isList) {
-                Entry* entry = dynamic_cast<Entry*>(cur);
-                Entry* next = entry->next;
-                if (next!=curContent->tail) {
-                    return true;
-                }
-            } else {
-                bool hasNext = avlIterator.next();
-                if(hasNext) {
-                    cur = avlIterator.getData();
-                    return true;
-                }
-            }
+        bool lookForNextSlot() {
             while (true) {
                 slotIndex++;
                 if (slotIndex >= map->capacity) {
@@ -114,11 +101,26 @@ private:
             }
         };
     public:
-        MapIterator(HashMap* map) : array(map->arrayFrom){
+        MapIterator(HashMap* map) : map(map),array(map->arrayFrom){
             curContent = &array[0];
+            cur = curContent->head;
         };
         bool next() {
-            return lookForNext();
+            if (curContent->isList) {
+                Entry* entry = dynamic_cast<Entry*>(cur);
+                Entry* next = entry->next;
+                if (next!=curContent->tail) {
+                    cur = next;
+                    return true;
+                }
+            } else {
+                bool hasNext = avlIterator.next();
+                if(hasNext) {
+                    cur = avlIterator.getData();
+                    return true;
+                }
+            }
+            return lookForNextSlot();
         };
 
         KeyValue* operator->() {

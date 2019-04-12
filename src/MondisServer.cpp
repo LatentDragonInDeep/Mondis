@@ -1269,8 +1269,15 @@ void MondisServer::msgHandle() {
             case mondis::MsgType::COMMAND: {
                 ExecRes res = execute(msg->content(), action.client, msg->db_index());
                 if (serverStatus == ServerStatus::SV_STAT_MASTER) {
-                    putCommandMsgToWriteQueue(msg->content(), action.client->id, mondis::CommandFrom::MASTER_COMMAND,
-                                              SendToType::ALL_PEERS, msg->db_index());
+                    if (msg->db_index() == -1) {
+                        putCommandMsgToWriteQueue(msg->content(), action.client->id,
+                                                  mondis::CommandFrom::MASTER_COMMAND,
+                                                  SendToType::ALL_PEERS);
+                    } else {
+                        putCommandMsgToWriteQueue(msg->content(), action.client->id,
+                                                  mondis::CommandFrom::MASTER_COMMAND,
+                                                  SendToType::ALL_PEERS,msg->db_index());
+                    }
                 }
                 if (msg->command_from() == mondis::CommandFrom::CLIENT_COMMAND && res.needReturn) {
                     putExecResMsgToWriteQueue(res, action.client->id, SendToType::SPECIFY_CLIENT);

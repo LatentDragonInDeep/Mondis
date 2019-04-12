@@ -242,7 +242,7 @@ public:
     void putToReadQueue(Action &action);
     void putToWriteQueue(ActionResult &actionResult);
     void putCommandMsgToWriteQueue(const string &cmdStr, unsigned int clientId, mondis::CommandFrom commandFrom,
-                                   SendToType sendToType, int dbIndex=0);
+                                   SendToType sendToType, int dbIndex=-1);
     void putExecResMsgToWriteQueue(const ExecRes &res, unsigned int clientId, SendToType sendToType);
     void putControlMsgToWriteQueue(const string& content,unsigned int clientId, SendToType sendToType);
     void replyHeartBeat(int clientId);

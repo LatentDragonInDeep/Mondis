@@ -47,10 +47,7 @@ INVALID_AND_RETURN \
 
 JSONParser MondisServer::parser;
 
-ExecRes MondisServer::execute(Command *command, MondisClient *client, int dbIndex) {
-    if(dbIndex!=-1) {
-        client->dBIndex = dbIndex;
-    }
+ExecRes MondisServer::execute(Command *command, MondisClient *client) {
     return (this->*commandHandlers[command->type])(command,client);
 }
 
@@ -551,7 +548,10 @@ ExecRes MondisServer::execute(const string &commandStr, MondisClient *client, in
         OK_AND_RETURN
     }
     if (controlCommands.find(command->type) != controlCommands.end() || cstruct.isLocate) {
-        res = transactionExecute(cstruct, client, dbIndex);
+        if(dbIndex!=-1) {
+            client->dBIndex = dbIndex;
+        }
+        res = transactionExecute(cstruct, client);
     } else if (command->type != LOCATE) {
         res.desc = "Invalid command";
         Command::destroyCommand(command);
@@ -688,7 +688,7 @@ void MondisServer::init() {
         recoveryFileIn.open(workDir + "/" + recoveryFile);
         string command;
         while (getline(recoveryFileIn, command)) {
-            execute(interpreter->getCommand(command), self, 0);
+            execute(interpreter->getCommand(command), self);
         }
     }
     if (daemonize) {
@@ -706,7 +706,7 @@ void MondisServer::init() {
         sync+= masterUsername;
         sync+=" ";
         sync+=masterPassword;
-        execute(interpreter->getCommand(sync), nullptr, 0);
+        execute(interpreter->getCommand(sync), nullptr);
     }
     //接收连接
     std::thread accept(&MondisServer::acceptSocket, this);
@@ -906,7 +906,7 @@ void MondisServer::undoExecute(MultiCommand *command, MondisClient *client) {
     }
     if (command->locateCommand == nullptr) {
         for (auto m:command->operations) {
-            execute(m, client, 0);
+            execute(m, client);
             Command::destroyCommand(m);
         }
     } else {
@@ -969,7 +969,7 @@ void MondisServer::appendAof(const string &command) {
     }
 }
 
-ExecRes MondisServer::transactionExecute(CommandStruct &cstruct, MondisClient *client, int dbIndex) {
+ExecRes MondisServer::transactionExecute(CommandStruct &cstruct, MondisClient *client) {
     ExecRes res;
     bool canContinue = true;
     if (cstruct.isModify) {
@@ -979,7 +979,7 @@ ExecRes MondisServer::transactionExecute(CommandStruct &cstruct, MondisClient *c
         if (cstruct.isLocate) {
             cstruct.obj->execute(cstruct.operation);
         } else {
-            res = execute(cstruct.operation, client,dbIndex);
+            res = execute(cstruct.operation, client);
         }
         Command::destroyCommand(cstruct.locate);
         Command::destroyCommand(cstruct.operation);

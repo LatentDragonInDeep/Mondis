@@ -57,7 +57,7 @@ ExecRes MondisClient::commitTransaction(MondisServer *server) {
         Command *command = server->interpreter->getCommand(next);
         CommandStruct cstruct = server->getCommandStruct(command, this);
         MultiCommand *undo = server->getUndoCommand(cstruct, this);
-        ExecRes res = server->transactionExecute(cstruct, this, 0);
+        ExecRes res = server->transactionExecute(cstruct, this);
         if (res.type != OK) {
             while (hasExecutedCommandNumInTransaction > 0) {
                 MultiCommand *un = undoCommands->back();

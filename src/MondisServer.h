@@ -287,7 +287,7 @@ public:
 
     int start(string& confFile);
 
-    ExecRes execute(Command *command, MondisClient *client, int dbIndex = -1);
+    ExecRes execute(Command *command, MondisClient *client);
 
     static JSONParser *getJSONParser();
 
@@ -307,7 +307,7 @@ public:
 
     void undoExecute(MultiCommand *command, MondisClient *client);
 
-    ExecRes transactionExecute(CommandStruct &cstruct, MondisClient *client, int dbIndex = -1);
+    ExecRes transactionExecute(CommandStruct &cstruct, MondisClient *client);
 
     CommandStruct getCommandStruct(Command *command, MondisClient *client);
 private:

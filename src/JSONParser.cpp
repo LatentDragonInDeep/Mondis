@@ -9,13 +9,6 @@
 #include "MondisList.h"
 #include "SplayTree.h"
 
-
-JSONParser::JSONParser(std::string &source) {
-
-    lexicalParser = new LexicalParser(source);
-}
-
-
 void JSONParser::parse(HashMap *keySpace) {
     Token next = lexicalParser->nextToken();
     if (next.type != LEFT_ANGLE_BRACKET) {
@@ -233,8 +226,8 @@ void JSONParser::parseAll(std::vector<HashMap *> &dbs) {
             if (dbs[dbIndex] == nullptr) {
                 dbs[dbIndex] = new HashMap();
             }
-            dbs[dbIndex]->put(iter->data->key, iter->data->value);
-            tree->remove(iter->data->key);
+            dbs[dbIndex]->put(iter->key, iter->value);
+            tree->remove(iter->key);
         }
     }
     Token end = lexicalParser->nextToken();
@@ -282,8 +275,6 @@ void JSONParser::LexicalParser::skip() {
         }
     }
 }
-
-JSONParser::LexicalParser::LexicalParser(std::string &s) : source(s) {}
 
 JSONParser::LexicalParser::LexicalParser() {}
 

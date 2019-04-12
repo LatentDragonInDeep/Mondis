@@ -2,7 +2,7 @@
 // Created by caesarschen on 2018/8/20.
 //
 
-#include "HashMap.h"
+#include "AVLTree.h"
 #include "MondisServer.h"
 
 using namespace std;
@@ -240,7 +240,7 @@ void AVLTree::toJson() {
     AVLIterator iterator = this->iterator();
     json += "{\n";
     while (iterator.next()) {
-        json += iterator->data->getJson();
+        json += iterator->getJson();
         json += ",";
         json += "\n";
     }
@@ -255,14 +255,14 @@ void AVLTree::insert(KeyValue *kv) {
     realInsert(kv);
 }
 
-KeyValue *AVLTree::get(string &key) {
+MondisObject *AVLTree::get(string &key) {
     AVLTreeNode* cur = root;
     while (true) {
         if(cur == nullptr) {
             return nullptr;
         }
         if(key == cur->data->key) {
-            return cur->data;
+            return cur->data->value;
         } else if(key.compare(cur->data->key)) {
             cur = cur->right;
             continue;
@@ -271,14 +271,6 @@ KeyValue *AVLTree::get(string &key) {
             continue;
         }
     }
-}
-
-MondisObject *AVLTree::getValue(string &key) {
-    KeyValue* kv = get(key);
-    if(kv == nullptr) {
-        return nullptr;
-    }
-    return kv->value;
 }
 
 bool AVLTree::containsKey(string &key) {
@@ -293,7 +285,7 @@ MondisObject *AVLTree::locate(Command *command) {
         return nullptr;
     }
     KEY(0)
-    return getValue(key);
+    return get(key);
 }
 
 ExecRes AVLTree::execute(Command *command) {
@@ -311,7 +303,7 @@ ExecRes AVLTree::execute(Command *command) {
             CHECK_PARAM_NUM(1);
             CHECK_PARAM_TYPE(0, PLAIN)
             KEY(0)
-            auto *obj = getValue(key);
+            auto *obj = get(key);
             if (obj == nullptr) {
                 res.desc = "the key " + PARAM(0) + " does not exists";
                 LOGIC_ERROR_AND_RETURN
@@ -393,7 +385,7 @@ void AVLTree::rebalance(AVLTreeNode *root) {
     }
 }
 
-bool AVLTree::isModified() {
+bool AVLTree::hasModified() {
     return !hasSerialized;
 }
 

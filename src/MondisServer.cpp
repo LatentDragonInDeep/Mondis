@@ -1522,12 +1522,12 @@ ExecRes MondisServer::renameKey(Command *command, MondisClient *client) {
     CHECK_PARAM_TYPE(1, PLAIN)
     MondisObject *data = dbs[client->dBIndex]->get(PARAM(0));
     if (data == nullptr) {
-        res.desc = "the object whose key is " + PARAM(0) + " does not exists";
+        res.desc = "the value whose key is " + PARAM(0) + " does not exists";
         LOGIC_ERROR_AND_RETURN
     }
     bool containsNew = dbs[client->dBIndex]->containsKey(PARAM(1));
     if (containsNew) {
-        res.desc = "the object whose key is " + PARAM(0) + " already exists";
+        res.desc = "the value whose key is " + PARAM(0) + " already exists";
         LOGIC_ERROR_AND_RETURN
     }
     dbs[client->dBIndex]->put(PARAM(0), nullptr);

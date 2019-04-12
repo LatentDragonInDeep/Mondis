@@ -241,9 +241,9 @@ void Message::Clear() {
 }
 
 #if GOOGLE_PROTOBUF_ENABLE_EXPERIMENTAL_PARSER
-const char* Message::_InternalParse(const char* begin, const char* end, void* object,
+const char* Message::_InternalParse(const char* begin, const char* end, void* value,
                   ::google::protobuf::internal::ParseContext* ctx) {
-  auto msg = static_cast<Message*>(object);
+  auto msg = static_cast<Message*>(value);
   ::google::protobuf::int32 size; (void)size;
   int depth; (void)depth;
   ::google::protobuf::uint32 tag;
@@ -267,13 +267,13 @@ const char* Message::_InternalParse(const char* begin, const char* end, void* ob
         ptr = ::google::protobuf::io::ReadSize(ptr, &size);
         GOOGLE_PROTOBUF_PARSER_ASSERT(ptr);
         ctx->extra_parse_data().SetFieldName("mondis.Message.content");
-        object = msg->mutable_content();
+        value = msg->mutable_content();
         if (size > end - ptr + ::google::protobuf::internal::ParseContext::kSlopBytes) {
           parser_till_end = ::google::protobuf::internal::GreedyStringParserUTF8;
           goto string_till_end;
         }
         GOOGLE_PROTOBUF_PARSER_ASSERT(::google::protobuf::internal::StringCheckUTF8(ptr, size, ctx));
-        ::google::protobuf::internal::InlineGreedyStringParser(object, ptr, size, ctx);
+        ::google::protobuf::internal::InlineGreedyStringParser(value, ptr, size, ctx);
         ptr += size;
         break;
       }
@@ -317,12 +317,12 @@ const char* Message::_InternalParse(const char* begin, const char* end, void* ob
   }  // while
   return ptr;
 string_till_end:
-  static_cast<::std::string*>(object)->clear();
-  static_cast<::std::string*>(object)->reserve(size);
+  static_cast<::std::string*>(value)->clear();
+  static_cast<::std::string*>(value)->reserve(size);
   goto len_delim_till_end;
 len_delim_till_end:
   return ctx->StoreAndTailCall(ptr, end, {_InternalParse, msg},
-                               {parser_till_end, object}, size);
+                               {parser_till_end, value}, size);
 }
 #else  // GOOGLE_PROTOBUF_ENABLE_EXPERIMENTAL_PARSER
 bool Message::MergePartialFromCodedStream(

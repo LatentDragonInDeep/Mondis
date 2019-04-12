@@ -102,8 +102,6 @@ public:
     public:
         LexicalParser();
 
-        LexicalParser(std::string &s);
-
         LexicalParser(const std::string &s);
 
         LexicalParser(const char *filePath);;
@@ -122,7 +120,6 @@ public:
     Token current;
     JSONParser();
     JSONParser(const char *filePath);
-    JSONParser(std::string&);
     JSONParser(const std::string&);
     void parse(HashMap* keySpace);
 

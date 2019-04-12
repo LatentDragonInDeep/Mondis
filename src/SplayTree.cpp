@@ -648,7 +648,7 @@ ExecRes SplayTree::execute(Command *command) {
             CHECK_AND_DEFINE_INT_LEGAL(0, score)
             MondisObject *data = getByScore(score);
             if(data== nullptr) {
-                res.desc = string("there is no object whose score is ") + to_string(score);
+                res.desc = string("there is no value whose score is ") + to_string(score);
                 LOGIC_ERROR_AND_RETURN
             }
             res.desc = data->getJson();

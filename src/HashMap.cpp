@@ -18,8 +18,8 @@ bool HashMap::put(string& key, MondisObject *value)
     if(content.isList) {
         for (Entry *cur = content.head->next; cur != content.tail; cur = cur->next) {
             if (key == cur->key) {
-                delete cur->object;
-                cur->object = value;
+                delete cur->value;
+                cur->value = value;
                 hasModified();
                 globalMutex.unlock_shared();
                 return true;
@@ -61,20 +61,16 @@ MondisObject *HashMap::get(string &key)
             if(key == cur->key)
             {
                 globalMutex.unlock_shared();
-                return cur->object;
+                return cur->value;
             }
         }
         globalMutex.unlock_shared();
         return nullptr;
     }
 
-    KeyValue *kv = content.tree->get(key);
-    if (kv == nullptr) {
-        globalMutex.unlock_shared();
-        return nullptr;
-    }
+    MondisObject* obj= content.tree->get(key);
     globalMutex.unlock_shared();
-    return kv->value;
+    return obj;
 }
 
 bool HashMap::containsKey (string &key)
@@ -95,15 +91,11 @@ bool HashMap::containsKey (string &key)
             }
             globalMutex.unlock_shared();
             return false;
-        }
-
-        KeyValue *kv = content.tree->get(key);
-        if (kv == nullptr) {
+        } else {
+            MondisObject *obj = content.tree->get(key);
             globalMutex.unlock_shared();
-            return false;
+            return obj!=nullptr;
         }
-        globalMutex.unlock_shared();
-        return true;
     }
     globalMutex.unlock_shared();
     return get(key) != nullptr;
@@ -157,7 +149,7 @@ void HashMap::toTree (int index)
     Content &content = arrayFrom[index];
     for (Entry *cur = content.head; cur != content.tail; cur = cur->next)
     {
-        tree->insert(cur->toKeyValue());
+        tree->insert(cur);
     }
     content.isList = false;
     content.tree = tree;
@@ -182,8 +174,8 @@ void HashMap::rehash()
         else{
             auto treeIterator = arrayFrom[i].tree->iterator();
             while (treeIterator.next()) {
-                int index = hash(treeIterator->data->key)&(capacity-1);
-                addToSlot(index, new Entry(treeIterator->data->key,treeIterator->data->value));
+                int index = hash(treeIterator->key)&(capacity-1);
+                addToSlot(index, new Entry(treeIterator->key,treeIterator->value));
                 delete arrayFrom[i].tree;
             }
         }

@@ -567,10 +567,13 @@ ExecRes MondisServer::execute(const string &commandStr, MondisClient *client, in
         if (cur > maxCommandReplicaBufferSize) {
             replicaCommandBuffer->pop_front();
         }
-        replicaCommandBuffer->push_back(commandStr);
+        replicaCommandBuffer->push_back(BufferedCommand(commandStr,dbIndex));
         incrReplicaOffset();
+        if(serverStatus == ServerStatus::SV_STAT_MASTER) {
+            putCommandMsgToWriteQueue(commandStr, client->id, mondis::CommandFrom::MASTER_COMMAND,
+                                      SendToType::ALL_PEERS, dbIndex);
+        }
     }
-
     return res;
 }
 
@@ -810,7 +813,7 @@ MondisServer::MondisServer() {
 #elif defined(linux)
     listenEvent.events = EPOLLET|EPOLLIN;
 #endif
-    replicaCommandBuffer = new deque<string>();
+    replicaCommandBuffer = new deque<BufferedCommand>();
 }
 
 MondisServer::~MondisServer() {
@@ -823,7 +826,7 @@ MondisServer::~MondisServer() {
 }
 
 void MondisServer::replicaToSlave(MondisClient *client, long long slaveReplicaOffset) {
-    if (replicaOffset - slaveReplicaOffset > replicaCommandBuffer->size()) {
+    if (replicaOffset - slaveReplicaOffset > 1000) {
         slaveReplicaOffset = replicaOffset;
         runStatusMtx.lock();
         runStatus = RunStatus::PROPAGATING;
@@ -845,8 +848,7 @@ void MondisServer::replicaToSlave(MondisClient *client, long long slaveReplicaOf
     auto begin  = replicaCommandBuffer->begin()+(replicaCommandBuffer->size()-replicaOffset + slaveReplicaOffset);
     auto end = replicaCommandBuffer->end();
     for (;begin!=end;begin++){
-        putCommandMsgToWriteQueue(*begin, client->id, mondis::CommandFrom::MASTER_COMMAND, SendToType::SPECIFY_CLIENT,
-                                  0);
+        putCommandMsgToWriteQueue(begin->command, client->id, mondis::CommandFrom::MASTER_COMMAND, SendToType::SPECIFY_CLIENT,begin->dbIndex);
     }
     string newPeer = "NEW_PEER ";
     newPeer += client->ip;
@@ -1112,7 +1114,6 @@ unordered_set<CommandType> MondisServer::modifyCommands = {
         CommandType:: TO_STRING,
         CommandType:: TO_INTEGER,
         CommandType:: CHANGE_SCORE,
-        CommandType:: SELECT
 };
 unordered_set<CommandType> MondisServer::transactionAboutCommands = {
         CommandType ::MULTI,
@@ -1275,17 +1276,6 @@ void MondisServer::msgHandle() {
         switch (msg->msg_type()) {
             case mondis::MsgType::COMMAND: {
                 ExecRes res = execute(msg->content(), action.client, msg->db_index());
-                if (serverStatus == ServerStatus::SV_STAT_MASTER) {
-                    if (msg->db_index() == -1) {
-                        putCommandMsgToWriteQueue(msg->content(), action.client->id,
-                                                  mondis::CommandFrom::MASTER_COMMAND,
-                                                  SendToType::ALL_PEERS);
-                    } else {
-                        putCommandMsgToWriteQueue(msg->content(), action.client->id,
-                                                  mondis::CommandFrom::MASTER_COMMAND,
-                                                  SendToType::ALL_PEERS,msg->db_index());
-                    }
-                }
                 if (msg->command_from() == mondis::CommandFrom::CLIENT_COMMAND && res.needReturn) {
                     putExecResMsgToWriteQueue(res, action.client->id, SendToType::SPECIFY_CLIENT);
                 }

@@ -94,8 +94,6 @@ public:
     int dBIndex = 0;
     string ip;
     int port;
-    long long preInteraction = chrono::duration_cast<chrono::milliseconds>(
-            chrono::system_clock::now().time_since_epoch()).count();
     unordered_set<string> watchedKeys;
     unordered_set<string> modifiedKeys;
 
@@ -112,7 +110,6 @@ private:
     queue<mondis::Message*> recvMsgs;
     char * halfPacketBuffer = nullptr;
     unsigned nextMessageLen = 0;
-    mondis::Message* nextMsg = nullptr;
     unsigned nextMsgHasRecv = 0;
     unsigned nextDataLenHasRecv = 0;
     char * nextDataLenBuffer = new char[4];
@@ -126,8 +123,6 @@ private:
 #endif
 
     ~MondisClient();
-
-    void updateHeartBeatTime();
 
     void startTransaction();
 
@@ -194,6 +189,15 @@ public:
     MondisClient* client = nullptr;
 };
 
+class BufferedCommand{
+public:
+    string command;
+    int dbIndex = -1;
+    BufferedCommand(){};
+    BufferedCommand(string& cmd):command(cmd){};
+    BufferedCommand(const string& cmd,int di):command(cmd),dbIndex(di){};
+};
+
 class MondisServer {
 private:
     static MondisServer* server;
@@ -201,7 +205,7 @@ private:
     int maxClientNum = 1024;
     int maxCommandReplicaBufferSize = 1024 * 1024;
     int maxSlaveNum = 1024;
-    deque<string> * replicaCommandBuffer = nullptr;
+    deque<BufferedCommand> * replicaCommandBuffer = nullptr;
     bool isSlaveOf = false;
     pid_t pid;
     std::string configfile;

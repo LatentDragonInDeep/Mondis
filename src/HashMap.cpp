@@ -73,7 +73,7 @@ MondisObject *HashMap::get(string &key)
     return obj;
 }
 
-bool HashMap::containsKey (string &key)
+bool HashMap::containsKey(string &key)
 {
     globalMutex.lock_shared();
     if (isValueNull) {
@@ -92,9 +92,9 @@ bool HashMap::containsKey (string &key)
             globalMutex.unlock_shared();
             return false;
         } else {
-            MondisObject *obj = content.tree->get(key);
+            bool existed = content.tree->containsKey(key);
             globalMutex.unlock_shared();
-            return obj!=nullptr;
+            return existed;
         }
     }
     globalMutex.unlock_shared();

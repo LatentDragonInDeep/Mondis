@@ -1022,7 +1022,7 @@ MondisClient *MondisServer::buildConnection(const string &ip, int port) {
     WORD sockVersion = MAKEWORD(2, 2);
     WSADATA data;
     WSAStartup(sockVersion, &data);
-    SOCKET sock = socket(AF_INET, SOCK_STREAM|SOCK_NONBLOCK, IPPROTO_TCP);
+    SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (sock== INVALID_SOCKET) {
         return nullptr;
     }
@@ -1033,6 +1033,8 @@ MondisClient *MondisServer::buildConnection(const string &ip, int port) {
     if (connect(sock, (sockaddr *) &serAddr, sizeof(serAddr)) == SOCKET_ERROR) {
         return res;
     }
+    u_long mode = 1;
+    ioctlsocket(sock,FIONBIO,&mode);
     BOOL noDelay = TRUE;
     setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char FAR *) &noDelay, sizeof(BOOL));
     res = new MondisClient(this, sock);

@@ -234,7 +234,7 @@ private:
     string recoveryStrategy;
     string aofFile;
     string jsonFile;
-    ServerStatus serverStatus;
+    ServerStatus serverStatus = ServerStatus::SV_STAT_UNDETERMINED;
     RunStatus runStatus;
     unordered_map<unsigned, MondisClient *> idToPeers;
     unordered_map<unsigned, MondisClient *> idToClients;
@@ -341,9 +341,8 @@ private:
     thread *msgHandler = nullptr;
     thread *msgWriter = nullptr;
     thread *timer = nullptr;
+    thread* replica = nullptr;
     bool autoMoveCommandToMaster = true;
-
-    void saveAll(const string &jsonFile);
 
     bool forbidOtherModifyInTransaction = false;
 

@@ -69,7 +69,6 @@ private:
     Content * arrayFrom = nullptr;
     Content * arrayTo = nullptr;
     mutex* mutexes = nullptr;
-    shared_mutex globalMutex;
     class MapIterator{
     private:
         KeyValue* cur = nullptr;
@@ -82,6 +81,7 @@ private:
             while (true) {
                 slotIndex++;
                 if (slotIndex >= map->capacity) {
+                    map->globalMutex.unlock();
                     return false;
                 }
                 Content &current = array[slotIndex];
@@ -149,7 +149,6 @@ private:
 public:
     HashMap::MapIterator iterator();
     virtual ExecRes execute(Command *command);
-
     virtual MondisObject *locate(Command *command);
 };
 

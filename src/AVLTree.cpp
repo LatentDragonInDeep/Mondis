@@ -50,10 +50,9 @@ void AVLTree::realInsert(KeyValue *kv) {
 }
 
 void AVLTree::remove(string &key) {
-    KeyValue temp;
-    temp.key = key;
-    realRemove(temp, root);
-    temp.key = nullptr;
+    globalMutex.lock();
+    realRemove(key, root);
+    globalMutex.unlock();
 }
 
 AVLTree::AVLIterator AVLTree::iterator ()
@@ -149,13 +148,13 @@ int AVLTree::getHeight (AVLTreeNode *root)
     return root->height;
 }
 
-void AVLTree::realRemove(KeyValue &kv, AVLTreeNode *root) {
+void AVLTree::realRemove(string &key, AVLTreeNode *root) {
     AVLTreeNode *cur = root;
     while (true) {
         if (cur == nullptr) {
             return;
         }
-        if (kv.equals(*cur->data)) {
+        if (key == cur->data->key) {
             if (cur->left == nullptr && cur->right == nullptr) {
                 if (cur->parent != nullptr) {
                     if (cur == cur->parent->left) {
@@ -213,11 +212,9 @@ void AVLTree::realRemove(KeyValue &kv, AVLTreeNode *root) {
                 return;
             } else {
                 AVLTreeNode *successor = getSuccessor(root);
-                root->data = successor->data;
-                kv.key = successor->data->key;
-                realRemove(kv, root->right);
+                realRemove(successor->data->key, root->right);
             }
-        } else if (kv.compare(*root->data)) {
+        } else if (key.compare(root->data->key)) {
             cur = cur->right;
         } else {
             cur = cur->left;
@@ -252,16 +249,21 @@ AVLTree::~AVLTree() {
 }
 
 void AVLTree::insert(KeyValue *kv) {
+    globalMutex.lock();
     realInsert(kv);
+    globalMutex.unlock();
 }
 
 MondisObject *AVLTree::get(string &key) {
+    globalMutex.lock();
     AVLTreeNode* cur = root;
     while (true) {
         if(cur == nullptr) {
+            globalMutex.unlock();
             return nullptr;
         }
         if(key == cur->data->key) {
+            globalMutex.unlock();
             return cur->data->value;
         } else if(key.compare(cur->data->key)) {
             cur = cur->right;

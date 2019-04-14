@@ -828,9 +828,6 @@ MondisServer::~MondisServer() {
 void MondisServer::replicaToSlave(MondisClient *client, long long slaveReplicaOffset) {
     if (replicaOffset - slaveReplicaOffset > 1000) {
         slaveReplicaOffset = replicaOffset;
-        runStatusMtx.lock();
-        runStatus = RunStatus::PROPAGATING;
-        runStatusMtx.unlock();
         for (int i =0;i<databaseNum;i++) {
             if(dbs[i]!= nullptr) {
                 auto iter = dbs[i]->iterator();
@@ -845,6 +842,9 @@ void MondisServer::replicaToSlave(MondisClient *client, long long slaveReplicaOf
             }
         }
     }
+    runStatusMtx.lock();
+    runStatus = RunStatus::PROPAGATING;
+    runStatusMtx.unlock();
     auto begin  = replicaCommandBuffer->begin()+(replicaCommandBuffer->size()-replicaOffset + slaveReplicaOffset);
     auto end = replicaCommandBuffer->end();
     for (;begin!=end;begin++){
@@ -1570,6 +1570,7 @@ ExecRes MondisServer::beSlaveOf(Command *command, MondisClient *client) {
 
 ExecRes MondisServer::sync(Command *command, MondisClient *client) {
     ExecRes res;
+    res.needReturn = false;
     CHECK_PARAM_NUM(1)
     CHECK_PARAM_TYPE(0, PLAIN)
     CHECK_AND_DEFINE_INT_LEGAL(0, offset);
@@ -1577,7 +1578,10 @@ ExecRes MondisServer::sync(Command *command, MondisClient *client) {
         res.desc = "the target server is not a master";
         LOGIC_ERROR_AND_RETURN
     }
-    replicaToSlave(client, offset);
+    if(replica!= nullptr) {
+        delete replica;
+    }
+    replica = new thread(&MondisServer::replicaToSlave,this,client, offset);
     OK_AND_RETURN
 }
 
@@ -1742,6 +1746,9 @@ ExecRes MondisServer::ensureIdentity(Command *command, MondisClient *client) {
     } else if(PARAM(0) == "slave"){
         if(serverStatus == ServerStatus::SV_STAT_UNDETERMINED) {
             serverStatus = ServerStatus::SV_STAT_MASTER;
+        } else if(serverStatus == ServerStatus::SV_STAT_SLAVE) {
+            res.desc = "target host is a slave";
+            LOGIC_ERROR_AND_RETURN
         }
         if (idToPeers.size() > maxSlaveNum) {
             res.type = LOGIC_ERROR;

@@ -52,11 +52,9 @@ public:
     MondisObject* getByRank(int rank);
     MondisObject* getByRank(SplayTreeNode* root,int rank);
     SplayTreeNode* getNodeByRank(SplayTreeNode* root,int rank);
-
     SplayTreeNode *getNodeByRank(int rank);
     SplayTreeNode* getNodeByScore(int score);
     bool remove(SplayTreeNode* target);
-public:
     bool contains(int score);
     unsigned count(int startScore,int endScore);
     void removeRangeByRank(int start,int end);

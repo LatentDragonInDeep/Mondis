@@ -9,6 +9,7 @@
 #include <stdint-gcc.h>
 #include <unordered_set>
 #include <sstream>
+#include <shared_mutex>
 
 #include "Command.h"
 #include "JSONParser.h"
@@ -32,7 +33,7 @@ class MondisData {
 protected:
     string json;
     bool hasSerialized = false;
-
+    shared_mutex globalMutex;
     virtual void toJson() = 0;
 
 public:

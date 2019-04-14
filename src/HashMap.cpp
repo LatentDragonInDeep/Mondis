@@ -230,6 +230,7 @@ void HashMap::toJson() {
 }
 
 HashMap::MapIterator HashMap::iterator() {
+    globalMutex.lock();
     return HashMap::MapIterator(this);
 }
 

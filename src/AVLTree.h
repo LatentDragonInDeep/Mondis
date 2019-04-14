@@ -79,6 +79,7 @@ private:
 public:
     class AVLIterator {
     private:
+        AVLTree * tree = nullptr;
         AVLTreeNode *cur = nullptr;
         stack<AVLTreeNode*> s;
         void dfs(AVLTreeNode* cur) {
@@ -90,7 +91,7 @@ public:
     public:
         AVLIterator() {};
 
-        AVLIterator(AVLTree *avlTree) : cur(avlTree->root)
+        AVLIterator(AVLTree *avlTree) : tree(avlTree),cur(avlTree->root)
         {
             dfs(cur);
         }
@@ -101,6 +102,7 @@ public:
         bool next() {
             if(s.empty())
             {
+                tree->globalMutex.unlock();
                 return false;
             }
             cur = s.top();
@@ -131,7 +133,7 @@ public:
 private:
     void realInsert(KeyValue *kv);
 
-    void realRemove(KeyValue &kv, AVLTreeNode *root);
+    void realRemove(string &key, AVLTreeNode *root);
     AVLTreeNode* getSuccessor(AVLTreeNode* root);
 
     void leftRotate(AVLTreeNode *root);

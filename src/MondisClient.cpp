@@ -115,7 +115,8 @@ void MondisClient::writeMessage(mondis::Message *msg) {
         hasWrite+=writed;
     }
 #elif defined(linux)
-    while ((writed = send(fd,data->data()+hasWrite,data->length(),0)!=0)) {
+    while (hasWrite<totalLen){
+        writed = send(fd,data->data()+hasWrite,data->length(),0);
         hasWrite+=writed;
     }
 #endif
@@ -148,20 +149,23 @@ void MondisClient::readMessage() {
             nextMsgHasRecv += recved;
         }
 #elif defined(linux)
-        if (nextDataLenBuffer != nullptr) {
-            while (nextDataLenHasRecv < 4) {
-                recved = recv(fd, nextDataLenBuffer + nextDataLenHasRecv, 4 - nextDataLenHasRecv, 0);
-                if (recved == 0) {
-                    return;
-                }
-                nextDataLenHasRecv += recved;
+        while (nextDataLenHasRecv < 4) {
+            recved = recv(fd, nextDataLenBuffer + nextDataLenHasRecv, 4 - nextDataLenHasRecv, 0);
+            if (recved == -1) {
+                return;
             }
-            nextMessageLen = *((unsigned *) nextDataLenBuffer);
+            nextDataLenHasRecv += recved;
+        }
+        for (int i = 0; i <4; ++i) {
+            nextMessageLen |= (((unsigned)nextDataLenBuffer[i])<<(24-i*8));
+        }
+        if (halfPacketBuffer == nullptr) {
+            halfPacketBuffer = new char[nextMessageLen];
             nextMsgHasRecv = 0;
         }
         while (nextMsgHasRecv < nextMessageLen) {
             recved = recv(fd, halfPacketBuffer + nextMsgHasRecv, nextMessageLen - nextMsgHasRecv, 0);
-            if (recved == 0) {
+            if (recved == -1) {
                 return;
             }
             nextMsgHasRecv += recved;

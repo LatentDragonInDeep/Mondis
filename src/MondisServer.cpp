@@ -765,21 +765,32 @@ void MondisServer::acceptSocket() {
         client->ip = inet_ntoa(remoteAddr.sin_addr);
         client->port = ntohs(remoteAddr.sin_port);
         client->id = nextClientId();
+        allModifyMtx.lock();
         idToPeersAndClients[client->id] = client;
         FD_SET(clientSock, &fds);
-        allModifyMtx.lock();
         socketToClient[client->sock] = client;
         allModifyMtx.unlock();
-        clientModifyMtx.lock();
-        idToClients[client->id] = client;
-        clientModifyMtx.unlock();
     }
 #elif defined(linux)
     int socket_fd;
     int clientFd;
+    char * selfIp = nullptr;
+    char hostName[256];
+    ::gethostname(hostName,256);
+    hostent *hostEnt = ::gethostbyname(hostName);
+    in_addr addr;
+    for(int i= 0;;i++)
+    {
+        char *p = hostEnt->h_addr_list[i];
+        if(p == nullptr) {
+            break;
+        }
+        memcpy(&addr.s_addr,p,hostEnt->h_length);
+        selfIp = ::inet_ntoa(addr);
+    }
     sockaddr_in servaddr;
     servaddr.sin_family = PF_INET;
-    servaddr.sin_addr.s_addr = htonl(atoi("127.0.0.1"));
+    servaddr.sin_addr.s_addr = htonl(atoi(selfIp));
     servaddr.sin_port = htons(port);
     socket_fd = socket(AF_INET,SOCK_STREAM,0);
     listen(socket_fd,10);
@@ -797,12 +808,10 @@ void MondisServer::acceptSocket() {
         int noDelay = 1;
         setsockopt(clientFd, IPPROTO_TCP, FNDELAY, &noDelay, sizeof(noDelay));
         allModifyMtx.lock();
+        idToPeersAndClients[client->id] = client;
+        epoll_ctl(clientFd,EPOLL_CTL_ADD,clientFd,&listenEvent);
         fdToClients[clientFd] = client;
         allModifyMtx.unlock();
-        clientModifyMtx.lock();
-        idToClients[client->id]=client;
-        clientModifyMtx.unlock();
-        epoll_ctl(clientFd,EPOLL_CTL_ADD,clientFd,&listenEvent);
     }
 #endif
 }
@@ -865,7 +874,6 @@ void MondisServer::closeClient(MondisClient *client) {
     if (client == nullptr) {
         return;
     }
-#ifdef WIN32
     if (client->type == CLIENT) {
         watchedKeyMtx.lock();
         for (auto &key:client->watchedKeys) {
@@ -880,32 +888,16 @@ void MondisServer::closeClient(MondisClient *client) {
         idToPeers.erase(idToPeers.find(client->id));
         peersModifyMtx.unlock();
     }
+    allModifyMtx.lock();
+#ifdef WIN32
     FD_CLR(client->sock, &fds);
-    allModifyMtx.lock();
     socketToClient.erase(socketToClient.find(client->sock));
-    allModifyMtx.unlock();
 #elif defined(linux)
-    watchedKeyMtx.lock();
-    for (auto &key:client->watchedKeys) {
-        keyToWatchedClients[key].erase(keyToWatchedClients[key].find(client));
-    }
-    watchedKeyMtx.unlock();
     epoll_ctl(epollFd, EPOLL_CTL_DEL, client->fd, nullptr);
-    if(client->type == CLIENT) {
-        clientModifyMtx.lock();
-        idToClients.erase(idToClients.find(client->id));
-        clientModifyMtx.unlock();
-    } else if(client->type == PEER) {
-        peersModifyMtx.lock();
-        idToPeers.erase(idToPeers.find(client->id));
-        peersModifyMtx.unlock();
-    }
-    idToPeersAndClients.erase(client->id);
-    allModifyMtx.lock();
     fdToClients.erase(fdToClients.find(client->fd));
-    allModifyMtx.unlock();
 #endif
     idToPeersAndClients.erase(client->id);
+    allModifyMtx.unlock();
     delete client;
 }
 
@@ -1030,8 +1022,8 @@ MondisClient *MondisServer::buildConnection(const string &ip, int port) {
     WORD sockVersion = MAKEWORD(2, 2);
     WSADATA data;
     WSAStartup(sockVersion, &data);
-    SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if ( sock== INVALID_SOCKET) {
+    SOCKET sock = socket(AF_INET, SOCK_STREAM|SOCK_NONBLOCK, IPPROTO_TCP);
+    if (sock== INVALID_SOCKET) {
         return nullptr;
     }
     sockaddr_in serAddr;
@@ -1041,30 +1033,31 @@ MondisClient *MondisServer::buildConnection(const string &ip, int port) {
     if (connect(sock, (sockaddr *) &serAddr, sizeof(serAddr)) == SOCKET_ERROR) {
         return res;
     }
-    unsigned long iMode = 1;
-    ioctlsocket(sock, FIONBIO, &iMode);
-    BOOL bNoDelay = TRUE;
-    setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char FAR *) &bNoDelay, sizeof(BOOL));
+    BOOL noDelay = TRUE;
+    setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char FAR *) &noDelay, sizeof(BOOL));
     res = new MondisClient(this, sock);
     allModifyMtx.lock();
     socketToClient[sock] = res;
     allModifyMtx.unlock();
 #elif defined(linux)
-    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    int sockFd = socket(AF_INET, SOCK_STREAM|SOCK_NONBLOCK, IPPROTO_TCP);
+    if(sockFd == -1) {
+        return nullptr;
+    }
     sockaddr_in serAddr;
     serAddr.sin_family = AF_INET;
     serAddr.sin_port = htons((u_int16_t)port);
-    inet_pton(AF_INET,ip.c_str(),&serAddr.sin_addr);
-    int masterFd;
-    if((masterFd = connect(sockfd, (struct sockaddr*)&serAddr, sizeof(serAddr)))<0) {
+    serAddr.sin_addr.s_addr = inet_addr(ip.c_str());
+    int connectFd;
+    if((connectFd = connect(sockFd, (struct sockaddr*)&serAddr, sizeof(serAddr)))<0) {
         return res;
     }
-    int flags = fcntl(sockfd, F_GETFL, 0);
-    fcntl(sockfd, F_SETFL, flags | O_NONBLOCK);
-    res = new MondisClient(this,masterFd);
+    int noDelay = 1;
+    setsockopt(connectFd, IPPROTO_TCP,FNDELAY, &noDelay, sizeof(int));
+    res = new MondisClient(this,connectFd);
     allModifyMtx.lock();
-    epoll_ctl(m->fd,EPOLL_CTL_ADD,m->fd,&listenEvent);
-    fdToClients[sockFd] = res;
+    epoll_ctl(epollFd,EPOLL_CTL_ADD,connectFd,&listenEvent);
+    fdToClients[connectFd] = res;
     allModifyMtx.unlock();
 #endif
     res->ip = ip;
@@ -1250,6 +1243,8 @@ void MondisServer::selectAndHandle() {
             if(events[i].events&EPOLLRDHUP){
                 closeClient(fdToClients[client->fd]);
             } else {
+                MondisClient *client = pair.second;
+                mondis::Message* msg = nullptr;
                 while ((msg = client->nextMessage())!= nullptr) {
                     Action action;
                     action.msg = msg;
@@ -1447,25 +1442,13 @@ ExecRes MondisServer::save(Command *command, MondisClient *client) {
         LOGIC_ERROR_AND_RETURN
     }
     string jsonFile = (*command)[0].content;
-#ifdef WIN32
     ofstream out(jsonFile + "2");
     out << dbs[client->dBIndex]->getJson();
     out.flush();
     remove(jsonFile.c_str());
     out.close();
     rename((jsonFile + "2").c_str(), jsonFile.c_str());
-#elif defined(linux)
-    int pid = fork();
-    if(pid == 0) {
-        ofstream out(jsonFile + "2");
-        out << dbs[client->dBIndex]->getJson();
-        out.flush();
-        remove(jsonFile.c_str());
-        out.close();
-        rename((jsonFile + "2").c_str(), jsonFile.c_str());
-        exit(0);
-    }
-#endif
+    exit(0);
     OK_AND_RETURN
 }
 
@@ -1474,7 +1457,6 @@ ExecRes MondisServer::saveAll(Command *command, MondisClient *client) {
     CHECK_PARAM_NUM(1)
     CHECK_PARAM_TYPE(0, PLAIN)
     string jsonFile = (*command)[0].content;
-#ifdef WIN32
     string *temp = new string;
     getJson(temp);
     ofstream out(jsonFile + "2");
@@ -1484,22 +1466,7 @@ ExecRes MondisServer::saveAll(Command *command, MondisClient *client) {
     out.close();
     delete temp;
     rename((jsonFile + "2").c_str(), jsonFile.c_str());
-#elif defined(linux)
-    int pid = fork();
-        if(pid == 0) {
-            string* temp = new string;
-            getJson(temp);
-            ofstream out(jsonFile + "2");
-            out << temp;
-            out.flush();
-            remove(jsonFile.c_str());
-            out.close();
-            delete temp;
-            rename((jsonFile + "2").c_str(), jsonFile.c_str());
-            exit(0);
-        }
-#endif
-     OK_AND_RETURN
+    OK_AND_RETURN
 }
 
 ExecRes MondisServer::renameKey(Command *command, MondisClient *client) {
@@ -1721,6 +1688,7 @@ ExecRes MondisServer::ensureIdentity(Command *command, MondisClient *client) {
             msg->set_res_type(mondis::ExecResType::LOGIC_ERROR);
             msg->set_content(res.toString());
             client->writeMessage(msg);
+            allModifyMtx.lock();
 #ifdef WIN32
             FD_CLR(client->sock, &fds);
             socketToClient.erase(socketToClient.find(client->sock));
@@ -1729,6 +1697,7 @@ ExecRes MondisServer::ensureIdentity(Command *command, MondisClient *client) {
             fdToClients.erase(fdToClients.find(client->fd));
 #endif
             idToPeersAndClients.erase(idToClients.find(client->id));
+            allModifyMtx.unlock();
             delete client;
             LOGIC_ERROR_AND_RETURN
         } else {
@@ -1740,7 +1709,9 @@ ExecRes MondisServer::ensureIdentity(Command *command, MondisClient *client) {
         }
     } else if (PARAM(0) == "peer") {
         client->type = ClientType ::PEER;
+        peersModifyMtx.lock();
         idToPeers[client->id] = client;
+        peersModifyMtx.unlock();
         res.needReturn = false;
         OK_AND_RETURN
     } else if(PARAM(0) == "slave"){
@@ -1758,6 +1729,7 @@ ExecRes MondisServer::ensureIdentity(Command *command, MondisClient *client) {
             msg->set_res_type(mondis::ExecResType::LOGIC_ERROR);
             msg->set_content(res.toString());
             client->writeMessage(msg);
+            allModifyMtx.lock();
 #ifdef WIN32
             FD_CLR(client->sock, &fds);
             socketToClient.erase(socketToClient.find(client->sock));
@@ -1766,6 +1738,7 @@ ExecRes MondisServer::ensureIdentity(Command *command, MondisClient *client) {
             fdToClients.erase(fdToClients.find(client->fd));
 #endif
             idToPeersAndClients.erase(idToClients.find(client->id));
+            allModifyMtx.unlock();
             delete client;
             LOGIC_ERROR_AND_RETURN
         } else {

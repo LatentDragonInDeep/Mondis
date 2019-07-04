@@ -1,99 +1,57 @@
 # Mondis
 Mondis is a key-value database powered by redis and addToSlot some new feature。
 # 什么是Mondis
-Mondis是一个key-value数据库，它很像redis，但是支持许多redis不支持的新特性。实际上，它的名字mondis就是取自mongodb与redis。
-下面，让我们了解以及学习如何来使用它。
+Mondis是一个key-value数据库，它很像redis，但是支持许多redis不支持的新特性。实际上，它的名字mondis就是取自mongodb与redis。下面，让我们了解以及学习如何来使用它。
 # 选择mondis的理由
 ## mondis嵌套
-mondis支持数据结构的任意嵌套，mondis键的取值只能是字符串，但是值的取值可以是string,list,set,zset,hash的任意一种。
-mondis嵌套意味着list,zset的元素与hash类型键值对的值可以是另一个list,set,zset或者hash，就像json
-那样。注意，set类型的元素只能是string，这是因为set底层采用hash表进行实现，而list,zset与hash没有默认的哈希函数。
+mondis支持数据结构的任意嵌套，mondis键的取值只能是字符串，但是值的取值可以是string,list,set,zset,hash的任意一种。mondis嵌套意味着list,zset的元素与hash类型键值对的值可以是另一个list,set,zset或者hash，就像json那样。注意，set类型的元素只能是string，这是因为set底层采用hash表进行实现，而list,zset与hash没有默认的哈希函数。mondis支持任意复杂，任意深度的嵌套。
 ## json支持
-mondis查询类似于redis查询，但是不同的是mondis查询返回的格式是json。这使得mondis更方便使用。而且mondis
-支持json持久化与恢复。
+mondis查询类似于redis查询，但是不同的是mondis查询返回的格式是json。这使得mondis更方便使用。而且mondis支持json持久化与恢复。
 ## 自动转化数据结构
-mondis可以把json格式的value自动转化为对应的数据结构。例如，""this is a test""将会被解析成一个RAW_STRING，内容是
-this is a test。注意这里出现了两对引号，这样做的原因是外面的一对引号表明这是一个string参数，内部的一对引号是
-json字符串表示法的引号。""12345""将会被解析成RAW_INT编码的12345。如果想要使用RAW_BIN编码，可以在
-二进制字符串的最开始加上LatentDragon这十二个字符。例如，""LatentDragonxxx""将会被解析成RAW_BIN编码的
-xxxx,开头的LatentDragon将被忽略。注意所有以LatentDragon开头的字符串都将被解析成RAW_BIN，也就是说我们无法
-保存普通的以LatentDragon开头的RAW_STRING。这个缺陷无伤大雅，而且会在后续版本中修复。"{}"将会被解析成没有键值对的hash。
-"[]"将会被解析成没有元素的list,"["LIST"]"同样是list,"["SET"]"则是空的set,"["ZSET"]"则是空的zset。
- "[{}]"则会被解析成有一个hash元素的list。自动转化的数据结构支持任意形式和深度的嵌套，就像在第一条中所说的那样。
+mondis可以把json格式的value自动转化为对应的数据结构。例如，"this is a test"将会被解析成一个字符串类型的value，内容是this is a test。"{}"将会被解析成没有键值对的hash。"[]"将会被解析成没有元素的list,但是set和zset同样对应json中的list，这时候就要采用一种区分方式，mondis采用的是根据地一个元素区别，默认是list，如果第一个元素是"LIST"，那么就会被解析为list，set和zset同理。"[{“this is a test”}]"则会被解析成有一个hash元素的list，这个list里面有一个元素，这个元素是字符串this is a test。自动转化的数据结构支持任意形式和深度的嵌套，就像在第一条中所说的那样。
 ## mondis多态命令
 在redis里面，我们在操作的时候必须指定底层数据的类型，比如list命令全部以l开头，zset命令全部以z开头，hash命令全部以hash开头，
 但是在mondis里面，这些统统不需要。mondis命令具有多态性，相同的命令在不同数据结构上的效果是不同的，只需要执行命令而无需关心底层数据结构是
 什么。如果执行了不合适的命令，mondis会处理这种情况，不用担心崩溃。
 ## mondis定位命令
-由于mondis支持任意嵌套，有时候我们要操作一个嵌套层数很深的数据对象，此时就需要用到定位命令。
-定位命令是locate，它可以具有不定数量的参数。它的作用就是定位到当前要操作的数据对象上，然后执行操作命令。
+由于mondis支持任意嵌套，有时候我们要操作一个数据对象的一部分，它的嵌套层数很深，此时就需要用到定位命令。定位命令是locate，它的作用是定位到你要操作的部分上面。locate命令可以连续使用，每一条locate命令递进一层，locate命令之间用|隔开。假如目前键空间里面有一个list，它的key是test，你要对这个list的第一个元素执行某些操作，需要这样写：locate test|locate 0|你要执行的命令。
 多个locate命令之间需要以|分隔，看上去就像linux的管道命令。
-## 二进制支持
-mondis添加了对于二进制数据的支持，类似于java的bytebuffer，并且完美支持bytebuffer的所有操作。
 ## mondis持久化
-mondis支持两种持久化方式，json与aof。json类似于rdb，但是持久化的格式是完全兼容的json，
-这使得持久化文件方便迁移并解析。aof持久化则与redis的aof完全相同，除了命令格式。但是目前mondis还不支持aof重写。
+mondis支持两种持久化方式，json与aof。json类似于rdb，但是持久化的格式是json，这使得持久化文件方便迁移并解析。aof持久化则与redis的aof完全相同，除了命令格式。但是目前mondis还不支持aof重写。
 ## 跨平台
-Mondis在设计的时候已经考虑到了平台兼容性的问题，mondis是跨平台的，在windows以及unix系统上都能正常使用。
-不过要在各自的平台上编译二进制文件。
+Mondis在设计的时候已经考虑到了平台兼容性的问题，mondis是跨平台的，在windows以及unix系统上都能正常使用。不过要在各自的平台上编译二进制文件。
 ## 事务支持回滚
-Mondis的事务支持回滚，就像传统关系型数据库那样。这意味着如果在事务执行过程中某条命令没有执行成功，已经执行的命令就会
-回滚，就像从来没有执行过这条命令一样。然后事务的执行状态将会被重置。
+Mondis的事务支持回滚，就像传统关系型数据库那样。这意味着如果在事务执行过程中某条命令没有执行成功，已经执行的命令就会回滚，就像从来没有执行过这条命令一样。然后事务的执行状态将会被重置。
 ## 集群raft支持
-mondis的集群采用了raft算法实现最终一致性，这意味着如果leader节点在任意时刻挂掉了，集群都不会因此受到影响。
-raft算法会处理好所有的一切，包括重新选leader，以及同步到其他所有节点。
+mondis的主从复制集群采用了raft算法实现最终一致性，这意味着如果leader节点在任意时刻挂掉了，集群都不会因此受到影响。raft算法会处理好所有的一切，包括重新选leader，以及同步到其他所有节点。
 ## 写命令重定向
-mondis slave节点可以自动将收到的写命令转发到master节点执行，这个行为对客户端是完全透明的。这意味着如果a,b,c
-组成了一个集群，a是master,b,c是slave，那么b,c收到的写命令将会自动转发给a执行，b,c的客户端对此毫不知情，
-就好像这条命令是由b,c执行的一样。此功能需要在配置文件中开启，如果没开启，那么slave节点在收到写命令后拒绝执行
-并返回一个错误。
+mondis slave节点可以自动将收到的写命令转发到master节点执行，这个行为对客户端是完全透明的。这意味着如果a,b,c组成了一个集群，a是master,b,c是slave，那么b,c收到的写命令将会自动转发给a执行，b,c的客户端对此毫不知情，就好像这条命令是由b,c执行的一样。此功能需要在配置文件中开启，如果没开启，那么slave节点在收到写命令后拒绝执行并返回一个错误。
 ## mondis底层实现相对于redis的改进
 ### list
-在mondis里面，list还是用链表实现。不同的是mondis保存了对象指针与索引的双向映射，这样虽然多占用了一些空间，
-不过支持元素的随机访问。list同时支持redis里面的list所有操作。这些操作的均摊时间复杂度均为常数。
+在mondis里面，list还是用链表实现。不同的是mondis保存了对象指针与索引的双向映射，这样虽然多占用了一些空间，不过支持元素的随机访问。list同时支持redis里面的list所有操作。这些操作的均摊时间复杂度均为常数。
 ### set
-mondis的set采用的是value为空的hash表进行实现，听起来似乎与redis没什么不同，但是mondis的hashmap采用avl树解决哈希冲突，
-减小了哈希表操作的常数因子。
+mondis的set采用的是value为空的hash表进行实现，听起来似乎与redis没什么不同，但是mondis的hashmap采用avl树解决哈希冲突，减小了哈希表操作的常数因子。
 ### zset
-redis的zset采用跳表+哈希表实现，编码异常复杂，空间占用也没很大优势。
-mondis的zset采用伸展树实现，在时间与空间复杂度上进行了很好的权衡，而且伸展树方便的支持区间操作。
+redis的zset采用跳表+哈希表实现，编码异常复杂，空间占用也没很大优势。mondis的zset采用伸展树实现，在时间与空间复杂度上进行了很好的权衡，而且伸展树方便的支持区间操作。
 ### hash
-redis的hash在键值对数量不多时采用ziplist，虽然空间
-占用小，但是查询时必须线性扫描，而且插入时有可能连锁更新影响性能。
-在键值对数量较多时采用哈希表，浪费大量空间。
-mondis的hash采用平衡树实现，在时间与空间复杂度上进行了很好的权衡。
+redis的hash在键值对数量不多时采用ziplist，虽然空间占用小，但是查询时必须线性扫描，而且插入时有可能连锁更新影响性能。在键值对数量较多时采用哈希表，浪费大量空间。mondis的hash采用平衡树实现，在时间与空间复杂度上进行了很好的权衡。
 # 开始使用Mondis
-使用Mondis非常简单，首先需要取得Mondis的可执行文件，然后在终端输入./mondis xxx.conf。这时候可以
-看到终端上打印出启动信息，表示Mondis启动成功。xxx.conf即配置文件路径，如果不指定配置文件，Mondis将
-以默认配置启动。
-Mondis启动后并不能立即使用。实际上，你需要登录才能执行命令。登录的命令是login username password。
-username与password可以在配置文件中指定，如果没有配置文件，默认的username为root，password为admin。
-其他命令将在下面介绍。
+使用Mondis非常简单，首先需要取得Mondis的可执行文件，然后在终端输入./mondis xxx.conf。这时候可以看到终端上打印出启动信息，表示Mondis启动成功。xxx.conf即配置文件路径，如果不指定配置文件，Mondis将以默认配置启动。
+Mondis启动后并不能立即使用。实际上，你需要登录才能执行命令。登录的命令是login username password。username与password可以在配置文件中指定，如果没有配置文件，默认的username为root，password为admin。其他命令将在下面介绍。
 # mondis的数据结构
 mondis支持redis所支持的全部数据结构，除此之外，mondis还支持二进制数据。也就是说Mondis支持string,list,set,zset,hash,binary
 六种数据结构。下面一一进行介绍。
 ## string
 顾名思义，string就是字符串，它跟redis的string，以及其他编程语言中的字符串并没有任何不同。但是string有两种编码方式,RAW_STRING和RAW_INT.
 RAW_STRING就是字符串编码，如果string可以被转化为一个int的话，那么它将采用RAW_INT编码，这意味着在内存中它将是一个int。序列化结果是一个字符串。
-## binary
-即二进制数据，表现为内存中一块连续的char数组，长度不可变。支持随机访问和读写操作。序列化结果是一个字符串。
 ## list
-即列表，相当于java里面的LinkedList，但是支持随机访问，时间复杂度为常数。除此之外还支持双端队列操作，即push_front,
-push_bakc,pop_front和pop_back。list里面的元素可以是任意类型。序列化结果是一个json数组，内部元素按照list内部顺序排列。
-但是第一个元素是一个"LIST"字符串，表明这是一个LIST序列化的结果，用于反序列化时参考。
+即列表，相当于java里面的LinkedList，但是支持随机访问，时间复杂度为常数。除此之外还支持双端队列操作，即push_front,push_bakc,pop_front和pop_back。list里面的元素可以是任意类型。序列化结果是一个json数组，内部元素按照list内部顺序排列。但是第一个元素是一个"LIST"字符串，表明这是一个LIST序列化的结果，用于反序列化时参考。
 ## set
-即集合，集合中不包含重复的元素，而且集合中的元素是无序的。集合支持add,remove,size和exists操作，时间复杂度均为常数。
-与list不同，集合中的元素只能是string或者binary。序列化结果是一个json数组，内部元素顺序未定义。但是第一个元素是一个
-"SET"字符串，表明这是一个SET序列化的结果，用于反序列化时参考。
+即集合，集合中不包含重复的元素，而且集合中的元素是无序的。集合支持add,remove,size和exists操作，时间复杂度均为常数。与list不同，集合中的元素只能是string或者binary。序列化结果是一个json数组，内部元素顺序未定义。但是第一个元素是一个"SET"字符串，表明这是一个SET序列化的结果，用于反序列化时参考。
 ## zset
-即有序集合，在存取元素时需要指定一个int的score，内部元素根据score从小到大有序。但是score不能指定int类型的极值。
-zset里面的元素可以是任意类型，支持set的所有操作，同时支持根据rank的区间访问，区间删除和根据score的区间访问，区间删除，
-还有更改一个元素的score。序列化结果是一个json数组，元素是内部元素，顺序按score从大到小排列。但是第一个元素是一个"ZSET"字符串，
-表明这是一个ZSET序列化的结果，用于反序列化时参考。zset的序列化把四个字节的score作为一个元素以string形式添加到对应元素序列化结果
-的前面。
+即有序集合，在存取元素时需要指定一个int的score，内部元素根据score从小到大有序。但是score不能指定int类型的极值。zset里面的元素可以是任意类型，支持set的所有操作，同时支持根据rank的区间访问，区间删除和根据score的区间访问，区间删除，还有更改一个元素的score。序列化结果是一个json数组，元素是内部元素，顺序按score从大到小排列。但是第一个元素是一个"ZSET"字符串，表明这是一个ZSET序列化的结果，用于反序列化时参考。zset的序列化把四个字节的score转化为一个四字节大小的byte数组放在对应的元素前面。
 ## hash
-即键值对的集合，key只能是RAW_STRING编码的string，值可以是任意类型。支持add,remove,size和exists操作。
-序列化结果是一个json对象，键值对即hash的键值对。
+即键值对的集合，key只能是RAW_STRING编码的string，值可以是任意类型。支持add,remove,size和exists操作。序列化结果是一个json对象，键值对即hash的键值对。
 # Mondis命令
 ## 概述
 mondis有很多命令，分为键空间命令，控制命令，locate命令与数据对象命令。键空间命令即直接在数据库空间执行的命令，
@@ -151,8 +109,6 @@ mondis不提供bgsave。
 ### unwatch &lt;key&gt;
 取消监视当前键空间为key的键。
 
-
-
 ## string命令
 string命令分为两大类，有些只能在RAW_INT上执行，有些可以在RAW_STRING上执行。下面分别介绍
 ## RAW_STRING命令
@@ -182,37 +138,6 @@ string命令分为两大类，有些只能在RAW_INT上执行，有些可以在R
 值减去增量。
 ### to_string
 将底层编码变成RAW_STRING
-
-## binary命令
-## get &lt;position&gt; 
-返回position处的字符。
-### set &lt;position&gt; [char]
-设置position处的字符为char。char的长度必须为1。
-### set_position &lt;pos&gt;
-将当前读写指针设为pos。
-### forward &lt;increment&gt;
-读写指针前进increment字节。
-### backward &lt;decrement&gt;
-读写指针后退decrement
-###read系列命令
-read系列命令在剩余长度小于想要读取的长度时，会读到末尾，直接返回。
-### read_char
-从当前读写指针读一个字节
-### read_short
-从当前读写指针读两个字节
-### read_int
-从当前读写指针读四个字节
-### read_long
-从当前读写指针读八个字节
-### read_long_long
-从当前读写指针读十六个字节
-### read &lt;length&gt;
-从当前读写指针读length个字节。如果省略参数，会一次性读完剩下所有字节。
-### write &lt;length&gt; [data]
-从当前读写指针开始从data里面读取length个字节长度的数据到binary里面。data的长度必须大于等于length，
-如果剩余可读区间小于length，则length多余的部分会被截断。
-### check_pos
-返回当前读写指针的位置。
 
 ## list命令
 ### set &lt;index&gt; [data]

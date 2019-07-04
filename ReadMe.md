@@ -15,7 +15,6 @@ mondis可以把json格式的value自动转化为对应的数据结构。例如�
 什么。如果执行了不合适的命令，mondis会处理这种情况，不用担心崩溃。
 ## mondis定位命令
 由于mondis支持任意嵌套，有时候我们要操作一个数据对象的一部分，它的嵌套层数很深，此时就需要用到定位命令。定位命令是locate，它的作用是定位到你要操作的部分上面。locate命令可以连续使用，每一条locate命令递进一层，locate命令之间用|隔开。假如目前键空间里面有一个list，它的key是test，你要对这个list的第一个元素执行某些操作，需要这样写：locate test|locate 0|你要执行的命令。
-多个locate命令之间需要以|分隔，看上去就像linux的管道命令。
 ## mondis持久化
 mondis支持两种持久化方式，json与aof。json类似于rdb，但是持久化的格式是json，这使得持久化文件方便迁移并解析。aof持久化则与redis的aof完全相同，除了命令格式。但是目前mondis还不支持aof重写。
 ## 跨平台
